@@ -349,6 +349,13 @@ void handle_hypercall_kafl_release(struct kvm_run *run, CPUState *cpu, uint64_t 
 		if (init_state){
 			init_state = false;	
 		} else {
+			//printf(CORE_PREFIX, "Got STARVED notification (num=%llu)\n", run->hypercall.args[0]);
+			if (run->hypercall.args[0] > 0) {
+				GET_GLOBAL_STATE()->starved = 1;
+			} else {
+				GET_GLOBAL_STATE()->starved = 0;
+			}
+
 			synchronization_disable_pt(cpu);
 			release_print_once(cpu);
 		}

@@ -291,7 +291,12 @@ void synchronization_lock(void){
 	pthread_mutex_unlock(&synchronization_lock_mutex);
 
 	check_auxiliary_config_buffer(GET_GLOBAL_STATE()->auxilary_buffer, &GET_GLOBAL_STATE()->shadow_config);
-	set_success_auxiliary_result_buffer(GET_GLOBAL_STATE()->auxilary_buffer, 1);
+
+	//set_success_auxiliary_result_buffer(GET_GLOBAL_STATE()->auxilary_buffer, 1);
+	if (GET_GLOBAL_STATE()->starved == true)
+		set_success_auxiliary_result_buffer(GET_GLOBAL_STATE()->auxilary_buffer, 2);
+	else
+		set_success_auxiliary_result_buffer(GET_GLOBAL_STATE()->auxilary_buffer, 1);
 
 	GET_GLOBAL_STATE()->pt_trace_size = 0;
 	/*

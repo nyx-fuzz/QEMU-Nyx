@@ -229,7 +229,12 @@ void reset_page_not_found_result_buffer(auxilary_buffer_t* auxilary_buffer){
 }
 
 void set_success_auxiliary_result_buffer(auxilary_buffer_t* auxilary_buffer, uint8_t success){
-  VOLATILE_WRITE_8(auxilary_buffer->result.exec_result_code, rc_success);
+  //should refactor to let caller directly set the result codes
+  if (success == 2) {
+	  VOLATILE_WRITE_8(auxilary_buffer->result.exec_result_code, rc_starved);
+  } else {
+	  VOLATILE_WRITE_8(auxilary_buffer->result.exec_result_code, rc_success);
+  }
 }
 
 void set_payload_buffer_write_reason_auxiliary_buffer(auxilary_buffer_t* auxilary_buffer, char* msg, uint32_t len){

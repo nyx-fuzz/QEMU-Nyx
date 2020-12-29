@@ -45,6 +45,7 @@ enum nyx_result_codes {
   rc_input_buffer_write = 4,
   rc_aborted = 5,
   rc_sanitizer = 6, 
+  rc_starved = 7,
 };
 
 typedef struct auxilary_buffer_header_s{
