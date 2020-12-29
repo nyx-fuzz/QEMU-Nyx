@@ -463,7 +463,7 @@ static void handle_hypercall_kafl_submit_kasan(struct kvm_run *run, CPUState *cp
 
 //#define PANIC_DEBUG
 
-static void handle_hypercall_kafl_panic(struct kvm_run *run, CPUState *cpu, uint64_t hypercall_arg){
+void handle_hypercall_kafl_panic(struct kvm_run *run, CPUState *cpu, uint64_t hypercall_arg){
 	static char reason[1024];
 	if(hypercall_enabled){
 #ifdef PANIC_DEBUG

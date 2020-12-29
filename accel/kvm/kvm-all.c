@@ -2562,18 +2562,23 @@ int kvm_cpu_exec(CPUState *cpu)
             ret = EXCP_INTERRUPT;
             break;
         case KVM_EXIT_SHUTDOWN:
-            DPRINTF("shutdown\n");
 #ifndef QEMU_NYX
             qemu_system_reset_request(SHUTDOWN_CAUSE_GUEST_RESET);
             ret = EXCP_INTERRUPT;
 #else
-            fprintf(stderr, "ATTEMPT TO SHUTDOWN MACHINE (KVM_EXIT_SHUTDOWN)!\n");
             if(GET_GLOBAL_STATE()->in_fuzzing_mode){
+#define CONFIG_KVM_EXIT_SHUTODWN_IS_PANIC // consider triple-fault etc as crash?
+#ifndef CONFIG_KVM_EXIT_SHUTODWN_IS_PANIC
                 /* Fuzzing is enabled at this point -> don't exit */
+				fprintf(stderr, "Got KVM_EXIT_SHUTDOWN while in fuzzing mode => reload\n",);
                 handle_hypercall_kafl_release(run, cpu, (uint64_t)run->hypercall.args[0]);
-                ret = 0;
-            }
-            else{
+				ret = 0;
+#else
+				debug_fprintf(stderr "Got KVM_EXIT_SHUTDOWN while in fuzzing mode => panic\n",);
+				handle_hypercall_kafl_panic(run, cpu, (uint64_t)run->hypercall.args[0]);
+				ret = 0;
+#endif
+            } else{
                 qemu_system_reset_request(SHUTDOWN_CAUSE_GUEST_RESET);
                 ret = EXCP_INTERRUPT;
             }
@@ -2684,8 +2689,16 @@ int kvm_cpu_exec(CPUState *cpu)
 #ifndef QEMU_NYX
             DPRINTF("kvm_arch_handle_exit\n");
 #else
-            printf("kvm_arch_handle_exit => %d\n", run->exit_reason);
+#define CONFIG_UNKNOWN_ERROR_IS_PANIC
+#ifndef CONFIG_UNKNOWN_ERROR_IS_PANIC
+			fprintf(stderr, "Unknown exit code (%d) => ABORT\n", run->exit_reason);
             assert(false);
+			ret = kvm_arch_handle_exit(cpu, run);
+#else
+            debug_fprintf("kvm_arch_handle_exit(%d) => panic\n", run->exit_reason);
+			handle_hypercall_kafl_panic(run, cpu, (uint64_t)run->hypercall.args[0]);
+            ret = 0;
+#endif
 #endif
             ret = kvm_arch_handle_exit(cpu, run);
             break;
