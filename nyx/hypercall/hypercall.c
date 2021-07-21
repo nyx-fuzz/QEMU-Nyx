@@ -727,68 +727,90 @@ void pt_disable_rqi_trace(CPUState *cpu){
 	}
 }
 
-static void handle_hypercall_kafl_dump_file(struct kvm_run *run, CPUState *cpu, uint64_t hypercall_arg){
-
-	/* TODO: check via aux buffer if we should allow this hypercall during fuzzing */
-	/*
-	if(GET_GLOBAL_STATE()->in_fuzzing_mode){
-		return;
-	}
-	*/
-
+static void handle_hypercall_kafl_dump_file(struct kvm_run *run, CPUState *cpu, uint64_t hypercall_arg)
+{
+	kafl_dump_file_t file_obj;
 	char filename[256] = {0};
+	char* host_path = NULL;
+	FILE* f = NULL;
 
 	uint64_t vaddr = hypercall_arg;
-	kafl_dump_file_t file_obj;
 	memset((void*)&file_obj, 0, sizeof(kafl_dump_file_t));
 
+	if (!read_virtual_memory(vaddr, (uint8_t*)&file_obj, sizeof(kafl_dump_file_t), cpu)){
+		fprintf(stderr, "Failed to read file_obj in %s. Skipping..\n", __func__);
+		goto err_out1;
+	}
 
-	if(read_virtual_memory(vaddr, (uint8_t*)&file_obj, sizeof(kafl_dump_file_t), cpu)){
-
-		void* page = malloc(0x1000);
+	if (!read_virtual_memory(file_obj.file_name_str_ptr, (uint8_t*)filename, 255, cpu)) {
+		fprintf(stderr, "Failed to read file_name_str_ptr in %s. Skipping..\n", __func__);
+		goto err_out1;
+	}
+	filename[255] = 0;
 	
-		read_virtual_memory(file_obj.file_name_str_ptr, (uint8_t*)&filename, sizeof(char)*256, cpu);
-		filename[255] = 0;
+	//fprintf(stderr, "%s: dump %lu fbytes from %s (append=%u)\n",
+	//	   	__func__, file_obj.bytes, filename, file_obj.append);
 
-    char* base_name = basename(filename);		
-		char* host_path = NULL;
-
+	if (strnlen(filename, sizeof(filename))) {
+		char *base_name = basename(filename);
 		assert(asprintf(&host_path, "%s/dump/%s", GET_GLOBAL_STATE()->workdir_path , base_name) != -1);
-		//fprintf(stderr, "dumping file %s -> %s (bytes %ld) in append_mode=%d\n", base_name, host_path, file_obj.bytes, file_obj.append);
-
-    FILE* f = NULL;
 
 		if(file_obj.append){
-	  	f = fopen(host_path, "a+");
+			f = fopen(host_path, "a+");
+		} else{
+			f = fopen(host_path, "w+");
 		}
-		else{
-    	f = fopen(host_path, "w+");
+	} else { // no filename given - create tempfile
+		if (file_obj.append) {
+			fprintf(stderr, "Error request to append but no filename given in %s\n", __func__);
+			goto err_out1;
 		}
-
-		int32_t bytes = file_obj.bytes;
-		uint32_t pos = 0;
-
-		while(bytes > 0){
-
-			if(bytes >= 0x1000){
-				read_virtual_memory(file_obj.data_ptr+pos, (uint8_t*)page, 0x1000, cpu);
-				fwrite(page, 1, 0x1000, f);
-			}
-			else{
-				read_virtual_memory(file_obj.data_ptr+pos, (uint8_t*)page, bytes, cpu);
-				fwrite(page, 1, bytes, f);
-			}
-
-			bytes -= 0x1000;
-			pos += 0x1000;
-		}
-
-
-		fclose(f);
-		free(host_path);
-		free(page);
-		
+	
+		assert(asprintf(&host_path, "%s/dump/tmp.XXXXXX", GET_GLOBAL_STATE()->workdir_path) != -1);
+		f = fdopen(mkstemp(host_path), "w+");
 	}
+
+	if (!f) {
+		fprintf(stderr, "Error in %s(%s): %s\n", host_path, __func__, strerror(errno));
+		goto err_out1;
+	}
+
+	uint32_t pos = 0;
+	int32_t bytes = file_obj.bytes;
+	void* page = malloc(PAGE_SIZE);
+	uint32_t written = 0;
+
+	QEMU_PT_PRINTF(CORE_PREFIX, "%s: dump %d bytes to %s (append=%u)\n",
+			__func__, bytes, host_path, file_obj.append);
+
+	while (bytes > 0) {
+
+		if (bytes >= PAGE_SIZE) {
+			read_virtual_memory(file_obj.data_ptr+pos, (uint8_t*)page, PAGE_SIZE, cpu);
+			written = fwrite(page, 1, PAGE_SIZE, f);
+		}
+		else {
+			read_virtual_memory(file_obj.data_ptr+pos, (uint8_t*)page, bytes, cpu);
+			written = fwrite(page, 1, bytes, f);
+			break;
+		}
+
+		if (!written) {
+			fprintf(stderr, "Error in %s(%s): %s\n", host_path, __func__, strerror(errno));
+			goto err_out2;
+		}
+
+		bytes -= written;
+		pos += written;
+
+	}
+
+
+err_out2:
+	free(page);
+	fclose(f);
+err_out1:
+	free(host_path);
 }
 
 static void handle_hypercall_kafl_persist_page_past_snapshot(struct kvm_run *run, CPUState *cpu, uint64_t hypercall_arg){
