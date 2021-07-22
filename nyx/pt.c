@@ -34,9 +34,12 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 #include "nyx/memory_access.h"
 #include "nyx/interface.h"
 #include "nyx/debug.h"
+#include "nyx/file_helper.h"
+#ifdef CONFIG_REDQUEEN
 #include "nyx/redqueen.h"
 #include "nyx/redqueen_patch.h"
 #include "nyx/patcher.h"
+#endif
 #include "nyx/page_cache.h"
 #include "nyx/state/state.h"
 #include <libxdc.h>
@@ -47,8 +50,11 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 uint32_t state_byte = 0;
 uint32_t last = 0;
 
+uint32_t alt_bitmap_size = 0;
+uint8_t* alt_bitmap = NULL;
+
 int pt_trace_dump_fd = 0;
-bool should_dump_pt_trace= false;
+bool should_dump_pt_trace= false; /* dump PT trace as returned from HW */
 
 void pt_open_pt_trace_file(char* filename){
   printf("using pt trace at %s",filename);
@@ -98,10 +104,39 @@ static inline int pt_ioctl(int fd, unsigned long request, unsigned long arg){
 	return ioctl(fd, request, arg);
 }
 
+void alt_bitmap_init(void* ptr, uint32_t size)
+{
+	alt_bitmap = (uint8_t*)ptr;
+	alt_bitmap_size = size;
+}
+
+void alt_bitmap_reset(void)
+{
+	if(alt_bitmap) {
+		memset(alt_bitmap, 0x00, alt_bitmap_size);
+	}
+}
+
 static inline uint64_t mix_bits(uint64_t v) {
   v ^= (v >> 31);
   v *= 0x7fb5d329728ea185;
   return v;
+}
+
+/*
+ * quick+dirty bitmap based on libxdc trace callback
+ * similar but not itentical to libxdc bitmap.
+ */
+void alt_bitmap_add(uint64_t from, uint64_t to)
+{
+	uint64_t transition_value;
+
+	if (GET_GLOBAL_STATE()->redqueen_state->trace_mode) {
+		if(alt_bitmap) {
+			transition_value = mix_bits(to)^(mix_bits(from)>>1);
+			alt_bitmap[transition_value & (alt_bitmap_size-1)]++;
+		}
+	}
 }
 
 #ifdef DUMP_AND_DEBUG_PT
@@ -165,8 +200,11 @@ int pt_enable(CPUState *cpu, bool hmp_mode){
 	if(!fast_reload_set_bitmap(get_fast_reload_snapshot())){
 		coverage_bitmap_reset();
 	}
-	//pt_reset_bitmap();
-  pt_trucate_pt_trace_file();
+	if (GET_GLOBAL_STATE()->redqueen_state->trace_mode) {
+		delete_trace_files();
+		alt_bitmap_reset();
+	}
+	pt_trucate_pt_trace_file();
 	return pt_cmd(cpu, KVM_VMX_PT_ENABLE, hmp_mode);
 }
 	
@@ -248,6 +286,10 @@ void pt_init_decoder(CPUState *cpu){
 	GET_GLOBAL_STATE()->decoder = libxdc_init(filters, (void* (*)(void*, uint64_t, bool*))page_cache_fetch2, GET_GLOBAL_STATE()->page_cache, GET_GLOBAL_STATE()->shared_bitmap_ptr, GET_GLOBAL_STATE()->shared_bitmap_size);
 
 	libxdc_register_bb_callback(GET_GLOBAL_STATE()->decoder, (void (*)(void*, disassembler_mode_t, uint64_t, uint64_t))redqueen_callback, GET_GLOBAL_STATE()->redqueen_state);
+
+	alt_bitmap_init(
+			GET_GLOBAL_STATE()->shared_bitmap_ptr,
+			GET_GLOBAL_STATE()->shared_bitmap_size);
 }
 
 int pt_disable_ip_filtering(CPUState *cpu, uint8_t addrn, bool hmp_mode){

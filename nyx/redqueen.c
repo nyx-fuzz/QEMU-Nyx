@@ -250,7 +250,6 @@ static void redqueen_trace_disabled(redqueen_t* self){
 }
 
 void redqueen_set_trace_mode(redqueen_t* self){
-	delete_trace_files();
 	self->trace_mode = true;
   redqueen_trace_enabled(self);
 }

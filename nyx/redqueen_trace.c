@@ -4,11 +4,14 @@
 #include <assert.h>
 #include "redqueen_trace.h"
 
+void alt_bitmap_add(uint64_t from, uint64_t to);
+
 /* write full trace of edge transitions rather than sorted list? */
 //#define KAFL_FULL_TRACES
 
 #ifdef KAFL_FULL_TRACES
 #include "redqueen.h"
+extern int trace_fd;
 #endif
 
 redqueen_trace_t* redqueen_trace_new(void){
@@ -35,6 +38,10 @@ void redqueen_trace_free(redqueen_trace_t* self){
 void redqueen_trace_register_transition(redqueen_trace_t* self, disassembler_mode_t mode, uint64_t from, uint64_t to){
 	khiter_t k;
 	int ret;
+	uint64_t exit_ip = 0xffffffffffffffff;
+
+	if (from != exit_ip && to != exit_ip)
+		alt_bitmap_add(from, to);
 #ifdef KAFL_FULL_TRACES
 	extern int trace_fd;
 	if (!trace_fd)

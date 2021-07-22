@@ -74,7 +74,7 @@ typedef struct auxilary_buffer_config_s{
 
   /* trigger to enable / disable different QEMU-PT modes */
   uint8_t redqueen_mode; 
-  uint8_t trace_mode; 
+  uint8_t trace_mode;  /* dump decoded edge transitions to file */
   uint8_t reload_mode;
 
   uint8_t verbose_level;
