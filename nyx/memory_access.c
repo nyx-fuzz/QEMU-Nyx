@@ -216,8 +216,14 @@ bool remap_slot(uint64_t addr, uint32_t slot, CPUState *cpu, int fd, uint64_t sh
     QLIST_FOREACH_RCU(block, &ram_list.blocks, next) {
         if(!memcmp(block->idstr, "pc.ram", 6)){
             /* TODO: put assert calls here */ 
-            munmap((void*)(((uint64_t)block->host) + phys_addr), x86_64_PAGE_SIZE);
-            mmap((void*)(((uint64_t)block->host) + phys_addr), 0x1000, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, fd, (i*x86_64_PAGE_SIZE));
+            if (munmap((void*)(((uint64_t)block->host) + phys_addr), x86_64_PAGE_SIZE) == -1) {
+				fprintf(stderr, "%s: munmap failed!\n", __func__);
+				assert(false);
+			}
+            if (mmap((void*)(((uint64_t)block->host) + phys_addr), 0x1000, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, fd, (i*x86_64_PAGE_SIZE)) == MAP_FAILED) {
+				fprintf(stderr, "%s: mmap failed!\n", __func__);
+				assert(false);
+			}
 
             //printf("MMUNMAP: %d\n", munmap((void*)(((uint64_t)block->host) + phys_addr), x86_64_PAGE_SIZE));
             //printf("MMAP: %p\n", mmap((void*)(((uint64_t)block->host) + phys_addr), 0x1000, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, fd, (i*x86_64_PAGE_SIZE)));
@@ -286,6 +292,7 @@ void resize_shared_memory(uint32_t new_size, uint32_t* shm_size, void** shm_ptr,
 
 bool remap_payload_buffer(uint64_t virt_guest_addr, CPUState *cpu){    
     assert(GET_GLOBAL_STATE()->shared_payload_buffer_fd && GET_GLOBAL_STATE()->shared_payload_buffer_size);
+    assert(GET_GLOBAL_STATE()->shared_payload_buffer_size % x86_64_PAGE_SIZE == 0);
     RAMBlock *block;
     refresh_kvm_non_dirty(cpu);
 

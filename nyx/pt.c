@@ -185,7 +185,7 @@ void pt_dump(CPUState *cpu, int bytes){
 					GET_GLOBAL_STATE()->decoder_page_fault_addr = libxdc_get_page_fault_addr(GET_GLOBAL_STATE()->decoder);
 					break;
 				case decoder_unkown_packet:
-					fprintf(stderr, "WARNING: libxdc_decode returned decoder_error\n");
+					fprintf(stderr, "WARNING: libxdc_decode returned unknown_packet\n");
 					break;
 				case decoder_error:
 					fprintf(stderr, "WARNING: libxdc_decode returned decoder_error\n");
