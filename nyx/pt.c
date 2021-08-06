@@ -58,7 +58,7 @@ bool should_dump_pt_trace= false; /* dump PT trace as returned from HW */
 
 void pt_open_pt_trace_file(char* filename){
   printf("using pt trace at %s",filename);
-  pt_trace_dump_fd = open(filename, O_WRONLY);
+  pt_trace_dump_fd = open(filename, O_CREAT|O_TRUNC|O_WRONLY, 0644);
   should_dump_pt_trace = true;
   assert(pt_trace_dump_fd >= 0);
 }
