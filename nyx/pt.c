@@ -54,20 +54,34 @@ uint32_t alt_bitmap_size = 0;
 uint8_t* alt_bitmap = NULL;
 
 int pt_trace_dump_fd = 0;
+char *pt_trace_dump_filename;
 bool should_dump_pt_trace= false; /* dump PT trace as returned from HW */
 
-void pt_open_pt_trace_file(char* filename){
-  printf("using pt trace at %s",filename);
-  pt_trace_dump_fd = open(filename, O_CREAT|O_TRUNC|O_WRONLY, 0644);
-  should_dump_pt_trace = true;
-  assert(pt_trace_dump_fd >= 0);
+void pt_trace_dump_enable(char* filename)
+{
+	int test_fd;
+
+	printf("Enable pt trace dump at %s", filename);
+	pt_trace_dump_filename = filename;
+	should_dump_pt_trace = true;
+
+	test_fd = open(filename, O_CREAT|O_TRUNC|O_WRONLY, 0644);
+	if (test_fd < 0)
+		fprintf(stderr, "Error accessing pt_dump output path: %s", strerror(errno));
+	assert(test_fd >= 0);
 }
 
-void pt_trucate_pt_trace_file(void){
-  if(should_dump_pt_trace){
-    assert(lseek(pt_trace_dump_fd, 0, SEEK_SET) == 0);
-    assert(ftruncate(pt_trace_dump_fd, 0)==0);
-  }
+void pt_write_pt_dump_file(uint8_t *data, size_t bytes)
+{
+	int fd;
+
+	if (!should_dump_pt_trace)
+		return;
+
+	fd = open(pt_trace_dump_filename, O_CREAT|O_TRUNC|O_WRONLY, 0644);
+	assert(fd >= 0);
+
+    assert(bytes == write(fd, data, bytes));
 }
 
 static void pt_set(CPUState *cpu, run_on_cpu_data arg){
@@ -166,9 +180,8 @@ void dump_pt_trace(void* buffer, int bytes){
 #endif
 
 void pt_dump(CPUState *cpu, int bytes){
-  if(should_dump_pt_trace){
-    assert(bytes == write(pt_trace_dump_fd, cpu->pt_mmap, bytes));
-  }
+  pt_write_pt_dump_file(cpu->pt_mmap, bytes);
+
 	if(!(GET_GLOBAL_STATE()->redqueen_state && GET_GLOBAL_STATE()->redqueen_state->intercept_mode)){
 		if (GET_GLOBAL_STATE()->in_fuzzing_mode && GET_GLOBAL_STATE()->decoder_page_fault == false && GET_GLOBAL_STATE()->decoder && !GET_GLOBAL_STATE()->dump_page){
 			GET_GLOBAL_STATE()->pt_trace_size += bytes;
@@ -204,7 +217,6 @@ int pt_enable(CPUState *cpu, bool hmp_mode){
 		delete_trace_files();
 		alt_bitmap_reset();
 	}
-	pt_trucate_pt_trace_file();
 	return pt_cmd(cpu, KVM_VMX_PT_ENABLE, hmp_mode);
 }
 	

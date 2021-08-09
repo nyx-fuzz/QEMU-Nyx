@@ -277,9 +277,9 @@ static bool verify_workdir_state(nyx_interface_state *s, Error **errp){
 	init_redqueen_state();
 
   if(s->dump_pt_trace){
-	  assert(asprintf(&tmp, "%s/pt_trace_dump_%d", workdir, id) != -1);
-    	pt_open_pt_trace_file(tmp);
-    	free(tmp);
+	assert(asprintf(&tmp, "%s/pt_trace_dump_%d", workdir, id) != -1);
+	pt_trace_dump_enable(tmp);
+	free(tmp);
   }
 
 

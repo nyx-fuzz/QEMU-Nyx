@@ -44,7 +44,7 @@ void pt_post_kvm_run(CPUState *cpu);
 void pt_handle_overflow(CPUState *cpu);
 void pt_dump(CPUState *cpu, int bytes);
 
-void pt_open_pt_trace_file(char* filename);
-void pt_trucate_pt_trace_file(void);
+void pt_trace_dump_enable(char* filename);
+void pt_write_pt_dump_file(uint8_t *data, size_t bytes);
 #endif
 
