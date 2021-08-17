@@ -45,6 +45,5 @@ void pt_handle_overflow(CPUState *cpu);
 void pt_dump(CPUState *cpu, int bytes);
 
 void pt_trace_dump_enable(char* filename);
-void pt_write_pt_dump_file(uint8_t *data, size_t bytes);
 #endif
 

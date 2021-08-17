@@ -71,17 +71,35 @@ void pt_trace_dump_enable(char* filename)
 	assert(test_fd >= 0);
 }
 
-void pt_write_pt_dump_file(uint8_t *data, size_t bytes)
-{
+static void pt_truncate_pt_dump_file(void) {
 	int fd;
 
 	if (!should_dump_pt_trace)
 		return;
 
 	fd = open(pt_trace_dump_filename, O_CREAT|O_TRUNC|O_WRONLY, 0644);
-	assert(fd >= 0);
+	if (fd < 0) {
+		fprintf(stderr, "Error truncating pt_trace_dump: %s\n", strerror(errno));
+		assert(0);
+	}
+	close(fd);
+}
 
+static void pt_write_pt_dump_file(uint8_t *data, size_t bytes)
+{
+	int fd;
+
+	if (!should_dump_pt_trace)
+		return;
+
+	fd = open(pt_trace_dump_filename, O_APPEND|O_WRONLY, 0644);
+	//fd = open(pt_trace_dump_filename, O_CREAT|O_TRUNC|O_WRONLY, 0644);
+	if (fd < 0) {
+		fprintf(stderr, "Error writing pt_trace_dump: %s\n", strerror(errno));
+		assert(0);
+	}
     assert(bytes == write(fd, data, bytes));
+	close(fd);
 }
 
 static void pt_set(CPUState *cpu, run_on_cpu_data arg){
@@ -180,11 +198,13 @@ void dump_pt_trace(void* buffer, int bytes){
 #endif
 
 void pt_dump(CPUState *cpu, int bytes){
-  pt_write_pt_dump_file(cpu->pt_mmap, bytes);
+	//pt_write_pt_dump_file(cpu->pt_mmap, bytes);
 
 	if(!(GET_GLOBAL_STATE()->redqueen_state && GET_GLOBAL_STATE()->redqueen_state->intercept_mode)){
 		if (GET_GLOBAL_STATE()->in_fuzzing_mode && GET_GLOBAL_STATE()->decoder_page_fault == false && GET_GLOBAL_STATE()->decoder && !GET_GLOBAL_STATE()->dump_page){
 			GET_GLOBAL_STATE()->pt_trace_size += bytes;
+			//dump_pt_trace(cpu->pt_mmap, bytes);
+			pt_write_pt_dump_file(cpu->pt_mmap, bytes);
 			decoder_result_t result = libxdc_decode(GET_GLOBAL_STATE()->decoder, cpu->pt_mmap, bytes);
 			switch(result){
 				case decoder_success:
@@ -217,6 +237,7 @@ int pt_enable(CPUState *cpu, bool hmp_mode){
 		delete_trace_files();
 		alt_bitmap_reset();
 	}
+	pt_truncate_pt_dump_file();
 	return pt_cmd(cpu, KVM_VMX_PT_ENABLE, hmp_mode);
 }
 	
