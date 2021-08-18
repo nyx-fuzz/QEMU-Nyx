@@ -45,6 +45,7 @@ void state_init_global(void){
     global_state.nyx_fdl = false;
 
     global_state.workdir_path = NULL;
+    global_state.worker_id = 0xffff;
 
     global_state.fast_reload_enabled = false;
     global_state.fast_reload_mode = false;

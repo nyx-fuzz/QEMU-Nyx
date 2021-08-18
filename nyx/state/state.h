@@ -49,6 +49,7 @@ typedef struct qemu_nyx_state_s{
     bool nyx_fdl;
 
     char* workdir_path;
+    uint32_t worker_id;
 
     /* FAST VM RELOAD */
     bool fast_reload_enabled;

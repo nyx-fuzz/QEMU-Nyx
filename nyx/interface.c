@@ -374,6 +374,7 @@ static void nyx_realize(DeviceState *dev, Error **errp){
 	if(s->cow_primary_size){
 		set_global_cow_cache_primary_size(s->cow_primary_size);
 	}
+	GET_GLOBAL_STATE()->worker_id = s->worker_id;
 
 	if (!s->workdir || !verify_workdir_state(s, errp)){
 		fprintf(stderr, "[QEMU-Nyx] Error:  work dir...\n");
