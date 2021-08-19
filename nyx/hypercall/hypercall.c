@@ -742,32 +742,38 @@ static void handle_hypercall_kafl_dump_file(struct kvm_run *run, CPUState *cpu, 
 		goto err_out1;
 	}
 
-	if (!read_virtual_memory(file_obj.file_name_str_ptr, (uint8_t*)filename, 255, cpu)) {
-		fprintf(stderr, "Failed to read file_name_str_ptr in %s. Skipping..\n", __func__);
-		goto err_out1;
+	if (file_obj.file_name_str_ptr != 0) {
+		if (!read_virtual_memory(file_obj.file_name_str_ptr, (uint8_t*)filename, sizeof(filename)-1, cpu)) {
+			fprintf(stderr, "Failed to read file_name_str_ptr in %s. Skipping..\n", __func__);
+			goto err_out1;
+		}
+		filename[sizeof(filename)-1] = 0;
 	}
-	filename[255] = 0;
 	
 	//fprintf(stderr, "%s: dump %lu fbytes from %s (append=%u)\n",
 	//	   	__func__, file_obj.bytes, filename, file_obj.append);
 
-	if (strnlen(filename, sizeof(filename))) {
-		char *base_name = basename(filename);
-		assert(asprintf(&host_path, "%s/dump/%s", GET_GLOBAL_STATE()->workdir_path , base_name) != -1);
+	// use a tempfile if file_name_ptr == NULL or points to empty string
+	if (0 == strnlen(filename, sizeof(filename))) {
+		strncpy(filename, "tmp.XXXXXX", sizeof(filename)-1);
+	}
 
-		if(file_obj.append){
-			f = fopen(host_path, "a+");
-		} else{
-			f = fopen(host_path, "w+");
-		}
-	} else { // no filename given - create tempfile
+	char *base_name = basename(filename); // clobbers the filename buffer!
+	assert(asprintf(&host_path, "%s/dump/%s", GET_GLOBAL_STATE()->workdir_path , base_name) != -1);
+
+	// check if base_name is mkstemp() pattern, otherwise write/append to exact name
+	if (strlen(base_name) > 6 && 0 == strcmp(base_name+strlen(base_name)-6, "XXXXXX")) {
 		if (file_obj.append) {
 			fprintf(stderr, "Error request to append but no filename given in %s\n", __func__);
 			goto err_out1;
 		}
-	
-		assert(asprintf(&host_path, "%s/dump/tmp.XXXXXX", GET_GLOBAL_STATE()->workdir_path) != -1);
 		f = fdopen(mkstemp(host_path), "w+");
+	} else {
+		if (file_obj.append){
+			f = fopen(host_path, "a+");
+		} else{
+			f = fopen(host_path, "w+");
+		}
 	}
 
 	if (!f) {
