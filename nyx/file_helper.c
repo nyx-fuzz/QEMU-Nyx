@@ -56,7 +56,6 @@ void parse_address_file(char* path, size_t* num_addrs, uint64_t** addrs){
 
 int re_fd = 0;
 int se_fd = 0;
-int trace_fd = 0;
 
 void write_re_result(char* buf){
   int unused __attribute__((unused));
@@ -65,20 +64,7 @@ void write_re_result(char* buf){
 	unused = write(re_fd, buf, strlen(buf));
 }
 
-void write_trace_result(redqueen_trace_t* trace_state){
-	//int fd;
-  int unused __attribute__((unused));
-	if (!trace_fd)
-		trace_fd = open(redqueen_workdir.pt_trace_results, O_WRONLY | O_CREAT | O_APPEND, S_IRWXU);
-  redqueen_trace_write_file(trace_state, trace_fd);
-  //unused = write(trace_fd, buf, strlen(buf));
-	//close(fd);
-}
-
-void fsync_all_traces(void){
-  if (!trace_fd){
-    fsync(trace_fd);
-  }
+void fsync_redqueen_files(void){
   if (!se_fd){
     fsync(se_fd);
   }
@@ -94,13 +80,6 @@ void write_se_result(char* buf){
 		se_fd = open(redqueen_workdir.symbolic_results, O_WRONLY | O_CREAT | O_APPEND, S_IRWXU);
 	unused = write(se_fd, buf, strlen(buf));
 	//close(fd);
-}
-
-void delete_trace_files(void){
-  int unused __attribute__((unused));
-	if (!trace_fd)
-		trace_fd = open(redqueen_workdir.pt_trace_results, O_WRONLY | O_CREAT | O_APPEND, S_IRWXU);
-	unused = ftruncate(trace_fd, 0);
 }
 
 void delete_redqueen_files(void){

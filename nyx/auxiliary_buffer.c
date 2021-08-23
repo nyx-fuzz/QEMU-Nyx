@@ -103,7 +103,7 @@ void check_auxiliary_config_buffer(auxilary_buffer_t* auxilary_buffer, auxilary_
 #ifdef SUPPORT_COMPILE_TIME_REDQUEEN
         GET_GLOBAL_STATE()->pt_trace_mode_force = true;		  
 #endif
-        redqueen_set_trace_mode(GET_GLOBAL_STATE()->redqueen_state);
+        redqueen_set_trace_mode();
       }
     }
     else {
@@ -112,7 +112,7 @@ void check_auxiliary_config_buffer(auxilary_buffer_t* auxilary_buffer, auxilary_
 #ifdef SUPPORT_COMPILE_TIME_REDQUEEN
         GET_GLOBAL_STATE()->pt_trace_mode_force = false;
 #endif
-		    redqueen_unset_trace_mode(GET_GLOBAL_STATE()->redqueen_state);
+        redqueen_unset_trace_mode();
       }
     }
 

@@ -277,12 +277,12 @@ void synchronization_lock(void){
 
 	//last_timeout = false;
 
-	if(unlikely(GET_GLOBAL_STATE()->in_redqueen_reload_mode || GET_GLOBAL_STATE()->redqueen_state->trace_mode)){
-		if(GET_GLOBAL_STATE()->redqueen_state->trace_mode){
-			write_trace_result(GET_GLOBAL_STATE()->redqueen_state->trace_state);
-			redqueen_trace_reset(GET_GLOBAL_STATE()->redqueen_state->trace_state);
-		}
-		fsync_all_traces();		
+	if(unlikely(GET_GLOBAL_STATE()->in_redqueen_reload_mode)) {
+			fsync_redqueen_files();		
+	}
+
+	if (unlikely(GET_GLOBAL_STATE()->trace_mode)) {
+		redqueen_trace_flush();
 	}
 
 	interface_send_char(NYX_INTERFACE_PING);

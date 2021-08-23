@@ -714,19 +714,6 @@ void pt_set_disable_patches_pending(CPUState *cpu){
 	GET_GLOBAL_STATE()->patches_disable_pending = true;
 }
 
-void pt_enable_rqi_trace(CPUState *cpu){
-	if (GET_GLOBAL_STATE()->redqueen_state){
-		redqueen_set_trace_mode(GET_GLOBAL_STATE()->redqueen_state);
-	}
-}
-
-void pt_disable_rqi_trace(CPUState *cpu){
-	if (GET_GLOBAL_STATE()->redqueen_state){
-		redqueen_unset_trace_mode(GET_GLOBAL_STATE()->redqueen_state);
-		return;
-	}
-}
-
 static void handle_hypercall_kafl_dump_file(struct kvm_run *run, CPUState *cpu, uint64_t hypercall_arg)
 {
 	kafl_dump_file_t file_obj;

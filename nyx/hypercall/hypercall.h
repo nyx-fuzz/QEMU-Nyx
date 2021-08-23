@@ -130,8 +130,6 @@ void pt_enable_rqo(CPUState *cpu);
 void pt_disable_rqo(CPUState *cpu);
 void pt_enable_rqi(CPUState *cpu);
 void pt_disable_rqi(CPUState *cpu);
-void pt_enable_rqi_trace(CPUState *cpu);
-void pt_disable_rqi_trace(CPUState *cpu);
 void pt_set_redqueen_instrumentation_mode(CPUState *cpu, int redqueen_instruction_mode);
 void pt_set_redqueen_update_blacklist(CPUState *cpu, bool newval);
 void pt_set_enable_patches_pending(CPUState *cpu);
