@@ -51,6 +51,7 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 #include "nyx/state/state.h"
 #include "nyx/sharedir.h"
 #include "nyx/helpers.h"
+#include "nyx/trace_dump.h"
 
 #include <time.h>
 
@@ -278,7 +279,7 @@ static bool verify_workdir_state(nyx_interface_state *s, Error **errp){
 
   if(s->dump_pt_trace){
 	assert(asprintf(&tmp, "%s/pt_trace_dump_%d", workdir, id) != -1);
-	pt_trace_dump_enable(tmp);
+	pt_trace_dump_init(tmp);
 	free(tmp);
   }
 

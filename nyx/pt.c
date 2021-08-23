@@ -44,6 +44,7 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 #include "nyx/state/state.h"
 #include <libxdc.h>
 #include "nyx/helpers.h"
+#include "nyx/trace_dump.h"
 
 #define PT_BUFFER_MMAP_ADDR 0x3ffff0000000
 
@@ -52,55 +53,6 @@ uint32_t last = 0;
 
 uint32_t alt_bitmap_size = 0;
 uint8_t* alt_bitmap = NULL;
-
-int pt_trace_dump_fd = 0;
-char *pt_trace_dump_filename;
-bool should_dump_pt_trace= false; /* dump PT trace as returned from HW */
-
-void pt_trace_dump_enable(char* filename)
-{
-	int test_fd;
-
-	printf("Enable pt trace dump at %s", filename);
-	pt_trace_dump_filename = filename;
-	should_dump_pt_trace = true;
-
-	test_fd = open(filename, O_CREAT|O_TRUNC|O_WRONLY, 0644);
-	if (test_fd < 0)
-		fprintf(stderr, "Error accessing pt_dump output path: %s", strerror(errno));
-	assert(test_fd >= 0);
-}
-
-static void pt_truncate_pt_dump_file(void) {
-	int fd;
-
-	if (!should_dump_pt_trace)
-		return;
-
-	fd = open(pt_trace_dump_filename, O_CREAT|O_TRUNC|O_WRONLY, 0644);
-	if (fd < 0) {
-		fprintf(stderr, "Error truncating pt_trace_dump: %s\n", strerror(errno));
-		assert(0);
-	}
-	close(fd);
-}
-
-static void pt_write_pt_dump_file(uint8_t *data, size_t bytes)
-{
-	int fd;
-
-	if (!should_dump_pt_trace)
-		return;
-
-	fd = open(pt_trace_dump_filename, O_APPEND|O_WRONLY, 0644);
-	//fd = open(pt_trace_dump_filename, O_CREAT|O_TRUNC|O_WRONLY, 0644);
-	if (fd < 0) {
-		fprintf(stderr, "Error writing pt_trace_dump: %s\n", strerror(errno));
-		assert(0);
-	}
-    assert(bytes == write(fd, data, bytes));
-	close(fd);
-}
 
 static void pt_set(CPUState *cpu, run_on_cpu_data arg){
 	asm volatile("" ::: "memory");

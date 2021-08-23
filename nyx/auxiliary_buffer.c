@@ -25,6 +25,7 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdbool.h>
 #include "nyx/state/state.h"
 #include "nyx/debug.h"
+#include "nyx/trace_dump.h"
 
 /* experimental feature (currently broken)
  * enabled via trace mode
@@ -104,6 +105,7 @@ void check_auxiliary_config_buffer(auxilary_buffer_t* auxilary_buffer, auxilary_
         GET_GLOBAL_STATE()->pt_trace_mode_force = true;		  
 #endif
         redqueen_set_trace_mode();
+        pt_trace_dump_enable(true);
       }
     }
     else {
@@ -113,6 +115,7 @@ void check_auxiliary_config_buffer(auxilary_buffer_t* auxilary_buffer, auxilary_
         GET_GLOBAL_STATE()->pt_trace_mode_force = false;
 #endif
         redqueen_unset_trace_mode();
+        pt_trace_dump_enable(false);
       }
     }
 
