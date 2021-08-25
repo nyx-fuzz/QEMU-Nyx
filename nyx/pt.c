@@ -45,14 +45,9 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 #include <libxdc.h>
 #include "nyx/helpers.h"
 #include "nyx/trace_dump.h"
+#include "nyx/redqueen_trace.h"
 
 #define PT_BUFFER_MMAP_ADDR 0x3ffff0000000
-
-uint32_t state_byte = 0;
-uint32_t last = 0;
-
-uint32_t alt_bitmap_size = 0;
-uint8_t* alt_bitmap = NULL;
 
 static void pt_set(CPUState *cpu, run_on_cpu_data arg){
 	asm volatile("" ::: "memory");
@@ -86,41 +81,6 @@ static inline int pt_ioctl(int fd, unsigned long request, unsigned long arg){
 		return -EINVAL;
 	}
 	return ioctl(fd, request, arg);
-}
-
-void alt_bitmap_init(void* ptr, uint32_t size)
-{
-	alt_bitmap = (uint8_t*)ptr;
-	alt_bitmap_size = size;
-}
-
-void alt_bitmap_reset(void)
-{
-	if(alt_bitmap) {
-		memset(alt_bitmap, 0x00, alt_bitmap_size);
-	}
-}
-
-static inline uint64_t mix_bits(uint64_t v) {
-  v ^= (v >> 31);
-  v *= 0x7fb5d329728ea185;
-  return v;
-}
-
-/*
- * quick+dirty bitmap based on libxdc trace callback
- * similar but not itentical to libxdc bitmap.
- */
-void alt_bitmap_add(uint64_t from, uint64_t to)
-{
-	uint64_t transition_value;
-
-	if (GET_GLOBAL_STATE()->trace_mode) {
-		if(alt_bitmap) {
-			transition_value = mix_bits(to)^(mix_bits(from)>>1);
-			alt_bitmap[transition_value & (alt_bitmap_size-1)]++;
-		}
-	}
 }
 
 #ifdef DUMP_AND_DEBUG_PT

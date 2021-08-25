@@ -8,14 +8,52 @@
 #include "state/state.h"
 
 
-void alt_bitmap_add(uint64_t from, uint64_t to);
-
 /* write full trace of edge transitions rather than sorted list? */
 //#define KAFL_FULL_TRACES
 
 int trace_fd = 0;
-
 int redqueen_trace_enabled = false;
+
+uint32_t alt_bitmap_size = 0;
+uint8_t* alt_bitmap = NULL;
+
+void alt_bitmap_init(void* ptr, uint32_t size)
+{
+	if (redqueen_trace_enabled) {
+		alt_bitmap = (uint8_t*)ptr;
+		alt_bitmap_size = size;
+	}
+}
+
+void alt_bitmap_reset(void)
+{
+	if (alt_bitmap) {
+		memset(alt_bitmap, 0x00, alt_bitmap_size);
+	}
+}
+
+static inline uint64_t mix_bits(uint64_t v) {
+  v ^= (v >> 31);
+  v *= 0x7fb5d329728ea185;
+  return v;
+}
+
+/*
+ * quick+dirty bitmap based on libxdc trace callback
+ * similar but not itentical to libxdc bitmap.
+ */
+static void alt_bitmap_add(uint64_t from, uint64_t to)
+{
+	uint64_t transition_value;
+
+	if (GET_GLOBAL_STATE()->trace_mode) {
+		if(alt_bitmap) {
+			transition_value = mix_bits(to)^(mix_bits(from)>>1);
+			alt_bitmap[transition_value & (alt_bitmap_size-1)]++;
+		}
+	}
+}
+
 
 static int reset_trace_fd(void) {
 	if (trace_fd)

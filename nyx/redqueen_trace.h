@@ -43,6 +43,10 @@ typedef struct redqueen_trace_s{
 	uint128_t* ordered_transitions;
 } redqueen_trace_t;
 
+/* libxdc outputs no bitmap in trace mode */
+void alt_bitmap_reset(void);
+void alt_bitmap_init(void* ptr, uint32_t size);
+
 redqueen_trace_t* redqueen_trace_new(void);
 void redqueen_trace_free(redqueen_trace_t* self);
 void redqueen_trace_register_transition(redqueen_trace_t* self, disassembler_mode_t mode, uint64_t from, uint64_t to);

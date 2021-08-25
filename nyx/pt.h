@@ -24,13 +24,6 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 
 void pt_init_decoder(CPUState *cpu);
 
-void pt_reset_bitmap(void);
-void pt_setup_bitmap(void* ptr);
-
-void alt_bitmap_reset(void);
-void alt_bitmap_init(void* ptr, uint32_t size);
-void alt_bitmap_add(uint64_t from, uint64_t to);
-
 int pt_enable(CPUState *cpu, bool hmp_mode);
 int pt_disable(CPUState *cpu, bool hmp_mode);
 int pt_enable_ip_filtering(CPUState *cpu, uint8_t addrn, bool redqueen, bool hmp_mode);
