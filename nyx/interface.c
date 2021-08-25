@@ -90,6 +90,7 @@ typedef struct nyx_interface_state {
 	uint32_t input_buffer_size;
 
 	bool dump_pt_trace;
+	bool edge_cb_trace;
 
 	bool redqueen;
 	
@@ -283,6 +284,10 @@ static bool verify_workdir_state(nyx_interface_state *s, Error **errp){
 	free(tmp);
   }
 
+  if(s->edge_cb_trace){
+	redqueen_trace_init();
+  }
+
 
 	assert(asprintf(&tmp, "%s/aux_buffer_%d", workdir, id) != -1);
 	/*
@@ -427,6 +432,7 @@ static Property nyx_interface_properties[] = {
 	DEFINE_PROP_UINT32("bitmap_size", nyx_interface_state, bitmap_size, DEFAULT_NYX_BITMAP_SIZE),
 	DEFINE_PROP_UINT32("input_buffer_size", nyx_interface_state, input_buffer_size, DEFAULT_NYX_BITMAP_SIZE),
 	DEFINE_PROP_BOOL("dump_pt_trace", nyx_interface_state, dump_pt_trace, false),
+	DEFINE_PROP_BOOL("edge_cb_trace", nyx_interface_state, edge_cb_trace, false),
 
 
 	DEFINE_PROP_END_OF_LIST(),

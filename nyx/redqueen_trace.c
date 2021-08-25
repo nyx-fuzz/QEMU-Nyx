@@ -15,6 +15,8 @@ void alt_bitmap_add(uint64_t from, uint64_t to);
 
 int trace_fd = 0;
 
+int redqueen_trace_enabled = false;
+
 static int reset_trace_fd(void) {
 	if (trace_fd)
 		close(trace_fd);
@@ -26,6 +28,10 @@ static int reset_trace_fd(void) {
 	return trace_fd;
 }
 
+void redqueen_trace_init(void) {
+	redqueen_trace_enabled = true;
+}
+
 redqueen_trace_t* redqueen_trace_new(void){
 	redqueen_trace_t* self = malloc(sizeof(redqueen_trace_t));
 	self->lookup = kh_init(RQ_TRACE);
@@ -33,13 +39,6 @@ redqueen_trace_t* redqueen_trace_new(void){
 	self->max_ordered_transitions = INIT_NUM_OF_STORED_TRANSITIONS;
 	self->ordered_transitions = malloc(INIT_NUM_OF_STORED_TRANSITIONS*sizeof(uint128_t));
 	return self;
-}
-
-static void redqueen_state_reset(void){
-	redqueen_trace_t *self = GET_GLOBAL_STATE()->redqueen_state->trace_state;
-	kh_destroy(RQ_TRACE, self->lookup);
-	self->lookup = kh_init(RQ_TRACE);
-	self->num_ordered_transitions = 0;
 }
 
 void redqueen_trace_free(redqueen_trace_t* self){
@@ -88,28 +87,42 @@ static void redqueen_trace_write(void){
 	}
 }
 
+static void redqueen_state_reset(void){
+	redqueen_trace_t *self = GET_GLOBAL_STATE()->redqueen_state->trace_state;
+	kh_destroy(RQ_TRACE, self->lookup);
+	self->lookup = kh_init(RQ_TRACE);
+	self->num_ordered_transitions = 0;
+}
+
+
 void redqueen_trace_reset(void){
-	redqueen_state_reset();
-	reset_trace_fd();
+	if (redqueen_trace_enabled) {
+		redqueen_state_reset();
+		reset_trace_fd();
+	}
 }
 
 void redqueen_trace_flush(void){
-	redqueen_trace_write();
-	if (trace_fd)
-		fsync(trace_fd);
+	if (redqueen_trace_enabled) {
+		redqueen_trace_write();
+		if (trace_fd)
+			fsync(trace_fd);
+	}
 }
 
 void redqueen_set_trace_mode(void){
-	GET_GLOBAL_STATE()->trace_mode = true;
-	libxdc_enable_tracing(GET_GLOBAL_STATE()->decoder);
-	libxdc_register_edge_callback(GET_GLOBAL_STATE()->decoder,
-			(void (*)(void*, disassembler_mode_t, uint64_t, uint64_t))&redqueen_trace_register_transition,
-			GET_GLOBAL_STATE()->redqueen_state->trace_state);
+	if (redqueen_trace_enabled) {
+		libxdc_enable_tracing(GET_GLOBAL_STATE()->decoder);
+		libxdc_register_edge_callback(GET_GLOBAL_STATE()->decoder,
+				(void (*)(void*, disassembler_mode_t, uint64_t, uint64_t))&redqueen_trace_register_transition,
+				GET_GLOBAL_STATE()->redqueen_state->trace_state);
+	}
 }
 
 void redqueen_unset_trace_mode(void){
-    libxdc_disable_tracing(GET_GLOBAL_STATE()->decoder);
-	GET_GLOBAL_STATE()->trace_mode = false;
+	if (redqueen_trace_enabled) {
+		libxdc_disable_tracing(GET_GLOBAL_STATE()->decoder);
+	}
 }
 
 #ifdef DEBUG_MAIN
@@ -126,7 +139,7 @@ int main(int argc, char** argv){
 			redqueen_trace_register_transition(rq_obj, 0xBADBEEF, 0xC0FFEE);
 		}
 		redqueen_trace_write(rq_obj, STDOUT_FILENO);
-		redqueen_state_reset();
+		redqueen_trace_reset();
 	}
 
 	redqueen_trace_free(rq_obj);

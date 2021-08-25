@@ -1,3 +1,10 @@
+#include <stdlib.h>
+#include <string.h>
+#include <stdint.h>
+#include <stdbool.h>
+
+#include "qemu/osdep.h"
+
 #pragma once
 #include "khash.h"
 #include <libxdc.h>
@@ -40,6 +47,7 @@ redqueen_trace_t* redqueen_trace_new(void);
 void redqueen_trace_free(redqueen_trace_t* self);
 void redqueen_trace_register_transition(redqueen_trace_t* self, disassembler_mode_t mode, uint64_t from, uint64_t to);
 
+void redqueen_trace_init(void);
 void redqueen_set_trace_mode(void);
 void redqueen_unset_trace_mode(void);
 
