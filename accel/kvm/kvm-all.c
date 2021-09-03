@@ -2692,12 +2692,13 @@ int kvm_cpu_exec(CPUState *cpu)
 #define CONFIG_UNKNOWN_ERROR_IS_PANIC
 #ifndef CONFIG_UNKNOWN_ERROR_IS_PANIC
 			fprintf(stderr, "Unknown exit code (%d) => ABORT\n", run->exit_reason);
-            assert(false);
 			ret = kvm_arch_handle_exit(cpu, run);
+            assert(ret == 0);
 #else
             debug_fprintf("kvm_arch_handle_exit(%d) => panic\n", run->exit_reason);
-			handle_hypercall_kafl_panic(run, cpu, (uint64_t)run->hypercall.args[0]);
-            ret = 0;
+			ret = kvm_arch_handle_exit(cpu, run);
+			if (ret != 0)
+				handle_hypercall_kafl_panic(run, cpu, (uint64_t)run->hypercall.args[0]);
 #endif
 #endif
             ret = kvm_arch_handle_exit(cpu, run);
