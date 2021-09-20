@@ -749,12 +749,13 @@ static void handle_hypercall_kafl_dump_file(struct kvm_run *run, CPUState *cpu, 
 	assert(asprintf(&host_path, "%s/dump/%s", GET_GLOBAL_STATE()->workdir_path , base_name) != -1);
 
 	// check if base_name is mkstemp() pattern, otherwise write/append to exact name
-	if (strlen(base_name) > 6 && 0 == strcmp(base_name+strlen(base_name)-6, "XXXXXX")) {
+	char *pattern = strstr(base_name, "XXXXXX");
+	if (pattern) {
+		unsigned suffix = strlen(pattern) - strlen("XXXXXX");
+		f = fdopen(mkstemps(host_path, suffix), "w+");
 		if (file_obj.append) {
-			fprintf(stderr, "Error request to append but no filename given in %s\n", __func__);
-			goto err_out1;
+			fprintf(stderr, "Warning in %s: Writing unique generated file in append mode?\n", __func__);
 		}
-		f = fdopen(mkstemp(host_path), "w+");
 	} else {
 		if (file_obj.append){
 			f = fopen(host_path, "a+");
