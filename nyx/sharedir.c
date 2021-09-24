@@ -42,19 +42,19 @@ static size_t get_file_size(const char* file){
 
 static char* sharedir_scan(sharedir_t* self, const char* file){
 
-  char* path = NULL;
-  assert(asprintf(&path, "%s/%s", self->dir, file) != -1);
+  /*
+   * Agent is not under our control, but lets roughly constrain
+   * it to anything stored in or linked from sharedir
+   */
+  chdir(self->dir);
+  char* real_path = realpath(file, NULL);
 
-  char* real_path = realpath(path, NULL);
-
-  free(path);
-  if(real_path && !strncmp(self->dir, real_path, strlen(self->dir)) && file_exits(real_path)){
+  if (file[0] != '/' && !strstr(file, "/../") &&
+      real_path && file_exits(real_path)) {
     return real_path;
   }
 
-  if(real_path){
-    free(real_path);
-  }
+  free(real_path);
   return NULL;
 }
 
@@ -115,15 +115,15 @@ static FILE* get_file_ptr(sharedir_t* self, sharedir_file_t* obj){
   if(obj == self->last_file_obj_ptr && self->last_file_f){
     return self->last_file_f;
   }
-  else{
-    if(self->last_file_f){
-      fclose(self->last_file_f);
-    }
-    FILE* f = fopen(obj->path, "r");
-    self->last_file_f = f;
-    self->last_file_obj_ptr = obj;
-    return f;
+
+  if(self->last_file_f){
+	  fclose(self->last_file_f);
   }
+
+  FILE* f = fopen(obj->path, "r");
+  self->last_file_f = f;
+  self->last_file_obj_ptr = obj;
+  return f;
 }
 
 uint64_t sharedir_request_file(sharedir_t* self, const char* file, uint8_t* page_buffer){
