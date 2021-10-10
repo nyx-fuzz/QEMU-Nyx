@@ -252,14 +252,22 @@ typedef struct SaveState {
     QTAILQ_HEAD(, SaveStateEntry) handlers;
     int global_section_id;
     uint32_t len;
+#ifndef QEMU_NYX
     const char *name;
+#else
+    char *name;
+#endif
     uint32_t target_page_bits;
     uint32_t caps_count;
     MigrationCapability *capabilities;
     QemuUUID uuid;
 } SaveState;
 
+#ifndef QEMU_NYX
 static SaveState savevm_state = {
+#else
+SaveState savevm_state = {
+#endif
     .handlers = QTAILQ_HEAD_INITIALIZER(savevm_state.handlers),
     .global_section_id = 0,
 };
@@ -289,6 +297,18 @@ static uint32_t get_validatable_capabilities_count(void)
     return result;
 }
 
+#ifdef QEMU_NYX
+int vmstate_load(QEMUFile *f, SaveStateEntry *se);
+int vmstate_save(QEMUFile *f, SaveStateEntry *se, QJSON *vmdesc);
+void save_section_header(QEMUFile *f, SaveStateEntry *se, uint8_t section_type);
+void save_section_footer(QEMUFile *f, SaveStateEntry *se);
+bool should_send_vmdesc(void);
+int qemu_savevm_state(QEMUFile *f, Error **errp);
+bool check_section_footer(QEMUFile *f, SaveStateEntry *se);
+int qemu_loadvm_section_start_full(QEMUFile *f, MigrationIncomingState *mis);
+int qemu_loadvm_section_part_end(QEMUFile *f, MigrationIncomingState *mis);
+#endif
+
 static int configuration_pre_save(void *opaque)
 {
     SaveState *state = opaque;
@@ -297,7 +317,15 @@ static int configuration_pre_save(void *opaque)
     int i, j;
 
     state->len = strlen(current_name);
+#ifndef QEMU_NYX
     state->name = current_name;
+#else
+    if(state->name){
+	    free(state->name);
+    }
+    state->name = strdup(current_name);
+#endif
+
     state->target_page_bits = qemu_target_page_bits();
 
     state->caps_count = get_validatable_capabilities_count();
@@ -508,7 +536,11 @@ static const VMStateDescription vmstate_uuid = {
     }
 };
 
+#ifndef QEMU_NYX
 static const VMStateDescription vmstate_configuration = {
+#else
+const VMStateDescription vmstate_configuration = {
+#endif
     .name = "configuration",
     .version_id = 1,
     .pre_load = configuration_pre_load,
@@ -848,7 +880,11 @@ void vmstate_unregister(DeviceState *dev, const VMStateDescription *vmsd,
     }
 }
 
+#ifndef QEMU_NYX
 static int vmstate_load(QEMUFile *f, SaveStateEntry *se)
+#else
+int vmstate_load(QEMUFile *f, SaveStateEntry *se)
+#endif
 {
     trace_vmstate_load(se->idstr, se->vmsd ? se->vmsd->name : "(old)");
     if (!se->vmsd) {         /* Old style */
@@ -877,7 +913,11 @@ static void vmstate_save_old_style(QEMUFile *f, SaveStateEntry *se, QJSON *vmdes
     }
 }
 
+#ifndef QEMU_NYX
 static int vmstate_save(QEMUFile *f, SaveStateEntry *se, QJSON *vmdesc)
+#else
+int vmstate_save(QEMUFile *f, SaveStateEntry *se, QJSON *vmdesc)
+#endif
 {
     trace_vmstate_save(se->idstr, se->vmsd ? se->vmsd->name : "(old)");
     if (!se->vmsd) {
@@ -890,8 +930,13 @@ static int vmstate_save(QEMUFile *f, SaveStateEntry *se, QJSON *vmdesc)
 /*
  * Write the header for device section (QEMU_VM_SECTION START/END/PART/FULL)
  */
+#ifndef QEMU_NYX
 static void save_section_header(QEMUFile *f, SaveStateEntry *se,
                                 uint8_t section_type)
+#else
+void save_section_header(QEMUFile *f, SaveStateEntry *se,
+                                uint8_t section_type)
+#endif
 {
     qemu_put_byte(f, section_type);
     qemu_put_be32(f, se->section_id);
@@ -912,7 +957,11 @@ static void save_section_header(QEMUFile *f, SaveStateEntry *se,
  * Write a footer onto device sections that catches cases misformatted device
  * sections.
  */
+#ifndef QEMU_NYX
 static void save_section_footer(QEMUFile *f, SaveStateEntry *se)
+#else
+void save_section_footer(QEMUFile *f, SaveStateEntry *se)
+#endif
 {
     if (migrate_get_current()->send_section_footer) {
         qemu_put_byte(f, QEMU_VM_SECTION_FOOTER);
@@ -1262,7 +1311,11 @@ int qemu_savevm_state_iterate(QEMUFile *f, bool postcopy)
     return ret;
 }
 
+#ifndef QEMU_NYX
 static bool should_send_vmdesc(void)
+#else
+bool should_send_vmdesc(void)
+#endif
 {
     MachineState *machine = MACHINE(qdev_get_machine());
     bool in_postcopy = migration_in_postcopy();
@@ -1498,7 +1551,11 @@ void qemu_savevm_state_cleanup(void)
     }
 }
 
+#ifndef QEMU_NYX
 static int qemu_savevm_state(QEMUFile *f, Error **errp)
+#else
+int qemu_savevm_state(QEMUFile *f, Error **errp)
+#endif
 {
     int ret;
     MigrationState *ms = migrate_get_current();
@@ -2200,7 +2257,11 @@ static int loadvm_process_command(QEMUFile *f)
  * Returns: true if the footer was good
  *          false if there is a problem (and calls error_report to say why)
  */
+#ifndef QEMU_NYX
 static bool check_section_footer(QEMUFile *f, SaveStateEntry *se)
+#else
+bool check_section_footer(QEMUFile *f, SaveStateEntry *se)
+#endif
 {
     int ret;
     uint8_t read_mark;
@@ -2237,8 +2298,13 @@ static bool check_section_footer(QEMUFile *f, SaveStateEntry *se)
     return true;
 }
 
+#ifndef QEMU_NYX
 static int
 qemu_loadvm_section_start_full(QEMUFile *f, MigrationIncomingState *mis)
+#else
+int
+qemu_loadvm_section_start_full(QEMUFile *f, MigrationIncomingState *mis)
+#endif
 {
     uint32_t instance_id, version_id, section_id;
     SaveStateEntry *se;
@@ -2302,8 +2368,13 @@ qemu_loadvm_section_start_full(QEMUFile *f, MigrationIncomingState *mis)
     return 0;
 }
 
+#ifndef QEMU_NYX
 static int
 qemu_loadvm_section_part_end(QEMUFile *f, MigrationIncomingState *mis)
+#else
+int
+qemu_loadvm_section_part_end(QEMUFile *f, MigrationIncomingState *mis)
+#endif
 {
     uint32_t section_id;
     SaveStateEntry *se;

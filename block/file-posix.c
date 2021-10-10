@@ -781,13 +781,18 @@ static int raw_apply_lock_bytes(BDRVRawState *s, int fd,
 static int raw_check_lock_bytes(int fd, uint64_t perm, uint64_t shared_perm,
                                 Error **errp)
 {
+#ifndef QEMU_NYX
     int ret;
+#endif
     int i;
 
     PERM_FOREACH(i) {
+#ifndef QEMU_NYX
         int off = RAW_LOCK_SHARED_BASE + i;
+#endif
         uint64_t p = 1ULL << i;
         if (perm & p) {
+#ifndef QEMU_NYX
             ret = qemu_lock_fd_test(fd, off, 1, true);
             if (ret) {
                 char *perm_name = bdrv_perm_names(p);
@@ -797,12 +802,16 @@ static int raw_check_lock_bytes(int fd, uint64_t perm, uint64_t shared_perm,
                 g_free(perm_name);
                 return ret;
             }
+#endif
         }
     }
     PERM_FOREACH(i) {
+#ifndef QEMU_NYX
         int off = RAW_LOCK_PERM_BASE + i;
+#endif
         uint64_t p = 1ULL << i;
         if (!(shared_perm & p)) {
+#ifndef QEMU_NYX
             ret = qemu_lock_fd_test(fd, off, 1, true);
             if (ret) {
                 char *perm_name = bdrv_perm_names(p);
@@ -812,6 +821,7 @@ static int raw_check_lock_bytes(int fd, uint64_t perm, uint64_t shared_perm,
                 g_free(perm_name);
                 return ret;
             }
+#endif
         }
     }
     return 0;

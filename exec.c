@@ -1355,6 +1355,52 @@ bool cpu_physical_memory_test_and_clear_dirty(ram_addr_t start,
     return dirty;
 }
 
+#ifdef QEMU_NYX
+extern void fast_reload_qemu_user_fdl_set_dirty(void* self, MemoryRegion *mr, uint64_t addr, uint64_t length);
+extern void* get_fast_reload_snapshot(void);
+
+/* Note: start and end must be within the same ram block.  */
+bool cpu_physical_memory_test_dirty(ram_addr_t start,
+                                              ram_addr_t length,
+                                              unsigned client)
+{
+    DirtyMemoryBlocks *blocks;
+    unsigned long end, page;
+    bool dirty = false;
+    RAMBlock *ramblock;
+    uint64_t mr_offset, mr_size;
+
+    if (length == 0) {
+        return false;
+    }
+
+    end = TARGET_PAGE_ALIGN(start + length) >> TARGET_PAGE_BITS;
+    page = start >> TARGET_PAGE_BITS;
+
+    WITH_RCU_READ_LOCK_GUARD() {
+        blocks = atomic_rcu_read(&ram_list.dirty_memory[client]);
+        ramblock = qemu_get_ram_block(start);
+        /* Range sanity check on the ramblock */
+        assert(start >= ramblock->offset &&
+               start + length <= ramblock->offset + ramblock->used_length);
+
+        while (page < end) {
+            unsigned long idx = page / DIRTY_MEMORY_BLOCK_SIZE;
+            unsigned long offset = page % DIRTY_MEMORY_BLOCK_SIZE;
+            unsigned long num = MIN(end - page,
+                                    DIRTY_MEMORY_BLOCK_SIZE - offset);
+
+            dirty |= bitmap_test_atomic(blocks->blocks[idx],
+                                                  offset, num);
+
+            page += num;
+        }
+    }
+
+    return dirty;
+}
+#endif
+
 DirtyBitmapSnapshot *cpu_physical_memory_snapshot_and_clear_dirty
     (MemoryRegion *mr, hwaddr offset, hwaddr length, unsigned client)
 {
@@ -3025,6 +3071,9 @@ int cpu_memory_rw_debug(CPUState *cpu, target_ulong addr,
 static void invalidate_and_set_dirty(MemoryRegion *mr, hwaddr addr,
                                      hwaddr length)
 {
+#ifdef QEMU_NYX
+    fast_reload_qemu_user_fdl_set_dirty(get_fast_reload_snapshot(), mr, addr & 0xFFFFFFFFFFFFF000, length);
+#endif
     uint8_t dirty_log_mask = memory_region_get_dirty_log_mask(mr);
     addr += memory_region_get_ram_addr(mr);
 

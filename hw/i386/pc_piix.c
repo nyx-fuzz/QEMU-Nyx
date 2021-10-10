@@ -1026,3 +1026,22 @@ static void xenfv_machine_options(MachineClass *m)
 DEFINE_PC_MACHINE(xenfv, "xenfv", pc_xen_hvm_init,
                   xenfv_machine_options);
 #endif
+
+#ifdef QEMU_NYX
+
+static void pc_kAFL64_vmx_v1_0_machine_options(MachineClass *m)
+{
+    pc_i440fx_machine_options(m);
+    m->alias = "kAFL64";
+    //m->is_default = 1;
+    m->desc = "kAFL64 PC (i440FX + PIIX, 1996)";
+}
+
+static void kAFL64_init(MachineState *machine)
+{
+    pc_init1(machine, TYPE_I440FX_PCI_HOST_BRIDGE, TYPE_I440FX_PCI_DEVICE);
+}
+
+DEFINE_PC_MACHINE(v1, "kAFL64-v1", kAFL64_init, pc_kAFL64_vmx_v1_0_machine_options);
+
+#endif

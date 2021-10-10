@@ -153,6 +153,10 @@ static inline uint8_t sr(VGACommonState *s, int idx)
     return vbe_enabled(s) ? s->sr_vbe[idx] : s->sr[idx];
 }
 
+#ifdef QEMU_NYX
+bool dirty = false;
+#endif
+
 static void vga_update_memory_access(VGACommonState *s)
 {
     hwaddr base, offset, size;
@@ -166,6 +170,9 @@ static void vga_update_memory_access(VGACommonState *s)
         object_unparent(OBJECT(&s->chain4_alias));
         s->has_chain4_alias = false;
         s->plane_updated = 0xf;
+#ifdef QEMU_NYX
+        dirty = true;
+#endif
     }
     if ((sr(s, VGA_SEQ_PLANE_WRITE) & VGA_SR02_ALL_PLANES) ==
         VGA_SR02_ALL_PLANES && sr(s, VGA_SEQ_MEMORY_MODE) & VGA_SR04_CHN_4M) {
@@ -2076,10 +2083,21 @@ static int vga_common_post_load(void *opaque, int version_id)
 {
     VGACommonState *s = opaque;
 
+#ifndef QEMU_NYX
     /* force refresh */
     s->graphic_mode = -1;
     vbe_update_vgaregs(s);
     vga_update_memory_access(s);
+#else
+    if(dirty){
+        /* force refresh */
+        s->graphic_mode = -1;
+        vbe_update_vgaregs(s);
+        //fprintf(stderr, "VGA DIRTY!\n");
+        vga_update_memory_access(s);
+        dirty = false;
+    }
+#endif
     return 0;
 }
 

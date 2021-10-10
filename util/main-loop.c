@@ -88,7 +88,9 @@ static int qemu_signal_init(Error **errp)
     sigemptyset(&set);
     sigaddset(&set, SIG_IPI);
     sigaddset(&set, SIGIO);
+#ifndef QEMU_NYX
     sigaddset(&set, SIGALRM);
+#endif
     sigaddset(&set, SIGBUS);
     /* SIGINT cannot be handled via signalfd, so that ^C can be used
      * to interrupt QEMU when it is being run under gdb.  SIGHUP and

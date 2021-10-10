@@ -41,6 +41,10 @@
 #include "hw/ide/internal.h"
 #include "trace.h"
 
+#ifdef QEMU_NYX
+#include "nyx/snapshot/devices/vm_change_state_handlers.h"
+#endif
+
 /* These values were based on a Seagate ST3500418AS but have been modified
    to make more sense in QEMU */
 static const int smart_attributes[][12] = {
@@ -2654,6 +2658,9 @@ void ide_register_restart_cb(IDEBus *bus)
 {
     if (bus->dma->ops->restart_dma) {
         bus->vmstate = qemu_add_vm_change_state_handler(ide_restart_cb, bus);
+#ifdef QEMU_NYX
+        add_fast_reload_change_handler(ide_restart_cb, bus, RELOAD_HANDLER_IDE_CORE);
+#endif
     }
 }
 

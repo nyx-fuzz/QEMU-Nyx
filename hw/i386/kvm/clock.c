@@ -30,8 +30,20 @@
 #include <linux/kvm.h>
 #include "standard-headers/asm-x86/kvm_para.h"
 
+#ifdef QEMU_NYX
+#include "nyx/snapshot/devices/vm_change_state_handlers.h"
+#endif
+
 #define TYPE_KVM_CLOCK "kvmclock"
 #define KVM_CLOCK(obj) OBJECT_CHECK(KVMClockState, (obj), TYPE_KVM_CLOCK)
+
+#ifdef QEMU_NYX
+bool fuzz_mode = false;
+
+void enable_fast_snapshot_kvm_clock(void){
+    fuzz_mode = true;
+}
+#endif
 
 typedef struct KVMClockState {
     /*< private >*/
@@ -176,7 +188,11 @@ static void kvmclock_vm_state_change(void *opaque, int running,
          * If the host where s->clock was read did not support reliable
          * KVM_GET_CLOCK, read kvmclock value from memory.
          */
+#ifndef QEMU_NYX
         if (!s->clock_is_reliable) {
+#else
+        if (!s->clock_is_reliable && !fuzz_mode) {
+#endif
             uint64_t pvclock_via_mem = kvmclock_current_nsec(s);
             /* We can't rely on the saved clock value, just discard it */
             if (pvclock_via_mem) {
@@ -231,6 +247,9 @@ static void kvmclock_realize(DeviceState *dev, Error **errp)
     kvm_update_clock(s);
 
     qemu_add_vm_change_state_handler(kvmclock_vm_state_change, s);
+#ifdef QEMU_NYX
+    add_fast_reload_change_handler(kvmclock_vm_state_change, s, RELOAD_HANDLER_KVM_CLOCK);
+#endif
 }
 
 static bool kvmclock_clock_is_reliable_needed(void *opaque)

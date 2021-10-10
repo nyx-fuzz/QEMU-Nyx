@@ -28,6 +28,10 @@
 #include "trace.h"
 #include "migration/misc.h"
 
+#ifdef QEMU_NYX
+#include "nyx/snapshot/block/block_cow.h"
+#endif
+
 /* Number of coroutines to reserve per attached device model */
 #define COROUTINE_POOL_RESERVATION 64
 
@@ -42,6 +46,7 @@ typedef struct BlockBackendAioNotifier {
     QLIST_ENTRY(BlockBackendAioNotifier) list;
 } BlockBackendAioNotifier;
 
+#ifndef QEMU_NYX
 struct BlockBackend {
     char *name;
     int refcnt;
@@ -96,6 +101,7 @@ struct BlockBackend {
      */
     unsigned int in_flight;
 };
+#endif
 
 typedef struct BlockBackendAIOCB {
     BlockAIOCB common;
@@ -335,6 +341,9 @@ BlockBackend *blk_new(AioContext *ctx, uint64_t perm, uint64_t shared_perm)
     BlockBackend *blk;
 
     blk = g_new0(BlockBackend, 1);
+#ifdef QEMU_NYX
+    blk->cow_cache = NULL;
+#endif
     blk->refcnt = 1;
     blk->ctx = ctx;
     blk->perm = perm;
@@ -406,6 +415,10 @@ BlockBackend *blk_new_open(const char *filename, const char *reference,
         blk_unref(blk);
         return NULL;
     }
+
+#ifdef QEMU_NYX
+    blk->cow_cache = cow_cache_new(filename);
+#endif
 
     return blk;
 }
@@ -1109,8 +1122,13 @@ void blk_set_disable_request_queuing(BlockBackend *blk, bool disable)
     blk->disable_request_queuing = disable;
 }
 
+#ifndef QEMU_NYX
 static int blk_check_byte_request(BlockBackend *blk, int64_t offset,
                                   size_t size)
+#else
+int blk_check_byte_request(BlockBackend *blk, int64_t offset,
+                                  size_t size)
+#endif
 {
     int64_t len;
 
@@ -1333,7 +1351,18 @@ static const AIOCBInfo blk_aio_em_aiocb_info = {
     .aiocb_size         = sizeof(BlkAioEmAIOCB),
 };
 
+#ifndef QEMU_NYX
 static void blk_aio_complete(BlkAioEmAIOCB *acb)
+#else
+void blk_aio_complete(BlkAioEmAIOCB *acb);
+BlockAIOCB *blk_aio_prwv(BlockBackend *blk, int64_t offset, int bytes,
+                                void *iobuf, CoroutineEntry co_entry,
+                                BdrvRequestFlags flags,
+                                BlockCompletionFunc *cb, void *opaque);
+void blk_aio_write_entry(void *opaque);
+
+void blk_aio_complete(BlkAioEmAIOCB *acb)
+#endif
 {
     if (acb->has_returned) {
         acb->common.cb(acb->common.opaque, acb->rwco.ret);
@@ -1349,10 +1378,17 @@ static void blk_aio_complete_bh(void *opaque)
     blk_aio_complete(acb);
 }
 
+#ifndef QEMU_NYX
 static BlockAIOCB *blk_aio_prwv(BlockBackend *blk, int64_t offset, int bytes,
                                 void *iobuf, CoroutineEntry co_entry,
                                 BdrvRequestFlags flags,
                                 BlockCompletionFunc *cb, void *opaque)
+#else
+BlockAIOCB *blk_aio_prwv(BlockBackend *blk, int64_t offset, int bytes,
+                                void *iobuf, CoroutineEntry co_entry,
+                                BdrvRequestFlags flags,
+                                BlockCompletionFunc *cb, void *opaque)
+#endif
 {
     BlkAioEmAIOCB *acb;
     Coroutine *co;
@@ -1399,7 +1435,11 @@ static void blk_aio_read_entry(void *opaque)
     blk_aio_complete(acb);
 }
 
+#ifndef QEMU_NYX
 static void blk_aio_write_entry(void *opaque)
+#else
+void blk_aio_write_entry(void *opaque)
+#endif
 {
     BlkAioEmAIOCB *acb = opaque;
     BlkRwCo *rwco = &acb->rwco;
@@ -1476,16 +1516,34 @@ BlockAIOCB *blk_aio_preadv(BlockBackend *blk, int64_t offset,
                            QEMUIOVector *qiov, BdrvRequestFlags flags,
                            BlockCompletionFunc *cb, void *opaque)
 {
+#ifndef QEMU_NYX
     return blk_aio_prwv(blk, offset, qiov->size, qiov,
                         blk_aio_read_entry, flags, cb, opaque);
+#else
+    if(blk->cow_cache->enabled){
+        return blk_aio_prwv(blk, offset, qiov->size, qiov, cow_cache_read_entry, flags, cb, opaque);
+    }
+    else{
+        return blk_aio_prwv(blk, offset, qiov->size, qiov, blk_aio_read_entry, flags, cb, opaque);
+    }
+#endif
 }
 
 BlockAIOCB *blk_aio_pwritev(BlockBackend *blk, int64_t offset,
                             QEMUIOVector *qiov, BdrvRequestFlags flags,
                             BlockCompletionFunc *cb, void *opaque)
 {
+#ifndef QEMU_NYX
     return blk_aio_prwv(blk, offset, qiov->size, qiov,
                         blk_aio_write_entry, flags, cb, opaque);
+#else
+    if(blk->cow_cache->enabled){
+        return blk_aio_prwv(blk, offset, qiov->size, qiov, cow_cache_write_entry, flags, cb, opaque);
+    }
+    else{
+        return blk_aio_prwv(blk, offset, qiov->size, qiov, blk_aio_write_entry, flags, cb, opaque);
+    }
+#endif
 }
 
 static void blk_aio_flush_entry(void *opaque)

@@ -236,6 +236,77 @@ struct kvm_hyperv_exit {
 #define KVM_EXIT_IOAPIC_EOI       26
 #define KVM_EXIT_HYPERV           27
 
+#ifdef QEMU_NYX
+#define HYPERCALL_KAFL_RAX_ID			0x01f
+#define KAFL_EXIT_OFFSET				100
+
+#define KVM_EXIT_KAFL_ACQUIRE			100
+#define KVM_EXIT_KAFL_GET_PAYLOAD		101
+#define KVM_EXIT_KAFL_GET_PROGRAM		102
+#define KVM_EXIT_KAFL_GET_ARGV			103
+#define KVM_EXIT_KAFL_RELEASE			104
+#define KVM_EXIT_KAFL_SUBMIT_CR3		105
+#define KVM_EXIT_KAFL_SUBMIT_PANIC		106
+#define KVM_EXIT_KAFL_SUBMIT_KASAN		107
+#define KVM_EXIT_KAFL_PANIC				108
+#define KVM_EXIT_KAFL_KASAN				109
+#define KVM_EXIT_KAFL_LOCK				110
+#define KVM_EXIT_KAFL_INFO				111
+#define KVM_EXIT_KAFL_NEXT_PAYLOAD		112
+#define KVM_EXIT_KAFL_PRINTF			113
+
+/* Kernel Printf Debugger */
+#define KVM_EXIT_KAFL_PRINTK_ADDR		114
+#define KVM_EXIT_KAFL_PRINTK			115
+
+/* user space only exit reasons */
+#define KVM_EXIT_KAFL_USER_RANGE_ADVISE	116
+#define KVM_EXIT_KAFL_USER_SUBMIT_MODE	117
+#define KVM_EXIT_KAFL_USER_FAST_ACQUIRE	118
+#define KVM_EXIT_KAFL_TOPA_MAIN_FULL	119
+#define KVM_EXIT_KAFL_USER_ABORT		120
+
+
+/* hypertrash only hypercalls */
+#define HYPERTRASH_HYPERCALL_MASK		0xAA000000
+
+#define HYPERCALL_KAFL_NESTED_PREPARE	(0 | HYPERTRASH_HYPERCALL_MASK)
+#define HYPERCALL_KAFL_NESTED_CONFIG	(1 | HYPERTRASH_HYPERCALL_MASK)
+#define HYPERCALL_KAFL_NESTED_ACQUIRE	(2 | HYPERTRASH_HYPERCALL_MASK)
+#define HYPERCALL_KAFL_NESTED_RELEASE	(3 | HYPERTRASH_HYPERCALL_MASK)
+
+#define KVM_EXIT_KAFL_NESTED_CONFIG		121
+#define KVM_EXIT_KAFL_NESTED_PREPARE	122
+#define KVM_EXIT_KAFL_NESTED_ACQUIRE	123
+#define KVM_EXIT_KAFL_NESTED_RELEASE	124
+
+#define KVM_EXIT_KAFL_PAGE_DUMP_BP	125
+#define KVM_EXIT_KAFL_TIMEOUT       126
+
+#define KVM_EXIT_KAFL_NESTED_HPRINTF	127
+#define KVM_EXIT_KAFL_MTF	128
+
+#define KVM_EXIT_KAFL_RANGE_SUBMIT	129
+#define HYPERCALL_KAFL_REQ_STREAM_DATA 130
+#define KVM_EXIT_KAFL_NESTED_EARLY_RELEASE	131
+#define KVM_EXIT_KAFL_PANIC_EXTENDED 132
+#define KVM_EXIT_KAFL_CREATE_TMP_SNAPSHOT 133
+
+#define KVM_EXIT_KAFL_DEBUG_TMP_SNAPSHOT 134 /* hypercall for debugging / development purposes */
+
+#define KVM_EXIT_KAFL_GET_HOST_CONFIG 135
+#define KVM_EXIT_KAFL_SET_AGENT_CONFIG 136
+
+#define KVM_EXIT_KAFL_DUMP_FILE 137
+
+#define HYPERCALL_KAFL_REQ_STREAM_DATA_BULK 138
+
+
+#define KVM_CAP_NYX_PT 512
+#define KVM_CAP_NYX_FDL 513
+
+#endif
+
 /* For KVM_EXIT_INTERNAL_ERROR */
 /* Emulate instruction failed. */
 #define KVM_INTERNAL_ERROR_EMULATION	1
@@ -1610,5 +1681,63 @@ struct kvm_hyperv_eventfd {
 
 #define KVM_HYPERV_CONN_ID_MASK		0x00ffffff
 #define KVM_HYPERV_EVENTFD_DEASSIGN	(1 << 0)
+
+#ifdef QEMU_NYX
+/*
+ * ioctls for vmx_pt fds
+ */
+#define KVM_VMX_PT_SETUP_FD                                     _IO(KVMIO,      0xd0)                   /* apply vmx_pt fd (via vcpu fd ioctl)*/
+#define KVM_VMX_PT_CONFIGURE_ADDR0                      _IOW(KVMIO,     0xd1, __u64)    /* configure IP-filtering for addr0_a & addr0_b */
+#define KVM_VMX_PT_CONFIGURE_ADDR1                      _IOW(KVMIO,     0xd2, __u64)    /* configure IP-filtering for addr1_a & addr1_b */
+#define KVM_VMX_PT_CONFIGURE_ADDR2                      _IOW(KVMIO,     0xd3, __u64)    /* configure IP-filtering for addr2_a & addr2_b */
+#define KVM_VMX_PT_CONFIGURE_ADDR3                      _IOW(KVMIO,     0xd4, __u64)    /* configure IP-filtering for addr3_a & addr3_b */
+
+#define KVM_VMX_PT_CONFIGURE_CR3                        _IOW(KVMIO,     0xd5, __u64)    /* setup CR3 filtering value */
+#define KVM_VMX_PT_ENABLE                                       _IO(KVMIO,      0xd6)                   /* enable and lock configuration */ 
+#define KVM_VMX_PT_GET_TOPA_SIZE                        _IOR(KVMIO,     0xd7, __u32)    /* get defined ToPA size */
+#define KVM_VMX_PT_DISABLE                                      _IO(KVMIO,      0xd8)                   /* enable and lock configuration */ 
+#define KVM_VMX_PT_CHECK_TOPA_OVERFLOW          _IO(KVMIO,      0xd9)                   /* check for ToPA overflow */
+
+#define KVM_VMX_PT_ENABLE_ADDR0                         _IO(KVMIO,      0xaa)                   /* enable IP-filtering for addr0 */
+#define KVM_VMX_PT_ENABLE_ADDR1                         _IO(KVMIO,      0xab)                   /* enable IP-filtering for addr1 */
+#define KVM_VMX_PT_ENABLE_ADDR2                         _IO(KVMIO,      0xac)                   /* enable IP-filtering for addr2 */
+#define KVM_VMX_PT_ENABLE_ADDR3                         _IO(KVMIO,      0xad)                   /* enable IP-filtering for addr3 */
+
+#define KVM_VMX_PT_DISABLE_ADDR0                        _IO(KVMIO,      0xae)                   /* disable IP-filtering for addr0 */
+#define KVM_VMX_PT_DISABLE_ADDR1                        _IO(KVMIO,      0xaf)                   /* disable IP-filtering for addr1 */
+#define KVM_VMX_PT_DISABLE_ADDR2                        _IO(KVMIO,      0xe0)                   /* disable IP-filtering for addr2 */
+#define KVM_VMX_PT_DISABLE_ADDR3                        _IO(KVMIO,      0xe1)                   /* disable IP-filtering for addr3 */
+
+#define KVM_VMX_PT_ENABLE_CR3                           _IO(KVMIO,      0xe2)                   /* enable CR3 filtering */
+#define KVM_VMX_PT_DISABLE_CR3                          _IO(KVMIO,      0xe3)                   /* disable CR3 filtering */
+
+#define KVM_VMX_PT_SUPPORTED                            _IO(KVMIO,      0xe4)
+
+#define KVM_VMX_FDL_SETUP_FD                            _IO(KVMIO,      0xe5)
+#define KVM_VMX_FDL_SET                                 _IOW(KVMIO,     0xe6, __u64)
+#define KVM_VMX_FDL_FLUSH                               _IO(KVMIO,      0xe7)
+#define KVM_VMX_FDL_GET_INDEX                           _IOR(KVMIO,     0xe8, __u64)
+
+#define KVM_VMX_PT_GET_ADDRN                            _IO(KVMIO,      0xe9)
+
+/* Multi CR3 Support */
+
+#define KVM_VMX_PT_CONFIGURE_MULTI_CR3			_IOW(KVMIO,	0xea, __u64)	/* setup CR3 filtering value */
+#define KVM_VMX_PT_ENABLE_MULTI_CR3				_IO(KVMIO,	0xeb)			/* enable CR3 filtering */
+#define KVM_VMX_PT_DISABLE_MULTI_CR3			_IO(KVMIO,	0xec)			/* disable CR3 filtering */
+
+/* Page Dump Support */
+
+#define KVM_VMX_PT_SET_PAGE_DUMP_CR3				_IOW(KVMIO,	0xed, __u64)
+#define KVM_VMX_PT_ENABLE_PAGE_DUMP_CR3			_IO(KVMIO,	0xee)	
+#define KVM_VMX_PT_DISABLE_PAGE_DUMP_CR3		_IO(KVMIO,	0xef)	
+
+#define KVM_VMX_PT_ENABLE_MTF			_IO(KVMIO,	0xf0)	
+#define KVM_VMX_PT_DISABLE_MTF		_IO(KVMIO,	0xf1)	
+
+/* KVM dirty-ring */
+#define KVM_CAP_DIRTY_LOG_RING 192
+#define KVM_EXIT_DIRTY_RING_FULL  31
+#endif
 
 #endif /* __LINUX_KVM_H */

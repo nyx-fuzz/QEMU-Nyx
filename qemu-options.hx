@@ -4251,6 +4251,16 @@ STEXI
 Enable FIPS 140-2 compliance mode.
 ETEXI
 
+#ifdef QEMU_NYX
+DEF("fast_vm_reload", HAS_ARG, QEMU_OPTION_fast_vm_reload,
+    "-fast_vm_reload    snapshot-folder\n", QEMU_ARCH_ALL)
+STEXI
+@item -fast_vm_reload
+@findex -fast_vm_reload
+fast_vm_reload.
+ETEXI
+#endif
+
 HXCOMM Deprecated by -accel tcg
 DEF("no-kvm", 0, QEMU_OPTION_no_kvm, "", QEMU_ARCH_I386)
 

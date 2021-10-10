@@ -75,7 +75,14 @@ void os_setup_signal_handling(void)
     memset(&act, 0, sizeof(act));
     act.sa_sigaction = termsig_handler;
     act.sa_flags = SA_SIGINFO;
+#ifndef QEMU_NYX
     sigaction(SIGINT,  &act, NULL);
+#else
+    /* don't install a special sighandler if the nyx block cow cache layer is disabled */
+	if(getenv("NYX_DISABLE_BLOCK_COW")){
+        sigaction(SIGINT,  &act, NULL);
+    }
+#endif
     sigaction(SIGHUP,  &act, NULL);
     sigaction(SIGTERM, &act, NULL);
 }

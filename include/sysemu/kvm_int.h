@@ -41,5 +41,9 @@ typedef struct KVMMemoryListener {
 void kvm_memory_listener_register(KVMState *s, KVMMemoryListener *kml,
                                   AddressSpace *as, int as_id);
 
+#ifdef QEMU_NYX
+KVMMemoryListener* kvm_get_kml(int as_id);
+#endif
+
 void kvm_set_max_memslot_size(hwaddr max_slot_size);
 #endif

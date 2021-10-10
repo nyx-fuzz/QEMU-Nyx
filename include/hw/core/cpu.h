@@ -409,6 +409,21 @@ struct CPUState {
      */
     uintptr_t mem_io_pc;
 
+#ifdef QEMU_NYX
+    volatile int pt_cmd;
+    volatile int pt_ret;
+    volatile bool pt_enabled;
+
+    int pt_fd;
+    void* pt_mmap;
+
+    void* pt_decoder_state;
+
+    bool reload_pending;
+    bool intel_pt_run_trashed;
+
+#endif
+
     int kvm_fd;
     struct KVMState *kvm_state;
     struct kvm_run *kvm_run;

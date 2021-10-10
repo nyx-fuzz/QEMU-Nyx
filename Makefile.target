@@ -157,6 +157,7 @@ obj-y += dump/
 obj-y += hw/
 obj-y += monitor/
 obj-y += qapi/
+obj-$(CONFIG_QEMU_NYX) += nyx/
 obj-y += memory.o
 obj-y += memory_mapping.o
 obj-y += migration/ram.o

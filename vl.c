@@ -132,6 +132,15 @@ int main(int argc, char **argv)
 #include "sysemu/iothread.h"
 #include "qemu/guest-random.h"
 
+#ifdef QEMU_NYX
+#include "nyx/pt.h"
+#include "nyx/hypercall.h"
+#include "nyx/synchronization.h"
+#include "nyx/fast_vm_reload.h"
+#include "nyx/state.h"
+#include "nyx/fast_vm_reload_sync.h"
+#endif
+
 #define MAX_VIRTIO_CONSOLES 1
 
 static const char *data_dir[16];
@@ -239,6 +248,32 @@ static struct {
     { .driver = "ati-vga",              .flag = &default_vga       },
     { .driver = "vhost-user-vga",       .flag = &default_vga       },
 };
+
+#ifdef QEMU_NYX
+static QemuOptsList qemu_fast_vm_reloads_opts = {
+    .name = "fast_vm_reload-opts",
+    .implied_opt_name = "order",
+    .head = QTAILQ_HEAD_INITIALIZER(qemu_fast_vm_reloads_opts.head),
+    .merge_lists = true,
+    .desc = {
+        {
+            .name = "path",
+            .type = QEMU_OPT_STRING,
+        },{
+            .name = "load",
+            .type = QEMU_OPT_BOOL,
+        },{
+            .name = "pre_path",
+            .type = QEMU_OPT_STRING,
+        },{
+            .name = "skip_serialization",
+            .type = QEMU_OPT_BOOL,
+        },
+        {  }
+    },
+};
+#endif
+
 
 static QemuOptsList qemu_rtc_opts = {
     .name = "rtc",
@@ -1437,6 +1472,10 @@ void vm_state_notify(int running, RunState state)
     }
 }
 
+#ifdef QEMU_NYX
+char* loadvm_global = NULL;
+#endif
+
 static ShutdownCause reset_requested;
 static ShutdownCause shutdown_requested;
 static int shutdown_signal;
@@ -1611,6 +1650,13 @@ void qemu_system_guest_panicked(GuestPanicInformation *info)
 
 void qemu_system_reset_request(ShutdownCause reason)
 {
+#ifdef QEMU_NYX
+   if(GET_GLOBAL_STATE()->in_fuzzing_mode){
+        fprintf(stderr, "%s!\n", __func__);
+        GET_GLOBAL_STATE()->shutdown_requested = true;
+        return;
+    }
+#endif
     if (no_reboot && reason != SHUTDOWN_CAUSE_SUBSYSTEM_RESET) {
         shutdown_requested = reason;
     } else {
@@ -1630,6 +1676,13 @@ static void qemu_system_suspend(void)
 
 void qemu_system_suspend_request(void)
 {
+#ifdef CONFIG_PROCESSOR_TRACE
+    if(GET_GLOBAL_STATE()->in_fuzzing_mode){
+        fprintf(stderr, "%s!\n", __func__);
+        GET_GLOBAL_STATE()->shutdown_requested = true;
+        return;
+    }
+#endif
     if (runstate_check(RUN_STATE_SUSPENDED)) {
         return;
     }
@@ -1699,6 +1752,13 @@ void qemu_system_killed(int signal, pid_t pid)
 
 void qemu_system_shutdown_request(ShutdownCause reason)
 {
+#ifdef CONFIG_PROCESSOR_TRACE
+    if(GET_GLOBAL_STATE()->in_fuzzing_mode){
+        fprintf(stderr, "%s!\n", __func__);
+        GET_GLOBAL_STATE()->shutdown_requested = true;
+        return;
+    }
+#endif
     trace_qemu_system_shutdown_request(reason);
     replay_shutdown_request(reason);
     shutdown_requested = reason;
@@ -1719,6 +1779,13 @@ static void qemu_system_shutdown(ShutdownCause cause)
 
 void qemu_system_powerdown_request(void)
 {
+#ifdef CONFIG_PROCESSOR_TRACE
+    if(GET_GLOBAL_STATE()->in_fuzzing_mode){
+        fprintf(stderr, "%s!\n", __func__);
+        GET_GLOBAL_STATE()->shutdown_requested = true;
+        return;
+    }
+#endif
     trace_qemu_system_powerdown_request();
     powerdown_requested = 1;
     qemu_notify_event();
@@ -1793,6 +1860,11 @@ static bool main_loop_should_exit(void)
         qemu_system_powerdown();
     }
     if (qemu_vmstop_requested(&r)) {
+#ifdef QEMU_NYX
+        if(check_if_relood_request_exists_post(GET_GLOBAL_STATE()->reload_state)){
+            return false;
+        }
+#endif
         vm_stop(r);
     }
     return false;
@@ -1816,8 +1888,13 @@ static void main_loop(void)
 
 static void version(void)
 {
+#ifdef QEMU_NYX
+    printf("QEMU-PT emulator version " QEMU_VERSION QEMU_PKGVERSION "  (kAFL)\n"
+           QEMU_COPYRIGHT "\n");
+#else
     printf("QEMU emulator version " QEMU_FULL_VERSION "\n"
            QEMU_COPYRIGHT "\n");
+#endif
 }
 
 static void help(int exitcode)
@@ -2715,6 +2792,26 @@ static bool object_create_delayed(const char *type, QemuOpts *opts)
     return !object_create_initial(type, opts);
 }
 
+#ifdef QEMU_NYX
+static bool verifiy_snapshot_folder(const char* folder){
+    struct stat s;
+
+    if(!folder){
+        return false;
+    }
+    if(-1 != stat(folder, &s)) {
+        if(S_ISDIR(s.st_mode)) {
+            return true;
+        }
+        else{
+            error_report("fast_vm_reload: path is not a folder");
+            exit(1);
+        }
+    }
+    error_report("fast_vm_reload: path does not exist");
+    exit(1);
+}
+#endif
 
 static void set_memory_options(uint64_t *ram_slots, ram_addr_t *maxram_size,
                                MachineClass *mc)
@@ -2827,6 +2924,12 @@ static void user_register_global_props(void)
 
 int main(int argc, char **argv, char **envp)
 {
+
+#ifdef QEMU_NYX
+    bool fast_vm_reload = false;
+    state_init_global();
+#endif
+
     int i;
     int snapshot, linux_boot;
     const char *initrd_filename;
@@ -2887,6 +2990,9 @@ int main(int argc, char **argv, char **envp)
     qemu_add_opts(&qemu_netdev_opts);
     qemu_add_opts(&qemu_nic_opts);
     qemu_add_opts(&qemu_net_opts);
+#ifdef QEMU_NYX
+    qemu_add_opts(&qemu_fast_vm_reloads_opts);
+#endif
     qemu_add_opts(&qemu_rtc_opts);
     qemu_add_opts(&qemu_global_opts);
     qemu_add_opts(&qemu_mon_opts);
@@ -2974,6 +3080,15 @@ int main(int argc, char **argv, char **envp)
                 exit(1);
             }
             switch(popt->index) {
+#ifdef QEMU_NYX
+            case QEMU_OPTION_fast_vm_reload:
+                opts = qemu_opts_parse_noisily(qemu_find_opts("fast_vm_reload-opts"),
+                                               optarg, true);                if (!opts) {
+                    exit(1);
+                }
+                fast_vm_reload = true;
+                break;
+#endif
             case QEMU_OPTION_cpu:
                 /* hw initialization will check this */
                 cpu_option = optarg;
@@ -3429,6 +3544,9 @@ int main(int argc, char **argv, char **envp)
                 break;
             case QEMU_OPTION_loadvm:
                 loadvm = optarg;
+#ifdef QEMU_NYX
+                loadvm_global = (char*)optarg;
+#endif
                 break;
             case QEMU_OPTION_full_screen:
                 dpy.has_full_screen = true;
@@ -3867,6 +3985,11 @@ int main(int argc, char **argv, char **envp)
         error_report_err(main_loop_err);
         exit(1);
     }
+
+#ifdef QEMU_NYX
+    block_signals();
+#endif
+
 
 #ifdef CONFIG_SECCOMP
     olist = qemu_find_opts_err("sandbox", NULL);
@@ -4435,6 +4558,108 @@ int main(int argc, char **argv, char **envp)
     replay_checkpoint(CHECKPOINT_RESET);
     qemu_system_reset(SHUTDOWN_CAUSE_NONE);
     register_global_state();
+
+#ifdef QEMU_NYX
+    fast_reload_init(GET_GLOBAL_STATE()->fast_reload_snapshot);
+
+    if (fast_vm_reload){
+
+        if(getenv("NYX_DISABLE_BLOCK_COW")){
+            fprintf(stderr, "ERROR: Nyx block COW cache layer cannot be disabled while using fast snapshots\n");
+            exit(1);
+        }
+
+        QemuOpts *opts = qemu_opts_parse_noisily(qemu_find_opts("fast_vm_reload-opts"), optarg, true);
+        const char* snapshot_path = qemu_opt_get(opts, "path");
+        const char* pre_snapshot_path = qemu_opt_get(opts, "pre_path");
+
+        /* 
+        
+        valid arguments: 
+            // create root snapshot to path (load pre_snapshot first)
+                -> path=foo,pre_path=bar,load=off // ALLOWED
+            // create root snapshot im memory (load pre_snapshot first)
+                -> pre_path=bar,load=off,skip_serialization // ALLOWED
+            // create root snapshot to path
+                -> path=foo,load=off // ALLOWED
+            // load root snapshot from path 
+                -> path=foo,load=on // ALLOWED
+            // create pre snapshot to pre_path
+                -> pre_path=bar,load=off // ALLOWED
+
+        invalid arguments: 
+            -> load=off // ALLOWED but useless
+            -> path=foo,pre_path=bar,load=on // INVALID
+            -> pre_path=bar,load=on // INVALID
+            -> load=on // INVALID
+        */
+
+        bool snapshot_used = verifiy_snapshot_folder(snapshot_path); 
+        bool pre_snapshot_used = verifiy_snapshot_folder(pre_snapshot_path); 
+        bool load_mode = qemu_opt_get_bool(opts, "load", false);
+        bool skip_serialization = qemu_opt_get_bool(opts, "skip_serialization", false);
+
+        if((snapshot_used || load_mode || skip_serialization) && getenv("NYX_DISABLE_DIRTY_RING")){
+		    fprintf(stderr, "ERROR: NYX_DISABLE_DIRTY_RING is only allowed during pre-snapshot creation\n");
+            exit(1);
+        }
+
+        if((pre_snapshot_used && !snapshot_used && !load_mode) && !getenv("NYX_DISABLE_DIRTY_RING")){
+		    fprintf(stderr, "ERROR: NYX_DISABLE_DIRTY_RING is required during pre-snapshot creation\n");
+            exit(1);
+        }
+
+        if(pre_snapshot_used && load_mode){
+            fprintf(stderr, "[!] qemu-nyx: invalid argument (pre_snapshot_used && load_mode)!\n");
+            exit(1);
+        }
+
+        if((!snapshot_used && !pre_snapshot_used) && load_mode){
+            fprintf(stderr, "[!] qemu-nyx: invalid argument ((!pre_snapshot_used && !pre_snapshot_used) && load_mode)!\n");
+            exit(1);
+        }
+
+        if(pre_snapshot_used && snapshot_used){
+            fprintf(stderr, "[!] qemu-nyx: loading pre image to start fuzzing...\n");
+            set_fast_reload_mode(false);
+            set_fast_reload_path(snapshot_path);
+            if(!skip_serialization){
+                enable_fast_reloads();
+            }
+            fast_reload_create_from_file_pre_image(get_fast_reload_snapshot(), pre_snapshot_path, false);
+            fast_reload_destroy(get_fast_reload_snapshot());
+            GET_GLOBAL_STATE()->fast_reload_snapshot = fast_reload_new();
+            fast_reload_init(GET_GLOBAL_STATE()->fast_reload_snapshot);
+        }
+        else{
+            if(pre_snapshot_used){
+                fprintf(stderr, "[!] qemu-nyx: preparing to create pre image...\n");
+                set_fast_reload_pre_path(pre_snapshot_path);
+                set_fast_reload_pre_image();
+            }
+            else if(snapshot_used){
+                set_fast_reload_path(snapshot_path);
+                if(!skip_serialization){
+                    enable_fast_reloads();
+                }
+                if (load_mode){
+                    set_fast_reload_mode(true);
+                    fprintf(stderr, "[!] qemu-nyx: waiting for snapshot to start fuzzing...\n");
+                    fast_reload_create_from_file(get_fast_reload_snapshot(), snapshot_path, false);
+                    //cpu_synchronize_all_post_reset();
+                    set_state_auxiliary_result_buffer(GET_GLOBAL_STATE()->auxilary_buffer, 3);
+                    skip_init();
+                    //GET_GLOBAL_STATE()->pt_trace_mode = false;
+                }
+                else{
+                    fprintf(stderr, "[!] qemu-nyx: Booting to start fuzzing...\n");
+                    set_fast_reload_mode(false);
+                }
+            }
+        }
+    }
+#endif
+
     if (loadvm) {
         Error *local_err = NULL;
         if (load_snapshot(loadvm, &local_err) < 0) {

@@ -44,6 +44,18 @@
 
 #include "hw/boards.h"
 
+#ifdef QEMU_NYX
+#include "nyx/pt.h"
+#include "nyx/hypercall.h"
+#include "nyx/synchronization.h"
+#include "nyx/debug.h"
+#include "nyx/state.h"
+#include "nyx/interface.h"
+#include "nyx/fast_vm_reload_sync.h"
+#include "nyx/snapshot/memory/backend/nyx_dirty_ring.h"
+#include "nyx/helpers.h"
+#endif
+
 /* This check must be after config-host.h is included */
 #ifdef CONFIG_EVENTFD
 #include <sys/eventfd.h>
@@ -75,6 +87,10 @@ struct KVMParkedVcpu {
 struct KVMState
 {
     AccelState parent_obj;
+
+#ifdef QEMU_NYX
+    bool nyx_no_pt_mode;
+#endif
 
     int nr_slots;
     int fd;
@@ -363,6 +379,16 @@ static int kvm_get_vcpu(KVMState *s, unsigned long vcpu_id)
     return kvm_vm_ioctl(s, KVM_CREATE_VCPU, (void *)vcpu_id);
 }
 
+#ifdef QEMU_NYX
+int kvm_get_vm_fd(KVMState *s){
+    return s->vmfd;
+}
+
+KVMMemoryListener* kvm_get_kml(int as_id){  
+  return kvm_state->as[as_id].ml;
+}
+#endif
+
 int kvm_init_vcpu(CPUState *cpu)
 {
     KVMState *s = kvm_state;
@@ -380,6 +406,16 @@ int kvm_init_vcpu(CPUState *cpu)
     cpu->kvm_fd = ret;
     cpu->kvm_state = s;
     cpu->vcpu_dirty = true;
+
+#ifdef QEMU_NYX
+    if(s->nyx_no_pt_mode){
+        if(!getenv("NYX_DISABLE_DIRTY_RING")){
+            nyx_dirty_ring_pre_init(cpu->kvm_fd, s->vmfd);
+        }
+    }
+    pt_kvm_init(cpu);
+    install_timeout_detector(&GET_GLOBAL_STATE()->timeout_detector);
+#endif
 
     mmap_size = kvm_ioctl(s, KVM_GET_VCPU_MMAP_SIZE, 0);
     if (mmap_size < 0) {
@@ -402,6 +438,11 @@ int kvm_init_vcpu(CPUState *cpu)
     }
 
     ret = kvm_arch_init_vcpu(cpu);
+
+#ifdef QEMU_NYX
+    unblock_signals();
+#endif
+
 err:
     return ret;
 }
@@ -1874,7 +1915,62 @@ static int kvm_init(MachineState *ms)
         ret = -errno;
         goto err;
     }
+#ifdef QEMU_NYX
+    if (ioctl(s->fd, KVM_CHECK_EXTENSION, KVM_CAP_NYX_PT) != 1 && ioctl(s->fd, KVM_CHECK_EXTENSION, KVM_CAP_NYX_FDL) != 1) {
+        fprintf(stderr, "[!] Could not access KVM-PT kernel module!\n [*] Trying vanilla KVM...\n");
 
+        /* fallback -> use vanilla KVM module instead (no Intel-PT tracing or nested hypercalls at this point) */
+        s->fd = qemu_open("/dev/kvm", O_RDWR);
+        if (s->fd == -1) {
+            fprintf(stderr, "Error: NYX fallback failed: Could not access vanilla KVM module!\n");
+            ret = -errno;
+            goto err;
+        }
+
+        int ret_val = ioctl(s->fd, KVM_CHECK_EXTENSION, KVM_CAP_DIRTY_LOG_RING);
+	    if(ret_val == -1 || ret_val == 0){
+            fprintf(stderr, "Error: NYX requires support for KVM_CAP_DIRTY_LOG_RING in fallback mode!\n");
+            ret = -errno;
+            goto err;
+        }
+
+        /* check for vmware_backdoor support */
+        int fd = open("/sys/module/kvm/parameters/enable_vmware_backdoor", O_RDONLY);
+        if(fd == -1){
+            fprintf(stderr, "ERROR: /sys/module/kvm/parameters/enable_vmware_backdoor file not found...\n");
+            ret = -errno;
+            goto err;
+        }
+
+        char vmware_backdoor_option = 0;
+        assert(read(fd, &vmware_backdoor_option, 1) == 1);
+        close(fd);
+
+        if(vmware_backdoor_option == 'N'){
+            fprintf(stderr, "\nERROR: vmware backdoor is not enabled...\n");
+            fprintf(stderr, "\n\tRun the following commands to fix the issue:\n");
+            fprintf(stderr, "\t-----------------------------------------\n");
+            fprintf(stderr, "\tsudo modprobe -r kvm-intel\n");
+            fprintf(stderr, "\tsudo modprobe -r kvm\n");
+            fprintf(stderr, "\tsudo modprobe  kvm enable_vmware_backdoor=y\n");
+            fprintf(stderr, "\tsudo modprobe  kvm-intel\n");
+            fprintf(stderr, "\tcat /sys/module/kvm/parameters/enable_vmware_backdoor\n");
+            fprintf(stderr, "\t-----------------------------------------\n\n");
+            ret = -errno;
+            goto err;
+        }
+
+        fprintf(stderr, "NYX runs in fallback mode (no Intel-PT tracing or nested hypercall support)!\n");
+        s->nyx_no_pt_mode = true;
+        GET_GLOBAL_STATE()->nyx_fdl = false;
+        fast_reload_set_mode(get_fast_reload_snapshot(), RELOAD_MEMORY_MODE_DIRTY_RING);
+    }
+    else{
+        s->nyx_no_pt_mode = false;
+        GET_GLOBAL_STATE()->nyx_fdl = true;
+        fast_reload_set_mode(get_fast_reload_snapshot(), RELOAD_MEMORY_MODE_FDL);
+    }
+#endif
     ret = kvm_ioctl(s, KVM_GET_API_VERSION, 0);
     if (ret < KVM_API_VERSION) {
         if (ret >= 0) {
@@ -1939,6 +2035,18 @@ static int kvm_init(MachineState *ms)
 
     s->vmfd = ret;
 
+#ifdef QEMU_NYX
+    if(s->nyx_no_pt_mode){
+        if(getenv("NYX_DISABLE_DIRTY_RING")){
+		    fprintf(stderr, "WARNING: Nyx has disabled KVM's dirty-ring (required to enable full VGA support during pre-snapshot creation procedure)\n");
+            fast_reload_set_mode(get_fast_reload_snapshot(), RELOAD_MEMORY_MODE_DEBUG_QUIET); /* required to create snapshot */
+        }
+        else{
+            nyx_dirty_ring_early_init(s->fd, s->vmfd);
+        }
+    }
+#endif
+
     /* check the vcpu limits */
     soft_vcpus_limit = kvm_recommended_vcpus(s);
     hard_vcpus_limit = kvm_max_vcpus(s);
@@ -1978,7 +2086,16 @@ static int kvm_init(MachineState *ms)
     s->manual_dirty_log_protect =
         kvm_check_extension(s, KVM_CAP_MANUAL_DIRTY_LOG_PROTECT2);
     if (s->manual_dirty_log_protect) {
+#ifndef QEMU_NYX
         ret = kvm_vm_enable_cap(s, KVM_CAP_MANUAL_DIRTY_LOG_PROTECT2, 0, 1);
+#else
+        if(s->nyx_no_pt_mode){
+            ret = kvm_vm_enable_cap(s, KVM_CAP_MANUAL_DIRTY_LOG_PROTECT2, 0, 1);
+        }
+        else{
+            ret = 0;
+        }
+#endif
         if (ret) {
             warn_report("Trying to enable KVM_CAP_MANUAL_DIRTY_LOG_PROTECT2 "
                         "but failed.  Falling back to the legacy mode. ");
@@ -2268,6 +2385,17 @@ static void kvm_eat_signals(CPUState *cpu)
     } while (sigismember(&chkset, SIG_IPI));
 }
 
+#ifdef QEMU_NYX
+static int handle_vmware_hypercall(struct kvm_run *run, CPUState *cpu){
+	kvm_arch_get_registers_fast(cpu);	
+
+    X86CPU *x86_cpu = X86_CPU(cpu);
+    CPUX86State *env = &x86_cpu->env;
+
+    return handle_kafl_hypercall(run, cpu, env->regs[R_EBX]+100, env->regs[R_ECX]);
+}
+#endif
+
 int kvm_cpu_exec(CPUState *cpu)
 {
     struct kvm_run *run = cpu->kvm_run;
@@ -2282,6 +2410,15 @@ int kvm_cpu_exec(CPUState *cpu)
 
     qemu_mutex_unlock_iothread();
     cpu_exec_start(cpu);
+
+#ifdef QEMU_NYX
+    static bool timeout_reload_pending = false;
+    if(timeout_reload_pending){
+          synchronization_lock_timeout_found();
+    }
+    timeout_reload_pending = false;
+#endif
+
 
     do {
         MemTxAttrs attrs;
@@ -2302,14 +2439,38 @@ int kvm_cpu_exec(CPUState *cpu)
             kvm_cpu_kick_self();
         }
 
+#ifdef QEMU_NYX
+        if(!kvm_state->nyx_no_pt_mode){
+            pt_pre_kvm_run(cpu);
+        }
+#endif
+
         /* Read cpu->exit_request before KVM_RUN reads run->immediate_exit.
          * Matching barrier in kvm_eat_signals.
          */
         smp_rmb();
 
+#ifdef QEMU_NYX
+        if(arm_sigprof_timer(&GET_GLOBAL_STATE()->timeout_detector)){
+            assert(false);
+        }
+#endif
+
         run_ret = kvm_vcpu_ioctl(cpu, KVM_RUN, 0);
 
+#ifdef QEMU_NYX
+        if (disarm_sigprof_timer(&GET_GLOBAL_STATE()->timeout_detector)){
+            timeout_reload_pending = true;
+        }
+#endif
+
         attrs = kvm_arch_post_run(cpu, run);
+
+#ifdef QEMU_NYX
+        if(!kvm_state->nyx_no_pt_mode){
+            pt_post_kvm_run(cpu);      
+        } 
+#endif
 
 #ifdef KVM_HAVE_MCE_INJECTION
         if (unlikely(have_sigbus_pending)) {
@@ -2328,8 +2489,25 @@ int kvm_cpu_exec(CPUState *cpu)
                 ret = EXCP_INTERRUPT;
                 break;
             }
+            
+#ifndef QEMU_NYX
             fprintf(stderr, "error: kvm run failed %s\n",
                     strerror(-run_ret));
+#else
+            if(run_ret == -EFAULT){
+                if(GET_GLOBAL_STATE()->protect_payload_buffer && GET_GLOBAL_STATE()->in_fuzzing_mode){
+                    /* Fuzzing is enabled at this point -> don't exit */
+                    synchronization_payload_buffer_write_detected();
+                    ret = 0;
+                    break;
+                }
+            }
+
+            fprintf(stderr, "QEMU-PT: error: kvm run failed %s\n",
+                    strerror(-run_ret));
+            qemu_backtrace();
+#endif
+
 #ifdef TARGET_PPC
             if (run_ret == -EBUSY) {
                 fprintf(stderr,
@@ -2346,6 +2524,15 @@ int kvm_cpu_exec(CPUState *cpu)
         switch (run->exit_reason) {
         case KVM_EXIT_IO:
             DPRINTF("handle_io\n");
+
+#ifdef QEMU_NYX
+            if(run->io.port == 0x5658 && run->io.size == 4 && *((uint32_t*)((uint8_t *)run + run->io.data_offset)) == 0x8080801f) {
+                assert(kvm_state->nyx_no_pt_mode);
+                ret = handle_vmware_hypercall(run, cpu);
+                break;
+            }
+#endif
+
             /* Called outside BQL */
             kvm_handle_io(run->io.port, attrs,
                           (uint8_t *)run + run->io.data_offset,
@@ -2370,33 +2557,116 @@ int kvm_cpu_exec(CPUState *cpu)
             break;
         case KVM_EXIT_SHUTDOWN:
             DPRINTF("shutdown\n");
+#ifndef QEMU_NYX
             qemu_system_reset_request(SHUTDOWN_CAUSE_GUEST_RESET);
             ret = EXCP_INTERRUPT;
+#else
+            fprintf(stderr, "ATTEMPT TO SHUTDOWN MACHINE (KVM_EXIT_SHUTDOWN)!\n");
+            if(GET_GLOBAL_STATE()->in_fuzzing_mode){
+                /* Fuzzing is enabled at this point -> don't exit */
+                handle_hypercall_kafl_release(run, cpu, (uint64_t)run->hypercall.args[0]);
+                ret = 0;
+            }
+            else{
+                qemu_system_reset_request(SHUTDOWN_CAUSE_GUEST_RESET);
+                ret = EXCP_INTERRUPT;
+            }
+#endif
             break;
         case KVM_EXIT_UNKNOWN:
             fprintf(stderr, "KVM: unknown exit, hardware reason %" PRIx64 "\n",
                     (uint64_t)run->hw.hardware_exit_reason);
+
+#ifdef QEMU_NYX
+            assert(false);
+#endif
+
             ret = -1;
             break;
         case KVM_EXIT_INTERNAL_ERROR:
             ret = kvm_handle_internal_error(cpu, run);
             break;
+
+#ifdef QEMU_NYX
+        case KVM_EXIT_DIRTY_RING_FULL:
+            //printf("[*] WARNING: KVM_EXIT_DIRTY_RING_FULL\n");
+            fast_reload_handle_dirty_ring_full(get_fast_reload_snapshot());
+            ret = 0;
+            break;
+
+        case KVM_EXIT_KAFL_ACQUIRE ... (KVM_EXIT_KAFL_ACQUIRE+100):
+            ret = handle_kafl_hypercall(run, cpu, (uint64_t)run->exit_reason, (uint64_t)run->hypercall.args[0]);
+            break;
+        
+        case KVM_EXIT_DEBUG:
+            kvm_arch_get_registers(cpu);                                                                                                                                     
+            if(!handle_hypercall_kafl_hook(run, cpu, (uint64_t)run->hypercall.args[0])){      
+                ret = kvm_arch_handle_exit(cpu, run);                                                                                                                        
+            }                                                                                                                                                      
+            else {     
+                ret = 0;                                                                                                                                                     
+            }                                                                                                                                                                
+            break;      
+#endif
+
         case KVM_EXIT_SYSTEM_EVENT:
             switch (run->system_event.type) {
             case KVM_SYSTEM_EVENT_SHUTDOWN:
+#ifndef QEMU_NYX
                 qemu_system_shutdown_request(SHUTDOWN_CAUSE_GUEST_SHUTDOWN);
                 ret = EXCP_INTERRUPT;
+#else
+                fprintf(stderr, "ATTEMPT TO SHUTDOWN MACHINE (KVM_SYSTEM_EVENT_SHUTDOWN)!\n");
+                if(GET_GLOBAL_STATE()->in_fuzzing_mode){
+                    /* Fuzzing is enabled at this point -> don't exit */
+                    handle_hypercall_kafl_release(run, cpu, (uint64_t)run->hypercall.args[0]);
+                    ret = 0;
+                }
+                else{
+                    qemu_system_shutdown_request(SHUTDOWN_CAUSE_GUEST_SHUTDOWN);
+                    ret = EXCP_INTERRUPT;
+                }
+#endif
                 break;
             case KVM_SYSTEM_EVENT_RESET:
+#ifndef QEMU_NYX
                 qemu_system_reset_request(SHUTDOWN_CAUSE_GUEST_RESET);
                 ret = EXCP_INTERRUPT;
+#else
+                fprintf(stderr, "ATTEMPT TO SHUTDOWN MACHINE (KVM_SYSTEM_EVENT_RESET)!\n");
+                if(GET_GLOBAL_STATE()->in_fuzzing_mode){
+                    /* Fuzzing is enabled at this point -> don't exit */
+                    handle_hypercall_kafl_release(run, cpu, (uint64_t)run->hypercall.args[0]);
+                    ret = 0;
+                }
+                else{
+                    qemu_system_reset_request(SHUTDOWN_CAUSE_GUEST_RESET);
+                    ret = EXCP_INTERRUPT;
+                }
+#endif
                 break;
             case KVM_SYSTEM_EVENT_CRASH:
+#ifndef QEMU_NYX
                 kvm_cpu_synchronize_state(cpu);
                 qemu_mutex_lock_iothread();
                 qemu_system_guest_panicked(cpu_get_crash_info(cpu));
                 qemu_mutex_unlock_iothread();
                 ret = 0;
+#else
+                fprintf(stderr, "ATTEMPT TO SHUTDOWN MACHINE (KVM_SYSTEM_EVENT_CRASH)!\n");
+                if(GET_GLOBAL_STATE()->in_fuzzing_mode){
+                    /* Fuzzing is enabled at this point -> don't exit */
+                    handle_hypercall_kafl_release(run, cpu, (uint64_t)run->hypercall.args[0]);
+                    ret = 0;
+                }
+                else{
+                    kvm_cpu_synchronize_state(cpu);
+                    qemu_mutex_lock_iothread();
+                    qemu_system_guest_panicked(cpu_get_crash_info(cpu));
+                    qemu_mutex_unlock_iothread();
+                    ret = 0;
+                }
+#endif
                 break;
             default:
                 DPRINTF("kvm_arch_handle_exit\n");
@@ -2405,21 +2675,65 @@ int kvm_cpu_exec(CPUState *cpu)
             }
             break;
         default:
+#ifndef QEMU_NYX
             DPRINTF("kvm_arch_handle_exit\n");
+#else
+            printf("kvm_arch_handle_exit => %d\n", run->exit_reason);
+            assert(false);
+#endif
             ret = kvm_arch_handle_exit(cpu, run);
             break;
         }
+
+#ifdef QEMU_NYX   
+        if(GET_GLOBAL_STATE()->in_fuzzing_mode && GET_GLOBAL_STATE()->cow_cache_full){
+            synchronization_cow_full_detected();
+            GET_GLOBAL_STATE()->cow_cache_full = false;
+            ret = 0;
+        }
+        else{
+            if(GET_GLOBAL_STATE()->in_fuzzing_mode && cpu->halted){
+                fprintf(stderr, "%s: Attempt to halt CPU -> FUCK OFF!\n", __func__);
+                cpu->halted = 0;
+                GET_GLOBAL_STATE()->shutdown_requested = true;
+            }
+
+            if(GET_GLOBAL_STATE()->in_fuzzing_mode && GET_GLOBAL_STATE()->shutdown_requested){
+                /* Fuzzing is enabled at this point -> don't exit */
+                fprintf(stderr, "shutdown_requested -> calling handle_hypercall_kafl_release\n");
+
+                //synchronization_lock_shutdown_detected();
+                synchronization_lock_crash_found();
+                GET_GLOBAL_STATE()->shutdown_requested = false;
+                ret = 0;
+            }
+        }
+        if(reload_request_exists(GET_GLOBAL_STATE()->reload_state)){
+            break;
+        }
+#endif
+
     } while (ret == 0);
 
     cpu_exec_end(cpu);
     qemu_mutex_lock_iothread();
 
     if (ret < 0) {
+#ifdef QEMU_NYX
+        fprintf(stderr, "ATTEMPT TO SHUTDOWN MACHINE (ret < 0)!\n");
+#endif
         cpu_dump_state(cpu, stderr, CPU_DUMP_CODE);
         vm_stop(RUN_STATE_INTERNAL_ERROR);
     }
 
     atomic_set(&cpu->exit_request, 0);
+
+#ifdef QEMU_NYX
+    if(check_if_relood_request_exists_pre(GET_GLOBAL_STATE()->reload_state)){
+        pause_all_vcpus(); /* performance boost ??? */
+    }
+#endif
+
     return ret;
 }
 
@@ -2545,6 +2859,12 @@ int kvm_device_access(int fd, int group, uint64_t attr,
     }
     return err;
 }
+
+#ifdef QEMU_NYX
+int kvm_has_vapic(void){
+    return !kvm_check_extension(kvm_state, KVM_CAP_VAPIC);
+}
+#endif
 
 bool kvm_has_sync_mmu(void)
 {
@@ -2815,6 +3135,9 @@ void kvm_init_cpu_signals(CPUState *cpu)
     pthread_sigmask(SIG_SETMASK, &set, NULL);
 #endif
     sigdelset(&set, SIG_IPI);
+#ifdef QEMU_NYX
+    sigdelset(&set, SIGALRM);
+#endif
     if (kvm_immediate_exit) {
         r = pthread_sigmask(SIG_SETMASK, &set, NULL);
     } else {

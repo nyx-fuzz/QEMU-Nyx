@@ -448,6 +448,12 @@ static inline void cpu_physical_memory_set_dirty_lebitmap(unsigned long *bitmap,
 }
 #endif /* not _WIN32 */
 
+#ifdef QEMU_NYX
+bool cpu_physical_memory_test_dirty(ram_addr_t start,
+                                              ram_addr_t length,
+                                              unsigned client);
+#endif
+
 bool cpu_physical_memory_test_and_clear_dirty(ram_addr_t start,
                                               ram_addr_t length,
                                               unsigned client);

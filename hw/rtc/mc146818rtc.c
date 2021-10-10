@@ -79,6 +79,14 @@ static void rtc_set_cmos(RTCState *s, const struct tm *tm);
 static inline int rtc_from_bcd(RTCState *s, int a);
 static uint64_t get_next_alarm(RTCState *s);
 
+#ifdef QEMU_NYX
+static bool fast_snapshot_rtc_enabled = false;
+
+void enable_fast_snapshot_rtc(void){
+    fast_snapshot_rtc_enabled = true;
+}
+#endif
+
 static inline bool rtc_running(RTCState *s)
 {
     return (!(s->cmos_data[RTC_REG_B] & REG_B_SET) &&
@@ -790,7 +798,11 @@ static int rtc_post_load(void *opaque, int version_id)
 {
     RTCState *s = opaque;
 
+#ifndef QEMU_NYX
     if (version_id <= 2 || rtc_clock == QEMU_CLOCK_REALTIME) {
+#else
+    if (version_id <= 2 || rtc_clock == QEMU_CLOCK_REALTIME || fast_snapshot_rtc_enabled) {
+#endif
         rtc_set_time(s);
         s->offset = 0;
         check_update_timer(s);

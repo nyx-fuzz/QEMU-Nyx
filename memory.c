@@ -35,6 +35,11 @@
 #include "hw/boards.h"
 #include "migration/vmstate.h"
 
+#ifdef QEMU_NYX
+#include "nyx/state.h"
+#include "nyx/fast_vm_reload.h"
+#endif
+
 //#define DEBUG_UNASSIGNED
 
 static unsigned memory_region_transaction_depth;
@@ -2011,6 +2016,9 @@ void memory_region_set_dirty(MemoryRegion *mr, hwaddr addr,
                              hwaddr size)
 {
     assert(mr->ram_block);
+#ifdef QEMU_NYX
+    fast_reload_qemu_user_fdl_set_dirty(get_fast_reload_snapshot(), mr, addr & 0xFFFFFFFFFFFFF000, size);
+#endif
     cpu_physical_memory_set_dirty_range(memory_region_get_ram_addr(mr) + addr,
                                         size,
                                         memory_region_get_dirty_log_mask(mr));

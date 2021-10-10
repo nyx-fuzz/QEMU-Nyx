@@ -1,0 +1,33 @@
+obj-y += \
+hypercall.o \
+memory_access.o \
+interface.o \
+fast_vm_reload.o \
+fast_vm_reload_sync.o \
+printk.o synchronization.o \
+page_cache.o \
+kvm_nested.o \
+state.o \
+debug.o \
+auxiliary_buffer.o \
+mmh3.o \
+nested_hypercalls.o \
+sharedir.o \
+helpers.o \
+redqueen.o \
+file_helper.o \
+redqueen_trace.o \
+snapshot/helper.o \
+snapshot/devices/nyx_device_state.o \
+snapshot/devices/state_reallocation.o \
+snapshot/devices/vm_change_state_handlers.o \
+snapshot/block/nyx_block_snapshot.o \
+snapshot/block/block_cow.o \
+snapshot/memory/shadow_memory.o \
+snapshot/memory/nyx_fdl_user.o \
+snapshot/memory/block_list.o \
+snapshot/memory/backend/nyx_debug.o \
+snapshot/memory/backend/nyx_fdl.o \
+snapshot/memory/backend/nyx_dirty_ring.o \
+pt.o
+

@@ -949,6 +949,8 @@ for opt do
   case "$opt" in
   --help|-h) show_help=yes
   ;;
+  --enable-nyx) nyx="yes"
+  ;;
   --version|-V) exec cat $source_path/VERSION
   ;;
   --prefix=*) prefix="$optarg"
@@ -1726,6 +1728,7 @@ Advanced options (experts only):
 Optional features, enabled with --enable-FEATURE and
 disabled with --disable-FEATURE, default is enabled if available:
 
+  nyx             build QEMU-NYX
   system          all system emulation targets
   user            supported user emulation targets
   linux-user      all linux usermode emulation targets
@@ -2045,7 +2048,7 @@ EOF
   # check we support --no-pie first...
   if compile_prog "-Werror -fno-pie" "-no-pie"; then
     CFLAGS_NOPIE="-fno-pie"
-    LDFLAGS_NOPIE="-nopie"
+    #LDFLAGS_NOPIE="-nopie"
   fi
 
   if compile_prog "-fPIE -DPIE" "-pie"; then
@@ -6095,7 +6098,12 @@ if test "$gcov" = "yes" ; then
   CFLAGS="-fprofile-arcs -ftest-coverage -g $CFLAGS"
   LDFLAGS="-fprofile-arcs -ftest-coverage $LDFLAGS"
 elif test "$fortify_source" = "yes" ; then
-  CFLAGS="-O2 -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2 $CFLAGS"
+  if test "$nyx" = "yes" ; then
+    CFLAGS="-DNESTED_PATCH -O3 -rdynamic -Wno-error=maybe-uninitialized -frename-registers -frename-registers -mtune=native -DQEMU_NYX -g -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2 $QEMU_CFLAGS"
+    LIBS="-lcapstone -lxdc $LIBS"
+  else
+    CFLAGS="-O2 -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2 $CFLAGS"
+  fi
 elif test "$debug" = "no"; then
   CFLAGS="-O2 $CFLAGS"
 fi
@@ -6849,6 +6857,11 @@ fi
 if test "$splice" = "yes" ; then
   echo "CONFIG_SPLICE=y" >> $config_host_mak
 fi
+
+if test "$nyx" = "yes" ; then
+  echo "CONFIG_QEMU_NYX=y" >> $config_host_mak
+fi
+
 if test "$eventfd" = "yes" ; then
   echo "CONFIG_EVENTFD=y" >> $config_host_mak
 fi
@@ -7515,7 +7528,7 @@ if test "$sparse" = "yes" ; then
   echo "QEMU_CFLAGS  += -Wbitwise -Wno-transparent-union -Wno-old-initializer -Wno-non-pointer-null" >> $config_host_mak
 fi
 echo "LDFLAGS=$LDFLAGS" >> $config_host_mak
-echo "LDFLAGS_NOPIE=$LDFLAGS_NOPIE" >> $config_host_mak
+#echo "LDFLAGS_NOPIE=$LDFLAGS_NOPIE" >> $config_host_mak
 echo "QEMU_LDFLAGS=$QEMU_LDFLAGS" >> $config_host_mak
 echo "LD_REL_FLAGS=$LD_REL_FLAGS" >> $config_host_mak
 echo "LD_I386_EMULATION=$ld_i386_emulation" >> $config_host_mak

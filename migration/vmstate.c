@@ -22,10 +22,25 @@
 
 static int vmstate_subsection_save(QEMUFile *f, const VMStateDescription *vmsd,
                                    void *opaque, QJSON *vmdesc);
+
+#ifndef QEMU_NYX
 static int vmstate_subsection_load(QEMUFile *f, const VMStateDescription *vmsd,
                                    void *opaque);
+#else
+int vmstate_subsection_load(QEMUFile *f, const VMStateDescription *vmsd,
+                                   void *opaque);
 
+int vmstate_n_elems(void *opaque, const VMStateField *field);
+int vmstate_size(void *opaque, const VMStateField *field);
+void vmstate_handle_alloc(void *ptr, const VMStateField *field, void *opaque);
+const VMStateDescription * vmstate_get_subsection(const VMStateDescription **sub, char *idstr);
+#endif
+
+#ifndef QEMU_NYX
 static int vmstate_n_elems(void *opaque, const VMStateField *field)
+#else
+int vmstate_n_elems(void *opaque, const VMStateField *field)
+#endif
 {
     int n_elems = 1;
 
@@ -49,7 +64,11 @@ static int vmstate_n_elems(void *opaque, const VMStateField *field)
     return n_elems;
 }
 
+#ifndef QEMU_NYX
 static int vmstate_size(void *opaque, const VMStateField *field)
+#else
+int vmstate_size(void *opaque, const VMStateField *field)
+#endif
 {
     int size = field->size;
 
@@ -63,8 +82,13 @@ static int vmstate_size(void *opaque, const VMStateField *field)
     return size;
 }
 
+#ifndef QEMU_NYX
 static void vmstate_handle_alloc(void *ptr, const VMStateField *field,
                                  void *opaque)
+#else
+void vmstate_handle_alloc(void *ptr, const VMStateField *field,
+                                 void *opaque)
+#endif
 {
     if (field->flags & VMS_POINTER && field->flags & VMS_ALLOC) {
         gsize size = vmstate_size(opaque, field);
@@ -428,8 +452,13 @@ int vmstate_save_state_v(QEMUFile *f, const VMStateDescription *vmsd,
     return ret;
 }
 
+#ifndef QEMU_NYX
 static const VMStateDescription *
 vmstate_get_subsection(const VMStateDescription **sub, char *idstr)
+#else
+const VMStateDescription *
+vmstate_get_subsection(const VMStateDescription **sub, char *idstr)
+#endif
 {
     while (sub && *sub) {
         if (strcmp(idstr, (*sub)->name) == 0) {
@@ -440,8 +469,13 @@ vmstate_get_subsection(const VMStateDescription **sub, char *idstr)
     return NULL;
 }
 
+#ifndef QEMU_NYX
 static int vmstate_subsection_load(QEMUFile *f, const VMStateDescription *vmsd,
                                    void *opaque)
+#else
+int vmstate_subsection_load(QEMUFile *f, const VMStateDescription *vmsd,
+                                   void *opaque)
+#endif
 {
     trace_vmstate_subsection_load(vmsd->name);
 

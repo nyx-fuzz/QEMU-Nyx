@@ -34,6 +34,9 @@
 #include "sysemu/runstate.h"
 #include "qemu/error-report.h"
 #include "trace.h"
+#ifdef QEMU_NYX
+#include "nyx/state.h"
+#endif
 
 //#define DEBUG_SERIAL
 
@@ -241,7 +244,9 @@ static gboolean serial_watch_cb(GIOChannel *chan, GIOCondition cond,
 static void serial_xmit(SerialState *s)
 {
     do {
+#ifndef QEMU_NYX
         assert(!(s->lsr & UART_LSR_TEMT));
+#endif
         if (s->tsr_retry == 0) {
             assert(!(s->lsr & UART_LSR_THRE));
 
@@ -342,6 +347,12 @@ static void serial_ioport_write(void *opaque, hwaddr addr, uint64_t val,
                                 unsigned size)
 {
     SerialState *s = opaque;
+
+#ifdef QEMU_NYX
+    if(GET_GLOBAL_STATE()->in_fuzzing_mode){
+        return;
+    }
+#endif
 
     addr &= 7;
     trace_serial_ioport_write(addr, val);

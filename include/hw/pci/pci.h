@@ -373,6 +373,10 @@ void pci_del_capability(PCIDevice *pci_dev, uint8_t cap_id, uint8_t cap_size);
 
 uint8_t pci_find_capability(PCIDevice *pci_dev, uint8_t cap_id);
 
+#ifdef QEMU_NYX
+void fast_get_pci_config_device(void* data, size_t size, void* opaque);
+void fast_get_pci_irq_state(void* data, size_t size, void* opaque);
+#endif
 
 uint32_t pci_default_read_config(PCIDevice *d,
                                  uint32_t address, int len);

@@ -1351,6 +1351,9 @@ static void *qemu_dummy_cpu_thread_fn(void *arg)
 
     sigemptyset(&waitset);
     sigaddset(&waitset, SIG_IPI);
+#ifdef QEMU_NYX
+    sigaddset(&waitset, SIGALRM);
+#endif
 
     /* signal CPU creation */
     cpu->created = true;

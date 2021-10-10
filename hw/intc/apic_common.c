@@ -274,14 +274,18 @@ static void apic_common_realize(DeviceState *dev, Error **errp)
     info->realize(dev, errp);
 
     /* Note: We need at least 1M to map the VAPIC option ROM */
+#ifndef QEMU_NYX
     if (!vapic && s->vapic_control & VAPIC_ENABLE_MASK &&
         !hax_enabled() && ram_size >= 1024 * 1024) {
         vapic = sysbus_create_simple("kvmvapic", -1, NULL);
     }
+#endif
     s->vapic = vapic;
+#ifndef QEMU_NYX
     if (apic_report_tpr_access && info->enable_tpr_reporting) {
         info->enable_tpr_reporting(s, true);
     }
+#endif
 
     if (s->legacy_instance_id) {
         instance_id = -1;

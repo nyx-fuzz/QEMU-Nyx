@@ -50,6 +50,10 @@
 #include "exec/memattrs.h"
 #include "trace.h"
 
+#ifdef QEMU_NYX
+#include "nyx/snapshot/devices/vm_change_state_handlers.h"
+#endif
+
 //#define DEBUG_KVM
 
 #ifdef DEBUG_KVM
@@ -118,6 +122,10 @@ static bool has_msr_mcg_ext_ctl;
 static struct kvm_cpuid2 *cpuid_cache;
 static struct kvm_msr_list *kvm_feature_msrs;
 
+#ifdef QEMU_NYX
+int kvm_nyx_put_tsc_value(CPUState *cs, uint64_t data);
+#endif
+
 int kvm_has_pit_state2(void)
 {
     return has_pit_state2;
@@ -182,6 +190,39 @@ bool kvm_hv_vpindex_settable(void)
 {
     return hv_vpindex_settable;
 }
+
+#ifdef QEMU_NYX
+int kvm_nyx_put_tsc_value(CPUState *cs, uint64_t data){
+    X86CPU *cpu = X86_CPU(cs);
+    CPUX86State *env = &cpu->env;
+    struct {
+        struct kvm_msrs info;
+        struct kvm_msr_entry entries[2];
+    } msr_data = {};
+    int ret;
+
+    memset(&msr_data, 0, sizeof(msr_data));
+    msr_data.info.nmsrs = 2;
+    msr_data.entries[0].index = MSR_IA32_TSC;
+    
+    /* NYX magic */
+    msr_data.entries[0].data = 0x00004e59584e5958ULL; /* reset TSC */
+
+    msr_data.entries[1].index = MSR_IA32_TSC;
+    msr_data.entries[1].data = data; /* new TSC value */
+
+    ret = kvm_vcpu_ioctl(CPU(cpu), KVM_SET_MSRS, &msr_data);
+
+    if (ret < 0) {
+        printf("%s: failed\n", __func__);
+        return ret;
+    }
+
+    env->tsc = data;
+
+    return 0;
+}
+#endif
 
 static int kvm_get_tsc(CPUState *cs)
 {
@@ -780,10 +821,12 @@ static int kvm_arch_set_tsc_khz(CPUState *cs)
                        kvm_vcpu_ioctl(cs, KVM_GET_TSC_KHZ) :
                        -ENOTSUP;
         if (cur_freq <= 0 || cur_freq != env->tsc_khz) {
+#ifndef QEMU_NYX
             warn_report("TSC frequency mismatch between "
                         "VM (%" PRId64 " kHz) and host (%d kHz), "
                         "and TSC scaling unavailable",
                         env->tsc_khz, cur_freq);
+#endif
             return r;
         }
     }
@@ -1760,6 +1803,9 @@ int kvm_arch_init_vcpu(CPUState *cs)
     }
 
     qemu_add_vm_change_state_handler(cpu_update_state, env);
+#ifdef QEMU_NYX
+    add_fast_reload_change_handler(cpu_update_state, env, RELOAD_HANDLER_KVM_CPU);
+#endif
 
     c = cpuid_find_entry(&cpuid_data.cpuid, 1, 0);
     if (c) {
@@ -2938,13 +2984,15 @@ static int kvm_put_msrs(X86CPU *cpu, int level)
         return ret;
     }
 
+#ifndef QEMU_NYX
     if (ret < cpu->kvm_msr_buf->nmsrs) {
         struct kvm_msr_entry *e = &cpu->kvm_msr_buf->entries[ret];
         error_report("error: failed to set MSR 0x%" PRIx32 " to 0x%" PRIx64,
                      (uint32_t)e->index, (uint64_t)e->data);
     }
-
     assert(ret == cpu->kvm_msr_buf->nmsrs);
+#endif
+
     return 0;
 }
 
@@ -3918,10 +3966,12 @@ int kvm_arch_put_registers(CPUState *cpu, int level)
     if (ret < 0) {
         return ret;
     }
+#ifndef QEMU_NYX
     ret = kvm_put_debugregs(x86_cpu);
     if (ret < 0) {
         return ret;
     }
+#endif
     /* must be last */
     ret = kvm_guest_debug_workarounds(x86_cpu);
     if (ret < 0) {
@@ -3929,6 +3979,63 @@ int kvm_arch_put_registers(CPUState *cpu, int level)
     }
     return 0;
 }
+
+#ifdef QEMU_NYX
+int kvm_arch_get_registers_fast(CPUState *cpu)
+{
+    X86CPU *x86_cpu = X86_CPU(cpu);
+    int ret = 0;
+    //fprintf(stderr, "%s - kvm_getput_regs\n", __func__);
+    ret = kvm_getput_regs(x86_cpu, 0);
+    if (ret < 0) {
+        fprintf(stderr, "%s - WARNING: kvm_getput_regs failed!\n", __func__);
+        return ret;
+    }
+
+    //fprintf(stderr, "%s - kvm_get_xsave\n", __func__);
+    ret = kvm_get_xsave(x86_cpu);
+    if (ret < 0) {
+        fprintf(stderr, "%s - WARNING: kvm_get_xsave failed!\n", __func__);
+        return ret;
+    }
+
+    //fprintf(stderr, "%s - kvm_get_xcrs\n", __func__);
+    ret = kvm_get_xcrs(x86_cpu);
+    if (ret < 0) {
+        fprintf(stderr, "%s - WARNING: kvm_get_xcrs failed!\n", __func__);
+        return ret;
+    }
+
+    //fprintf(stderr, "%s - kvm_get_sregs\n", __func__);
+    ret = kvm_get_sregs(x86_cpu);
+    if (ret < 0) {
+        fprintf(stderr, "%s - WARNING: kvm_get_sregs failed!\n", __func__);
+        return ret;
+    }
+
+    //fprintf(stderr, "%s - kvm_get_msrs\n", __func__);
+    ret = kvm_get_msrs(x86_cpu);
+    if (ret < 0) {
+        fprintf(stderr, "%s - WARNING: kvm_get_msrs failed!\n", __func__);
+        return ret;
+    }
+
+    //fprintf(stderr, "%s - kvm_get_mp_state\n", __func__);
+    ret = kvm_get_mp_state(x86_cpu);
+    if (ret < 0) {
+        fprintf(stderr, "%s - WARNING: kvm_get_mp_state failed!\n", __func__);
+        return ret;
+    }
+
+    //fprintf(stderr, "%s - kvm_get_apic\n", __func__);
+    ret = kvm_get_apic(x86_cpu);
+    if (ret < 0) {
+        fprintf(stderr, "%s - WARNING: kvm_get_apic failed!\n", __func__);
+        return ret;
+    }
+    return ret;
+}
+#endif
 
 int kvm_arch_get_registers(CPUState *cs)
 {

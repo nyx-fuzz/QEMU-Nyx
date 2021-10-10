@@ -548,6 +548,23 @@ static int get_pci_config_device(QEMUFile *f, void *pv, size_t size,
     return 0;
 }
 
+#ifdef QEMU_NYX
+void fast_get_pci_config_device(void* data, size_t size, void* opaque){
+    PCIDevice *s = container_of(opaque, PCIDevice, config);
+    PCIDeviceClass *pc = PCI_DEVICE_GET_CLASS(s);
+    uint8_t *config = (uint8_t *) data;
+
+    memcpy(s->config, config, size);
+
+    pci_update_mappings(s);
+    if (pc->is_bridge) {
+        PCIBridge *b = PCI_BRIDGE(s);
+        pci_bridge_update_mappings(b);
+    }
+}
+#endif
+
+
 /* just put buffer */
 static int put_pci_config_device(QEMUFile *f, void *pv, size_t size,
                                  const VMStateField *field, QJSON *vmdesc)
@@ -586,6 +603,17 @@ static int get_pci_irq_state(QEMUFile *f, void *pv, size_t size,
 
     return 0;
 }
+
+#ifdef QEMU_NYX
+void fast_get_pci_irq_state(void* data, size_t size, void* opaque){
+    PCIDevice *s = container_of(opaque, PCIDevice, irq_state);
+    uint32_t* irq_state = (uint32_t*) data;
+
+    for (int i = 0; i < PCI_NUM_PINS; ++i) {
+        pci_set_irq_state(s, i, irq_state[i]);
+    }
+}
+#endif
 
 static int put_pci_irq_state(QEMUFile *f, void *pv, size_t size,
                              const VMStateField *field, QJSON *vmdesc)

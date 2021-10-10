@@ -34,6 +34,10 @@
 #include "hw/timer/i8254_internal.h"
 #include "sysemu/kvm.h"
 
+#ifdef QEMU_NYX
+#include "nyx/snapshot/devices/vm_change_state_handlers.h"
+#endif
+
 #define KVM_PIT_REINJECT_BIT 0
 
 #define CALIBRATION_ROUNDS   3
@@ -300,6 +304,9 @@ static void kvm_pit_realizefn(DeviceState *dev, Error **errp)
     qdev_init_gpio_in(dev, kvm_pit_irq_control, 1);
 
     qemu_add_vm_change_state_handler(kvm_pit_vm_state_change, s);
+#ifdef QEMU_NYX
+    add_fast_reload_change_handler(kvm_pit_vm_state_change, s, RELOAD_HANDLER_KVM_PIT);
+#endif
 
     kpc->parent_realize(dev, errp);
 }

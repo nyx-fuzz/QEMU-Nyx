@@ -216,6 +216,10 @@ int kvm_has_many_ioeventfds(void);
 int kvm_has_gsi_routing(void);
 int kvm_has_intx_set_mask(void);
 
+#ifdef QEMU_NYX
+int kvm_get_vm_fd(KVMState *s);
+#endif
+
 int kvm_init_vcpu(CPUState *cpu);
 int kvm_cpu_exec(CPUState *cpu);
 int kvm_destroy_vcpu(CPUState *cpu);
@@ -366,6 +370,12 @@ int kvm_arch_get_registers(CPUState *cpu);
 #define KVM_PUT_RESET_STATE     2
 /* full state set, modified during initialization or on vmload */
 #define KVM_PUT_FULL_STATE      3
+
+#ifdef QEMU_NYX
+#define KVM_PUT_FULL_STATE_FAST      4
+
+int kvm_arch_get_registers_fast(CPUState *cpu);
+#endif
 
 int kvm_arch_put_registers(CPUState *cpu, int level);
 
