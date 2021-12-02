@@ -1092,6 +1092,14 @@ static void handle_hypercall_kafl_dump_file(struct kvm_run *run, CPUState *cpu, 
 	}
 }
 
+static void handle_hypercall_kafl_persist_page_past_snapshot(struct kvm_run *run, CPUState *cpu, uint64_t hypercall_arg){
+	CPUX86State *env = &(X86_CPU(cpu))->env;
+	kvm_arch_get_registers_fast(cpu);
+	hwaddr phys_addr = (hwaddr) get_paging_phys_addr(cpu, env->cr[3], hypercall_arg&(~0xFFF));
+	assert(phys_addr != 0xffffffffffffffffULL);
+	fast_reload_blacklist_page(get_fast_reload_snapshot(), phys_addr);
+}
+
 int handle_kafl_hypercall(struct kvm_run *run, CPUState *cpu, uint64_t hypercall, uint64_t arg){
 	int ret = -1;
 	//fprintf(stderr, "%s -> %ld\n", __func__, hypercall);
@@ -1289,8 +1297,12 @@ int handle_kafl_hypercall(struct kvm_run *run, CPUState *cpu, uint64_t hypercall
 			handle_hypercall_kafl_dump_file(run, cpu, arg);
 			ret = 0;
 			break;
-		case HYPERCALL_KAFL_REQ_STREAM_DATA_BULK:
+		case KVM_EXIT_KAFL_REQ_STREAM_DATA_BULK:
 			handle_hypercall_kafl_req_stream_data_bulk(run, cpu, arg);
+			ret = 0;
+			break;
+		case KVM_EXIT_KAFL_PERSIST_PAGE_PAST_SNAPSHOT:
+			handle_hypercall_kafl_persist_page_past_snapshot(run, cpu, arg);
 			ret = 0;
 			break;
 	}

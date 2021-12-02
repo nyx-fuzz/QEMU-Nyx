@@ -76,7 +76,7 @@ static void set_mem_mode(CPUState *cpu){
 }
 
 /*  Warning: This might break memory handling for hypervisor fuzzing => FIXME LATER */
-static uint64_t get_paging_phys_addr(CPUState *cpu, uint64_t cr3, uint64_t addr){
+uint64_t get_paging_phys_addr(CPUState *cpu, uint64_t cr3, uint64_t addr){
     if(GET_GLOBAL_STATE()->mem_mode == mm_unkown){
         set_mem_mode(cpu);
     }
