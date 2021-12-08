@@ -2495,11 +2495,17 @@ int kvm_cpu_exec(CPUState *cpu)
                     strerror(-run_ret));
 #else
             if(run_ret == -EFAULT){
-                if(GET_GLOBAL_STATE()->protect_payload_buffer && GET_GLOBAL_STATE()->in_fuzzing_mode){
-                    /* Fuzzing is enabled at this point -> don't exit */
-                    synchronization_payload_buffer_write_detected();
-                    ret = 0;
-                    break;
+                if(GET_GLOBAL_STATE()->protect_payload_buffer){
+                    if (GET_GLOBAL_STATE()->in_fuzzing_mode){
+                        /* Fuzzing is enabled at this point -> don't exit */
+                        synchronization_payload_buffer_write_detected();
+                        ret = 0;
+                        break;
+                    }
+                    else{
+                        fprintf(stderr, "ERROR: invalid write to input buffer detected before harness was ready (write protection is enabled)!\n");
+                        exit(1);
+                    }
                 }
             }
 

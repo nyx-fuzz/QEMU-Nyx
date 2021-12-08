@@ -301,6 +301,10 @@ bool remap_payload_buffer(uint64_t virt_guest_addr, CPUState *cpu){
 
                 memset((block->host) + phys_addr, 0xab, 0x1000);
 
+                if(GET_GLOBAL_STATE()->protect_payload_buffer){
+                    mprotect((block->host) + phys_addr, 0x1000, PROT_READ);
+                }
+
                 fast_reload_blacklist_page(get_fast_reload_snapshot(), phys_addr);
                 break;
             }

@@ -80,7 +80,7 @@ void state_init_global(void){
     global_state.payload_buffer = 0;
     global_state.nested_payload_pages = NULL;
     global_state.nested_payload_pages_num = 0;
-    global_state.protect_payload_buffer = 1; 
+    global_state.protect_payload_buffer = 0; 
     global_state.discard_tmp_snapshot = 0;
     global_state.mem_mode = mm_unkown;
 
@@ -239,6 +239,7 @@ void dump_global_state(const char* filename_prefix){
         fwrite(&global_state.cap_cr3, sizeof(global_state.cap_cr3), 1, fp);
         fwrite(&global_state.cap_compile_time_tracing_buffer_vaddr, sizeof(global_state.cap_compile_time_tracing_buffer_vaddr), 1, fp);
         fwrite(&global_state.cap_ijon_tracing_buffer_vaddr, sizeof(global_state.cap_ijon_tracing_buffer_vaddr), 1, fp);
+        fwrite(&global_state.protect_payload_buffer, sizeof(bool), 1, fp);
     }
     else{
         assert(global_state.nested_payload_pages != NULL && global_state.nested_payload_pages_num != 0);
@@ -312,7 +313,16 @@ void load_global_state(const char* filename_prefix){
         assert(fread(&global_state.payload_buffer, sizeof(uint64_t), 1, fp) == 1);
         debug_printf("LOADING global_state.payload_buffer: %lx\n", global_state.payload_buffer);
 
+        assert(fread(&global_state.cap_timeout_detection, sizeof(global_state.cap_timeout_detection), 1, fp) == 1);
+        assert(fread(&global_state.cap_only_reload_mode, sizeof(global_state.cap_only_reload_mode), 1, fp) == 1);
+        assert(fread(&global_state.cap_compile_time_tracing, sizeof(global_state.cap_compile_time_tracing), 1, fp) == 1);
+        assert(fread(&global_state.cap_ijon_tracing, sizeof(global_state.cap_ijon_tracing), 1, fp) == 1);
+        assert(fread(&global_state.cap_cr3, sizeof(global_state.cap_cr3), 1, fp) == 1);
+        assert(fread(&global_state.cap_compile_time_tracing_buffer_vaddr, sizeof(global_state.cap_compile_time_tracing_buffer_vaddr), 1, fp) == 1);
+        assert(fread(&global_state.cap_ijon_tracing_buffer_vaddr, sizeof(global_state.cap_ijon_tracing_buffer_vaddr), 1, fp) == 1);
+
         if(!global_state.fast_reload_pre_image){
+            assert(fread(&global_state.protect_payload_buffer, sizeof(bool), 1, fp) == 1);
             if(global_state.payload_buffer != 0){
                 debug_printf("REMAP PAYLOAD BUFFER!\n");
                 remap_payload_buffer(global_state.payload_buffer, ((CPUState *)qemu_get_cpu(0)) );
@@ -321,14 +331,6 @@ void load_global_state(const char* filename_prefix){
                 fprintf(stderr, "WARNING: address of payload buffer in snapshot file is zero!\n");
             }
         }
-
-        assert(fread(&global_state.cap_timeout_detection, sizeof(global_state.cap_timeout_detection), 1, fp) == 1);
-        assert(fread(&global_state.cap_only_reload_mode, sizeof(global_state.cap_only_reload_mode), 1, fp) == 1);
-        assert(fread(&global_state.cap_compile_time_tracing, sizeof(global_state.cap_compile_time_tracing), 1, fp) == 1);
-        assert(fread(&global_state.cap_ijon_tracing, sizeof(global_state.cap_ijon_tracing), 1, fp) == 1);
-        assert(fread(&global_state.cap_cr3, sizeof(global_state.cap_cr3), 1, fp) == 1);
-        assert(fread(&global_state.cap_compile_time_tracing_buffer_vaddr, sizeof(global_state.cap_compile_time_tracing_buffer_vaddr), 1, fp) == 1);
-        assert(fread(&global_state.cap_ijon_tracing_buffer_vaddr, sizeof(global_state.cap_ijon_tracing_buffer_vaddr), 1, fp) == 1);
 
         apply_capabilities(qemu_get_cpu(0));
     }
