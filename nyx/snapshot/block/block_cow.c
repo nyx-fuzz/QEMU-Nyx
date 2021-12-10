@@ -14,6 +14,20 @@
 //0x200
 #define PAGE_MASK 0xFFFFFFFFFFFFF000
 
+uint64_t global_cow_primary_size = COW_CACHE_PRIMARY_MINIMUM_SIZE;
+bool global_cow_primary_size_adjustable = true;
+
+void set_global_cow_cache_primary_size(uint64_t new_size){
+	if (global_cow_primary_size_adjustable && new_size > COW_CACHE_PRIMARY_MINIMUM_SIZE && (new_size & 0xFFF) == 0){
+		global_cow_primary_size = new_size;
+		global_cow_primary_size_adjustable = false;
+	}
+}
+
+static inline uint64_t get_global_cow_cache_primary_size(void){
+	return global_cow_primary_size;
+}
+
 cow_cache_t* cow_cache_new(const char* filename){
 
 	//printf("%s: \"%s\"\n", __func__, filename);
@@ -23,9 +37,10 @@ cow_cache_t* cow_cache_new(const char* filename){
 	self->lookup_secondary = kh_init(COW_CACHE);
 	self->lookup_secondary_tmp = kh_init(COW_CACHE);
 
-	self->data_primary = mmap(NULL, COW_CACHE_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
+	self->cow_primary_size = COW_CACHE_PRIMARY_MINIMUM_SIZE;
+	self->data_primary = mmap(NULL, self->cow_primary_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
 	assert(self->data_primary != MAP_FAILED);
-	//memset(self->data_primary, COW_CACHE_SIZE/CHUNK_SIZE, CHUNK_SIZE);
+	//memset(self->data_primary, COW_CACHE_PRIMARY_MINIMUM_SIZE/CHUNK_SIZE, CHUNK_SIZE);
 
 	self->data_secondary = mmap(NULL, COW_CACHE_SECONDARY_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
 	assert(self->data_secondary != MAP_FAILED);
@@ -80,6 +95,7 @@ static char* gen_file_name(cow_cache_t* self, const char* filename_prefix, const
 
 void read_primary_buffer(cow_cache_t* self, const char* filename_prefix, bool switch_mode){
 	assert(!self->enabled_fuzz);
+	global_cow_primary_size_adjustable = false;
 
 	//printf("%s: %s\n", __func__, self->filename);
 
@@ -98,6 +114,11 @@ void read_primary_buffer(cow_cache_t* self, const char* filename_prefix, bool sw
 	struct stat buffer;   
   assert(stat (tmp2, &buffer) == 0);
 
+	if (buffer.st_size > get_global_cow_cache_primary_size()){
+		fprintf(stderr, "ERROR: in-memory CoW buffer is too small compared to snapshot file (buffer: 0x%lx / file: 0x%lx)\n", get_global_cow_cache_primary_size(), buffer.st_size);
+		exit(1);
+	}
+
 	if(buffer.st_size){
 		self->lookup_primary = kh_load(COW_CACHE, tmp1);
 	}
@@ -109,14 +130,24 @@ void read_primary_buffer(cow_cache_t* self, const char* filename_prefix, bool sw
 	
 	//printf("TRY TO MMAP : %lx\n",  buffer.st_size);
 	if(switch_mode){
-		self->data_primary = mmap(0, COW_CACHE_SIZE, PROT_READ, MAP_SHARED, fd, 0);
+		munmap(self->data_primary, self->cow_primary_size);
+		self->cow_primary_size = get_global_cow_cache_primary_size();
+		self->data_primary = mmap(0, self->cow_primary_size, PROT_READ, MAP_SHARED, fd, 0);
 		assert(self->data_primary);
 	}
 	else{
-		void* ptr = mmap(0, COW_CACHE_SIZE, PROT_READ , MAP_SHARED, fd, 0);
+
+		if(get_global_cow_cache_primary_size() != self->cow_primary_size){
+			munmap(self->data_primary, self->cow_primary_size);
+			self->cow_primary_size = get_global_cow_cache_primary_size();
+			self->data_primary = mmap(NULL, self->cow_primary_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
+			assert(self->data_primary != MAP_FAILED);
+		}
+
+		void* ptr = mmap(0, COW_CACHE_PRIMARY_MINIMUM_SIZE, PROT_READ , MAP_SHARED, fd, 0);
 		assert(ptr);
 		memcpy(self->data_primary, ptr, buffer.st_size);
-		munmap(ptr, COW_CACHE_SIZE);
+		munmap(ptr, COW_CACHE_PRIMARY_MINIMUM_SIZE);
 	}
 	//printf("self->data_primary  -> %p\n", self->data_primary );
 	close(fd);
@@ -395,7 +426,7 @@ static inline void write_to_primary_buffer(cow_cache_t* self, BlockBackend *blk,
 		#endif		
 
 		/* IN CASE THE BUFFER IS FULL -> ABORT! */
-		assert(self->offset_primary < COW_CACHE_SIZE);
+		assert(self->offset_primary < self->cow_primary_size);
 	}
 
 	#ifdef COW_CACHE_DEBUG
@@ -515,8 +546,8 @@ static int cow_cache_write(cow_cache_t* self, BlockBackend *blk, int64_t offset,
 
 void switch_to_fuzz_mode(cow_cache_t* self){
 	self->enabled_fuzz = true;
-	assert(!mprotect(self->data_primary, COW_CACHE_SIZE, PROT_READ));
-	printf("[qemu-nyx] switch to secondary CoW buffer\n");
+	assert(!mprotect(self->data_primary, self->cow_primary_size, PROT_READ));
+	printf("[qemu-nyx] switching to secondary CoW buffer\n");
 }
 
 void cow_cache_read_entry(void* opaque){

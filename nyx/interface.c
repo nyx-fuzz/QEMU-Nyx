@@ -76,6 +76,7 @@ typedef struct kafl_mem_state {
 
 	char* workdir; 
 	uint32_t worker_id;
+	uint64_t cow_primary_size;
 	
 	char* redqueen_workdir;
 	char* data_bar_fd_0;
@@ -354,6 +355,10 @@ static void pci_kafl_guest_realize(DeviceState *dev, Error **errp){
 		abort();
 	}
 
+	if(s->cow_primary_size){
+		set_global_cow_cache_primary_size(s->cow_primary_size);
+	}
+
 	if (!s->workdir || !verify_workdir_state(s, errp)){
 		fprintf(stderr, "Invalid work dir...\n");
 		abort();
@@ -407,6 +412,7 @@ static Property kafl_guest_properties[] = {
 	DEFINE_PROP_STRING("workdir", kafl_mem_state, workdir),
 	DEFINE_PROP_UINT32("worker_id", kafl_mem_state, worker_id, 0xFFFF),
 
+	DEFINE_PROP_UINT64("cow_primary_size", kafl_mem_state, cow_primary_size, 0),
 	/* 
 	 * Since DEFINE_PROP_UINT64 is somehow broken (signed/unsigned madness),
 	 * let's use DEFINE_PROP_STRING and post-process all values by strtol...

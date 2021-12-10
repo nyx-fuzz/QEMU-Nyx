@@ -12,14 +12,16 @@
 
 //#define DEBUG_COW_LAYER
 
-/* 2GB Cache */
-//#define COW_CACHE_SIZE 0x80000000
+/* Minimum size of CoW buffer that stores data written to 
+ * the block device between boot time and root snapshot (3GB)
+ */
+#define COW_CACHE_PRIMARY_MINIMUM_SIZE 0xC0000000
 
-// 3GB
-#define COW_CACHE_SIZE 0xC0000000
-
-// 512MB
-//#define COW_CACHE_SECONDARY_SIZE 0x20000000 
+/* Size of CoW buffer which stores data written to 
+ * the block device between the root snapshot and the 
+ * next snapshot restore (3GB). This buffer is allocated 
+ * twice to store the incremental snapshot delta. 
+ */
 #define COW_CACHE_SECONDARY_SIZE 0xC0000000
 
 
@@ -33,6 +35,8 @@ typedef struct cow_cache_s{
 	void* data_primary;
 	void* data_secondary;
 	void* data_secondary_tmp;
+
+	uint64_t cow_primary_size;
 
 	char* filename;
 	uint64_t offset_primary;
@@ -70,3 +74,5 @@ void cow_cache_disable(cow_cache_t* self);
 
 void cow_cache_enable_tmp_mode(cow_cache_t* self);
 void cow_cache_disable_tmp_mode(cow_cache_t* self);
+
+void set_global_cow_cache_primary_size(uint64_t new_size);
