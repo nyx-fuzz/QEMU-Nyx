@@ -231,6 +231,12 @@ void set_crash_reason_auxiliary_buffer(auxilary_buffer_t* auxilary_buffer, char*
   VOLATILE_WRITE_8(auxilary_buffer->result.crash_found, 1);
 }
 
+void set_abort_reason_auxiliary_buffer(auxilary_buffer_t* auxilary_buffer, char* msg, uint32_t len){
+  VOLATILE_WRITE_16(auxilary_buffer->misc.len, MIN(len, MISC_SIZE-2));
+  volatile_memcpy((void*)&auxilary_buffer->misc.data, (void*)msg, (size_t) MIN(len, MISC_SIZE-2));
+  VOLATILE_WRITE_8(auxilary_buffer->result.abort, 1);
+}
+
 void flush_hprintf_auxiliary_buffer(auxilary_buffer_t* auxilary_buffer){
   VOLATILE_WRITE_8(auxilary_buffer->result.hprintf, 0);
 }

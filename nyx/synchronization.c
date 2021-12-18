@@ -439,7 +439,7 @@ void synchronization_cow_full_detected(void){
 void synchronization_disable_pt(CPUState *cpu){
 	//fprintf(stderr, "==============> %s\n", __func__);
 	if(!in_fuzzing_loop){
-		fprintf(stderr, "<%d-%ld>\t%s [NOT IN FUZZING LOOP]\n", getpid(), run_counter, __func__);
+		//fprintf(stderr, "<%d-%ld>\t%s [NOT IN FUZZING LOOP]\n", getpid(), run_counter, __func__);
 		set_success_auxiliary_result_buffer(GET_GLOBAL_STATE()->auxilary_buffer, 0);
 		/*
 		qemu_backtrace();

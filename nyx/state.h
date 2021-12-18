@@ -77,7 +77,7 @@ struct state_qemu_pt{
     /* Intel PT Options (not migratable) */
     uint64_t pt_c3_filter;
     volatile bool pt_ip_filter_enabled[4];
-    bool pt_trace_mode; // enable by default; disabled if compile-time tracing is implemented by agent
+    bool pt_trace_mode; // enabled by default; disabled if compile-time tracing is implemented by agent
 
     /* disabled by default; enable to force usage of PT tracing 
      * (useful for targets that use compile-time tracing and redqueen at the same time (which obviously relies on PT traces)) 

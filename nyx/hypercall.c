@@ -121,6 +121,14 @@ bool handle_hypercall_kafl_next_payload(struct kvm_run *run, CPUState *cpu, uint
 		} else {
 			if(!setup_snapshot_once){ 
 				//pt_reset_bitmap();
+
+				if (GET_GLOBAL_STATE()->pt_trace_mode){
+					fprintf(stderr, "[QEMU-Nyx] coverage mode: Intel-PT (KVM-Nyx and libxdc)\n");
+				}
+				else{
+					fprintf(stderr, "[QEMU-Nyx] coverage mode: compile-time instrumentation\n");
+				}
+
 				fuzz_bitmap_reset();
 				request_fast_vm_reload(GET_GLOBAL_STATE()->reload_state, REQUEST_SAVE_SNAPSHOT_ROOT_FIX_RIP);
 				setup_snapshot_once = true;
@@ -206,7 +214,7 @@ static void handle_hypercall_get_payload(struct kvm_run *run, CPUState *cpu, uin
 			//print_48_paging2(GET_GLOBAL_STATE()->parent_cr3);
 
 			if(hypercall_arg&0xFFF){
-				fprintf(stderr, "Error: Payload buffer is not page-aligned! (0x%lx)\n", hypercall_arg);
+				fprintf(stderr, "[QEMU-Nyx] Error: Payload buffer is not page-aligned! (0x%lx)\n", hypercall_arg);
 				abort();
 			}
 
@@ -295,7 +303,7 @@ static void handle_hypercall_kafl_range_submit(struct kvm_run *run, CPUState *cp
 	}
 
 	if(GET_GLOBAL_STATE()->pt_ip_filter_configured[buffer[2]]){
-			QEMU_PT_PRINTF(CORE_PREFIX, "Ignoring agent-provided address ranges (abort reason: 1)");
+			QEMU_PT_PRINTF(CORE_PREFIX, "Ignoring agent-provided address ranges (abort reason: 1) - %d", buffer[2]);
 		return;
 	}
 
@@ -304,7 +312,7 @@ static void handle_hypercall_kafl_range_submit(struct kvm_run *run, CPUState *cp
 		GET_GLOBAL_STATE()->pt_ip_filter_b[buffer[2]] = buffer[1];
 		GET_GLOBAL_STATE()->pt_ip_filter_configured[buffer[2]] = true;
 		QEMU_PT_PRINTF(CORE_PREFIX, "Configuring agent-provided address ranges:");
-		QEMU_PT_PRINTF(CORE_PREFIX, "\tIP0: %lx-%lx [ENABLED]", GET_GLOBAL_STATE()->pt_ip_filter_a[buffer[2]], GET_GLOBAL_STATE()->pt_ip_filter_b[buffer[2]]);
+		QEMU_PT_PRINTF(CORE_PREFIX, "\tIP%d: %lx-%lx [ENABLED]", buffer[2], GET_GLOBAL_STATE()->pt_ip_filter_a[buffer[2]], GET_GLOBAL_STATE()->pt_ip_filter_b[buffer[2]]);
 	}
 	else{
 		QEMU_PT_PRINTF(CORE_PREFIX, "Ignoring agent-provided address ranges (abort reason: 2)");	
@@ -916,17 +924,8 @@ bool handle_hypercall_kafl_hook(struct kvm_run *run, CPUState *cpu, uint64_t hyp
 
 static void handle_hypercall_kafl_user_abort(struct kvm_run *run, CPUState *cpu, uint64_t hypercall_arg){
 	read_virtual_memory(hypercall_arg, (uint8_t*)hprintf_buffer, HPRINTF_SIZE, cpu);
-
-	fprintf(stderr, "%s: %s\n", __func__, hprintf_buffer);
-
-	abort();
-
-	if(hypercall_enabled){
-		//hypercall_snd_char(KAFL_PROTO_PT_ABORT);
-		QEMU_PT_PRINTF_DEBUG("Protocol - SEND: KAFL_PROTO_PT_ABORT");
-	}
-	debug_fprintf(stderr, "USER ABORT!\n");
-	qemu_system_shutdown_request(SHUTDOWN_CAUSE_GUEST_SHUTDOWN);
+	set_abort_reason_auxiliary_buffer(GET_GLOBAL_STATE()->auxilary_buffer, hprintf_buffer, strlen(hprintf_buffer));
+	synchronization_lock();
 }
 
 void pt_enable_rqi(CPUState *cpu){

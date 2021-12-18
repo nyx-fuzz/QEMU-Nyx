@@ -1917,19 +1917,19 @@ static int kvm_init(MachineState *ms)
     }
 #ifdef QEMU_NYX
     if (ioctl(s->fd, KVM_CHECK_EXTENSION, KVM_CAP_NYX_PT) != 1 && ioctl(s->fd, KVM_CHECK_EXTENSION, KVM_CAP_NYX_FDL) != 1) {
-        fprintf(stderr, "[!] Could not access KVM-PT kernel module!\n [*] Trying vanilla KVM...\n");
+        fprintf(stderr, "[QEMU-Nyx] Could not access KVM-PT kernel module!\n[QEMU-Nyx] Trying vanilla KVM...\n");
 
         /* fallback -> use vanilla KVM module instead (no Intel-PT tracing or nested hypercalls at this point) */
         s->fd = qemu_open("/dev/kvm", O_RDWR);
         if (s->fd == -1) {
-            fprintf(stderr, "Error: NYX fallback failed: Could not access vanilla KVM module!\n");
+            fprintf(stderr, "[QEMU-Nyx] Error: NYX fallback failed: Could not access vanilla KVM module!\n");
             ret = -errno;
             goto err;
         }
 
         int ret_val = ioctl(s->fd, KVM_CHECK_EXTENSION, KVM_CAP_DIRTY_LOG_RING);
 	    if(ret_val == -1 || ret_val == 0){
-            fprintf(stderr, "Error: NYX requires support for KVM_CAP_DIRTY_LOG_RING in fallback mode!\n");
+            fprintf(stderr, "[QEMU-Nyx] Error: NYX requires support for KVM_CAP_DIRTY_LOG_RING in fallback mode!\n");
             ret = -errno;
             goto err;
         }
@@ -1947,7 +1947,7 @@ static int kvm_init(MachineState *ms)
         close(fd);
 
         if(vmware_backdoor_option == 'N'){
-            fprintf(stderr, "\nERROR: vmware backdoor is not enabled...\n");
+            fprintf(stderr, "\n[QEMU-Nyx] ERROR: vmware backdoor is not enabled...\n");
             fprintf(stderr, "\n\tRun the following commands to fix the issue:\n");
             fprintf(stderr, "\t-----------------------------------------\n");
             fprintf(stderr, "\tsudo modprobe -r kvm-intel\n");
@@ -1960,9 +1960,10 @@ static int kvm_init(MachineState *ms)
             goto err;
         }
 
-        fprintf(stderr, "NYX runs in fallback mode (no Intel-PT tracing or nested hypercall support)!\n");
+        fprintf(stderr, "[QEMU-Nyx] NYX runs in fallback mode (no Intel-PT tracing or nested hypercall support)!\n");
         s->nyx_no_pt_mode = true;
         GET_GLOBAL_STATE()->nyx_fdl = false;
+        GET_GLOBAL_STATE()->pt_trace_mode = false; // Intel PT is not available in this mode 
         fast_reload_set_mode(get_fast_reload_snapshot(), RELOAD_MEMORY_MODE_DIRTY_RING);
     }
     else{

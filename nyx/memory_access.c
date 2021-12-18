@@ -215,6 +215,12 @@ bool remap_slot(uint64_t addr, uint32_t slot, CPUState *cpu, int fd, uint64_t sh
     if(virtual){
         phys_addr = get_paging_phys_addr(cpu, cr3, (addr & x86_64_PAGE_MASK));
 
+        if(phys_addr == (uint64_t)-1){
+			fprintf(stderr, "[QEMU-Nyx] Error: failed to translate v_addr (0x%lx) to p_addr!\n", addr);
+            fprintf(stderr, "[QEMU-Nyx] Check if the buffer is present in the guest's memory...\n");
+            exit(1);
+        }
+
         phys_addr = address_to_ram_offset(phys_addr);
     }
         

@@ -4652,7 +4652,7 @@ int main(int argc, char **argv, char **envp)
                     //GET_GLOBAL_STATE()->pt_trace_mode = false;
                 }
                 else{
-                    fprintf(stderr, "[!] qemu-nyx: Booting to start fuzzing...\n");
+                    fprintf(stderr, "[QEMU-Nyx] Booting VM to start fuzzing...\n");
                     set_fast_reload_mode(false);
                 }
             }

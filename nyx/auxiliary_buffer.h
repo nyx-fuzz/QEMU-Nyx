@@ -27,7 +27,7 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 
 #define AUX_MAGIC 0x54502d554d4551
 
-#define QEMU_PT_VERSION 1 /* let's start at 1 for the initial version using the aux buffer */
+#define QEMU_PT_VERSION 2 /* let's start at 1 for the initial version using the aux buffer */
 
 #define HEADER_SIZE 128
 #define CAP_SIZE 256
@@ -123,7 +123,8 @@ typedef struct auxilary_buffer_result_s{
   uint32_t dirty_pages; 
   uint32_t pt_trace_size; 
 
-  uint8_t payload_buffer_write_attempt_found; 
+  uint8_t payload_buffer_write_attempt_found;
+  uint8_t abort; 
 
   /* more to come */
 } __attribute__((packed)) auxilary_buffer_result_t;
@@ -170,6 +171,7 @@ void set_hprintf_auxiliary_buffer(auxilary_buffer_t* auxilary_buffer, char* msg,
 void set_page_not_found_result_buffer(auxilary_buffer_t* auxilary_buffer, uint64_t page_addr);
 void set_success_auxiliary_result_buffer(auxilary_buffer_t* auxilary_buffer, uint8_t success);
 void set_crash_reason_auxiliary_buffer(auxilary_buffer_t* auxilary_buffer, char* msg, uint32_t len);
+void set_abort_reason_auxiliary_buffer(auxilary_buffer_t* auxilary_buffer, char* msg, uint32_t len);
 
 void set_tmp_snapshot_created(auxilary_buffer_t* auxilary_buffer, uint8_t value);
 

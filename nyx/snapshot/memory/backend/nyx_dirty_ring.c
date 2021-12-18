@@ -31,7 +31,7 @@ static int vm_enable_dirty_ring(int vm_fd, uint32_t ring_size){
 
 	int ret = ioctl(vm_fd, KVM_ENABLE_CAP, &cap);
 	if(ret != 0){
-		printf("[ ] KVM_ENABLE_CAP ioctl failed\n");
+		printf("[QEMU-Nyx] Error: KVM_ENABLE_CAP ioctl failed\n");
 	}
 
   return ring_size;
@@ -40,11 +40,11 @@ static int vm_enable_dirty_ring(int vm_fd, uint32_t ring_size){
 static int check_dirty_ring_size(int kvm_fd, int vm_fd){
 	int ret = ioctl(kvm_fd, KVM_CHECK_EXTENSION, KVM_CAP_DIRTY_LOG_RING); 
 	if(ret < 0 ){
-		printf("[ ] KVM_CAP_DIRTY_LOG_RING failed (dirty ring not supported?)\n");
+		printf("[QEMU-Nyx] Error: KVM_CAP_DIRTY_LOG_RING failed (dirty ring not supported?)\n");
 		exit(1);
 	}
 
-	printf("[*] Max Dirty Ring Size -> %d (Entries: %d)\n", ret, ret/(int)sizeof(struct kvm_dirty_gfn));
+	printf("[QEMU-Nyx] Max Dirty Ring Size -> %d (Entries: %d)\n", ret, ret/(int)sizeof(struct kvm_dirty_gfn));
 
 	uint64_t dirty_ring_max_size = ret; //kvm_dirty_ring_size * sizeof(struct kvm_dirty_gfn);
 
@@ -52,7 +52,7 @@ static int check_dirty_ring_size(int kvm_fd, int vm_fd){
 	ret = vm_enable_dirty_ring(vm_fd, dirty_ring_max_size);
 
 	if(ret < 0 ){
-		printf("[ ] Enabling dirty ring (size: %ld) failed\n", dirty_ring_max_size);
+		printf("[QEMU-Nyx] Error: Enabling dirty ring (size: %ld) failed\n", dirty_ring_max_size);
 		exit(1);
 	}
 
@@ -66,11 +66,11 @@ static void allocate_dirty_ring(int kvm_vcpu, int vm_fd){
 	if (dirty_ring_size) {
     kvm_dirty_gfns = mmap(NULL, dirty_ring_size, PROT_READ | PROT_WRITE, MAP_SHARED, kvm_vcpu, PAGE_SIZE * KVM_DIRTY_LOG_PAGE_OFFSET);
     if (kvm_dirty_gfns == MAP_FAILED) {
-			printf("[ ] Dirty ring mmap failed!\n");
+			printf("[QEMU-Nyx] Error: Dirty ring mmap failed!\n");
       exit(1);
     }
   }
-	printf("[*] Dirty ring mmap region located at %p\n", kvm_dirty_gfns);
+	printf("[QEMU-Nyx] Dirty ring mmap region located at %p\n", kvm_dirty_gfns);
 
 	int ret = ioctl(vm_fd, KVM_RESET_DIRTY_RINGS, 0); 
 	assert(ret == 0);
@@ -107,7 +107,6 @@ static void dirty_ring_flush_and_collect(nyx_dirty_ring_t* self, shadow_memory_t
 	struct kvm_dirty_gfn *entry = NULL;
   int cleared = 0;
 
-	//fprintf(stderr, "self->kvm_dirty_gfns_index -> %lx\n", kvm_dirty_gfns_index);
 	while(true){
 
 		entry = &kvm_dirty_gfns[kvm_dirty_gfns_index & kvm_dirty_gfns_index_mask];
@@ -122,7 +121,7 @@ static void dirty_ring_flush_and_collect(nyx_dirty_ring_t* self, shadow_memory_t
 			entry->flags |= 0x2; // reset dirty entry 
 		}
 		else{
-			printf("[%p] kvm_dirty_gfn -> flags: %d slot: %d offset: %lx {ERROR}\n", entry, entry->flags, entry->slot, entry->offset);
+			printf("[QEMU-Nyx] [%p] kvm_dirty_gfn -> flags: %d slot: %d offset: %lx {ERROR}\n", entry, entry->flags, entry->slot, entry->offset);
 			fflush(stdout);
 			exit(1);
 		}
@@ -131,7 +130,6 @@ static void dirty_ring_flush_and_collect(nyx_dirty_ring_t* self, shadow_memory_t
 	}
 
 	int ret = ioctl(vm_fd, KVM_RESET_DIRTY_RINGS, 0); 
-	//printf("KVM_RESET_DIRTY_RINGS -> (%d vs %d)\n", ret, cleared);
   assert(ret == cleared);
 }
 
@@ -139,7 +137,6 @@ static void dirty_ring_flush(int vm_fd){
 	struct kvm_dirty_gfn *entry = NULL;
   int cleared = 0;
 
-	//printf("self->kvm_dirty_gfns_index -> %lx\n", self->kvm_dirty_gfns_index);
 	while(true){
 
 		entry = &kvm_dirty_gfns[kvm_dirty_gfns_index & kvm_dirty_gfns_index_mask];
@@ -153,7 +150,7 @@ static void dirty_ring_flush(int vm_fd){
 			entry->flags |= 0x2; // reset dirty entry 
 		}
 		else{
-			printf("[%p] kvm_dirty_gfn -> flags: %d slot: %d offset: %lx {ERROR}\n", entry, entry->flags, entry->slot, entry->offset);
+			printf("[QEMU-Nyx] [%p] kvm_dirty_gfn -> flags: %d slot: %d offset: %lx {ERROR}\n", entry, entry->flags, entry->slot, entry->offset);
 			fflush(stdout);
 			exit(1);
 		}
@@ -162,8 +159,7 @@ static void dirty_ring_flush(int vm_fd){
 	}
 
 	int ret = ioctl(vm_fd, KVM_RESET_DIRTY_RINGS, 0); 
-	//printf("KVM_RESET_DIRTY_RINGS -> (%d vs %ld)\n", ret, cleared);
-  assert(ret == cleared);
+  	assert(ret == cleared);
 }
 
 /* init operation */
@@ -177,8 +173,6 @@ nyx_dirty_ring_t* nyx_dirty_ring_init(shadow_memory_t* shadow_memory){
   KVMMemoryListener *kml = kvm_get_kml(0);
   KVMSlot *mem;
 
-	//printf("kml -> %p\n", kml);
-	//printf("MEM-SLOTS -> %d\n", kvm_get_max_memslots());
   for (int i = 0; i < kvm_get_max_memslots(); i++) {
 		mem = &kml->slots[i];
 
@@ -186,16 +180,8 @@ nyx_dirty_ring_t* nyx_dirty_ring_init(shadow_memory_t* shadow_memory){
 			break;
 		}
 
-		//printf("[%p] SLOT: %d - start: %lx - size: %lx - flags: %x\n", mem, mem->slot, mem->start_addr, mem->memory_size, mem->flags);
-
 		self->kvm_region_slots_num++;
 	}
-
-	/*
-	for(int i = 0; i < shadow_memory->ram_regions_num; i++){
-			printf("[%d] base: %lx - size: %lx\n", i, shadow_memory->ram_regions[i].base, shadow_memory->ram_regions[i].size);
-	}
-	*/
 
 	self->kvm_region_slots = malloc(sizeof(slot_t) * self->kvm_region_slots_num);
 	memset(self->kvm_region_slots, 0, sizeof(slot_t) * self->kvm_region_slots_num);
@@ -220,7 +206,6 @@ nyx_dirty_ring_t* nyx_dirty_ring_init(shadow_memory_t* shadow_memory){
 
 		if(self->kvm_region_slots[i].enabled){
 			bool ram_region_found = false;
-			//printf("SEARCHING %lx %lx\n", mem->start_addr, mem->memory_size);
 			for(int j = 0; j < shadow_memory->ram_regions_num; j++){
 
 				if(FAST_IN_RANGE(mem->start_addr, shadow_memory->ram_regions[j].base, (shadow_memory->ram_regions[j].base+shadow_memory->ram_regions[j].size))){

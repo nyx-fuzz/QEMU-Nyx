@@ -382,7 +382,7 @@ page_cache_t* page_cache_new(const char* cache_file, uint8_t disassembler_word_w
 	self->last_page = 0xFFFFFFFFFFFFFFFF;
 	self->last_addr = 0xFFFFFFFFFFFFFFFF;
 
-	QEMU_PT_PRINTF(PAGE_CACHE_PREFIX, "%s (%s - %s) WORD_WIDTH: %d", __func__, tmp1, tmp2, disassembler_word_width);
+	QEMU_PT_PRINTF(PAGE_CACHE_PREFIX, "%s (%s - %s)", __func__, tmp1, tmp2);
 
 	free(tmp3);
 	free(tmp2);
