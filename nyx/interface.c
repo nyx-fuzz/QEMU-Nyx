@@ -97,7 +97,7 @@ typedef struct nyx_interface_state {
 	
 } nyx_interface_state;
 
-static void kafl_guest_event(void *opaque, QEMUChrEvent event){
+static void kafl_guest_event(void *opaque, int event){
 }
 
 static void send_char(char val, void* tmp_s){
