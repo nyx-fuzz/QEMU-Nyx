@@ -1917,10 +1917,9 @@ static int kvm_init(MachineState *ms)
     }
 #ifdef QEMU_NYX
     if (ioctl(s->fd, KVM_CHECK_EXTENSION, KVM_CAP_NYX_PT) != 1 && ioctl(s->fd, KVM_CHECK_EXTENSION, KVM_CAP_NYX_FDL) != 1) {
-        fprintf(stderr, "[QEMU-Nyx] Could not access KVM-PT kernel module!\n[QEMU-Nyx] Trying vanilla KVM...\n");
 
         /* fallback -> use vanilla KVM module instead (no Intel-PT tracing or nested hypercalls at this point) */
-        s->fd = qemu_open("/dev/kvm", O_RDWR);
+        fprintf(stderr, "[QEMU-Nyx] Could not access KVM-PT kernel module!\n[QEMU-Nyx] Trying vanilla KVM...\n");
         if (s->fd == -1) {
             fprintf(stderr, "[QEMU-Nyx] Error: NYX fallback failed: Could not access vanilla KVM module!\n");
             ret = -errno;
