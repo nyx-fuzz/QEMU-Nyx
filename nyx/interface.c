@@ -60,13 +60,13 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 
 #define TYPE_KAFLMEM "kafl"
 #define KAFLMEM(obj) \
-		OBJECT_CHECK(kafl_mem_state, (obj), TYPE_KAFLMEM)
+		OBJECT_CHECK(nyx_interface_state, (obj), TYPE_KAFLMEM)
 
 uint32_t kafl_bitmap_size = DEFAULT_KAFL_BITMAP_SIZE;
 
 static void pci_kafl_guest_realize(DeviceState *dev, Error **errp);
 
-typedef struct kafl_mem_state {
+typedef struct nyx_interface_state {
 	DeviceState parent_obj;
 
 	Chardev *kafl_chr_drv_state;
@@ -95,13 +95,13 @@ typedef struct kafl_mem_state {
 
 	bool redqueen;
 	
-} kafl_mem_state;
+} nyx_interface_state;
 
 static void kafl_guest_event(void *opaque, QEMUChrEvent event){
 }
 
 static void send_char(char val, void* tmp_s){
-	kafl_mem_state *s = tmp_s;
+	nyx_interface_state *s = tmp_s;
 
 	assert(val == KAFL_PING);
 	__sync_synchronize();
@@ -113,9 +113,9 @@ static int kafl_guest_can_receive(void * opaque){
 	return sizeof(int64_t);
 }
 
-static kafl_mem_state* state = NULL;
+static nyx_interface_state* state = NULL;
 
-static void init_send_char(kafl_mem_state* s){
+static void init_send_char(nyx_interface_state* s){
 	state = s;
 }
 
@@ -147,7 +147,7 @@ static void kafl_guest_receive(void *opaque, const uint8_t * buf, int size){
 	}
 }
 
-static int kafl_guest_create_memory_bar(kafl_mem_state *s, int region_num, uint64_t bar_size, const char* file, Error **errp){
+static int kafl_guest_create_memory_bar(nyx_interface_state *s, int region_num, uint64_t bar_size, const char* file, Error **errp){
 	void * ptr;
 	int fd;
 	struct stat st;
@@ -179,7 +179,7 @@ static int kafl_guest_create_memory_bar(kafl_mem_state *s, int region_num, uint6
 	return 0;
 }
 
-static void kafl_guest_setup_bitmap(kafl_mem_state *s, char* filename, uint32_t bitmap_size){
+static void kafl_guest_setup_bitmap(nyx_interface_state *s, char* filename, uint32_t bitmap_size){
 	void * ptr;
 	int fd;
 	struct stat st;
@@ -195,7 +195,7 @@ static void kafl_guest_setup_bitmap(kafl_mem_state *s, char* filename, uint32_t 
 	GET_GLOBAL_STATE()->shared_ijon_bitmap_size = DEFAULT_KAFL_IJON_BITMAP_SIZE;
 }
 
-static bool verify_workdir_state(kafl_mem_state *s, Error **errp){
+static bool verify_workdir_state(nyx_interface_state *s, Error **errp){
 
 	char* workdir = s->workdir;
 	uint32_t id = s->worker_id;
@@ -327,7 +327,7 @@ static void check_ipt_range(uint8_t i){
 	close(kvm);
 }
 
-static void check_available_ipt_ranges(kafl_mem_state* s){
+static void check_available_ipt_ranges(nyx_interface_state* s){
 	uint64_t addr_a, addr_b;
 
 	int kvm_fd = qemu_open("/dev/kvm", O_RDWR);
@@ -353,7 +353,7 @@ static void check_available_ipt_ranges(kafl_mem_state* s){
 	close(kvm_fd);
 }
 
-static bool verify_sharedir_state(kafl_mem_state *s, Error **errp){
+static bool verify_sharedir_state(nyx_interface_state *s, Error **errp){
 
 	char* sharedir = s->sharedir;
 
@@ -366,7 +366,7 @@ static bool verify_sharedir_state(kafl_mem_state *s, Error **errp){
 
 
 static void pci_kafl_guest_realize(DeviceState *dev, Error **errp){
-	kafl_mem_state *s = KAFLMEM(dev);
+	nyx_interface_state *s = KAFLMEM(dev);
 
 	if(s->bitmap_size <= 0){
 		s->bitmap_size = DEFAULT_KAFL_BITMAP_SIZE;
@@ -416,33 +416,33 @@ static void pci_kafl_guest_realize(DeviceState *dev, Error **errp){
 }
 
 static Property kafl_guest_properties[] = {
-	DEFINE_PROP_CHR("chardev", kafl_mem_state, chr),
+	DEFINE_PROP_CHR("chardev", nyx_interface_state, chr),
 
-	DEFINE_PROP_STRING("sharedir", kafl_mem_state, sharedir),
+	DEFINE_PROP_STRING("sharedir", nyx_interface_state, sharedir),
 
 
-	DEFINE_PROP_STRING("workdir", kafl_mem_state, workdir),
-	DEFINE_PROP_UINT32("worker_id", kafl_mem_state, worker_id, 0xFFFF),
+	DEFINE_PROP_STRING("workdir", nyx_interface_state, workdir),
+	DEFINE_PROP_UINT32("worker_id", nyx_interface_state, worker_id, 0xFFFF),
 
-	DEFINE_PROP_UINT64("cow_primary_size", kafl_mem_state, cow_primary_size, 0),
+	DEFINE_PROP_UINT64("cow_primary_size", nyx_interface_state, cow_primary_size, 0),
 	/* 
 	 * Since DEFINE_PROP_UINT64 is somehow broken (signed/unsigned madness),
 	 * let's use DEFINE_PROP_STRING and post-process all values by strtol...
 	 */
-	DEFINE_PROP_STRING("ip0_a", kafl_mem_state, ip_filter[0][0]),
-	DEFINE_PROP_STRING("ip0_b", kafl_mem_state, ip_filter[0][1]),
-	DEFINE_PROP_STRING("ip1_a", kafl_mem_state, ip_filter[1][0]),
-	DEFINE_PROP_STRING("ip1_b", kafl_mem_state, ip_filter[1][1]),
-	DEFINE_PROP_STRING("ip2_a", kafl_mem_state, ip_filter[2][0]),
-	DEFINE_PROP_STRING("ip2_b", kafl_mem_state, ip_filter[2][1]),
-	DEFINE_PROP_STRING("ip3_a", kafl_mem_state, ip_filter[3][0]),
-	DEFINE_PROP_STRING("ip3_b", kafl_mem_state, ip_filter[3][1]),
+	DEFINE_PROP_STRING("ip0_a", nyx_interface_state, ip_filter[0][0]),
+	DEFINE_PROP_STRING("ip0_b", nyx_interface_state, ip_filter[0][1]),
+	DEFINE_PROP_STRING("ip1_a", nyx_interface_state, ip_filter[1][0]),
+	DEFINE_PROP_STRING("ip1_b", nyx_interface_state, ip_filter[1][1]),
+	DEFINE_PROP_STRING("ip2_a", nyx_interface_state, ip_filter[2][0]),
+	DEFINE_PROP_STRING("ip2_b", nyx_interface_state, ip_filter[2][1]),
+	DEFINE_PROP_STRING("ip3_a", nyx_interface_state, ip_filter[3][0]),
+	DEFINE_PROP_STRING("ip3_b", nyx_interface_state, ip_filter[3][1]),
 
 
-	DEFINE_PROP_UINT64("bitmap_size", kafl_mem_state, bitmap_size, DEFAULT_KAFL_BITMAP_SIZE),
-	DEFINE_PROP_BOOL("debug_mode", kafl_mem_state, debug_mode, false),
-	DEFINE_PROP_BOOL("crash_notifier", kafl_mem_state, notifier, true),
-	DEFINE_PROP_BOOL("dump_pt_trace", kafl_mem_state, dump_pt_trace, false),
+	DEFINE_PROP_UINT64("bitmap_size", nyx_interface_state, bitmap_size, DEFAULT_KAFL_BITMAP_SIZE),
+	DEFINE_PROP_BOOL("debug_mode", nyx_interface_state, debug_mode, false),
+	DEFINE_PROP_BOOL("crash_notifier", nyx_interface_state, notifier, true),
+	DEFINE_PROP_BOOL("dump_pt_trace", nyx_interface_state, dump_pt_trace, false),
 
 
 	DEFINE_PROP_END_OF_LIST(),
@@ -464,7 +464,7 @@ static void kafl_guest_init(Object *obj){
 static const TypeInfo kafl_guest_info = {
 	.name          = TYPE_KAFLMEM,
 	.parent        = TYPE_DEVICE,
-	.instance_size = sizeof(kafl_mem_state),
+	.instance_size = sizeof(nyx_interface_state),
 	.instance_init = kafl_guest_init,
 	.class_init    = kafl_guest_class_init,
 };
