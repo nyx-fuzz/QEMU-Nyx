@@ -310,21 +310,47 @@ static bool verify_workdir_state(kafl_mem_state *s, Error **errp){
 
 #define KVM_VMX_PT_GET_ADDRN				_IO(KVMIO,	0xe9)
 
-static void check_range(uint8_t i){
+static void check_ipt_range(uint8_t i){
 	int ret = 0;
-	int kvm = open("/dev/dell", O_RDWR | O_CLOEXEC);
+	int kvm = open("/dev/kvm", O_RDWR | O_CLOEXEC);
 	ret = ioctl(kvm, KVM_VMX_PT_GET_ADDRN, NULL);
 
 	if(ret == -1){
-		QEMU_PT_PRINTF(INTERFACE_PREFIX, "ERROR: Multi range tracing is not supported! Please upgrade your kernel to 4.20-rc4!\n");
-		abort();
+		fprintf(stderr, "[QEMU-Nyx] Error: Multi range tracing is not supported!\n");
+		exit(1);
 	}
 
 	if(ret < (i+1)){
-		QEMU_PT_PRINTF(INTERFACE_PREFIX, "ERROR: CPU supports only %d IP filters!\n", ret);
-		abort();
+		fprintf(stderr, "[QEMU-Nyx] Error: CPU supports only %d IP filters!\n", ret);
+		exit(1);
 	}
 	close(kvm);
+}
+
+static void check_available_ipt_ranges(kafl_mem_state* s){
+	uint64_t addr_a, addr_b;
+
+	int kvm_fd = qemu_open("/dev/kvm", O_RDWR);
+	if (kvm_fd == -1) {
+	    fprintf(stderr, "[QEMU-Nyx] Error: could not access KVM kernel module: %m\n");
+		exit(1);
+	}
+
+	if (ioctl(kvm_fd, KVM_CHECK_EXTENSION, KVM_CAP_NYX_PT) == 1 && ioctl(kvm_fd, KVM_CHECK_EXTENSION, KVM_CAP_NYX_FDL) == 1) {
+		for(uint8_t i = 0; i < INTEL_PT_MAX_RANGES; i++){
+			if(s->ip_filter[i][0] && s->ip_filter[i][1]){
+				if(i >= 1){
+					check_ipt_range(i);
+				}
+				addr_a = CONVERT_UINT64(s->ip_filter[i][0]);
+				addr_b = CONVERT_UINT64(s->ip_filter[i][1]);
+				if (addr_a < addr_b){
+					pt_setup_ip_filters(i, addr_a, addr_b);
+				}
+			}
+		}
+	}
+	close(kvm_fd);
 }
 
 static bool verify_sharedir_state(kafl_mem_state *s, Error **errp){
@@ -340,7 +366,6 @@ static bool verify_sharedir_state(kafl_mem_state *s, Error **errp){
 
 
 static void pci_kafl_guest_realize(DeviceState *dev, Error **errp){
-	uint64_t tmp0, tmp1;
 	kafl_mem_state *s = KAFLMEM(dev);
 
 	if(s->bitmap_size <= 0){
@@ -351,8 +376,8 @@ static void pci_kafl_guest_realize(DeviceState *dev, Error **errp){
 	assert((((uint32_t)s->bitmap_size-DEFAULT_KAFL_IJON_BITMAP_SIZE) & (((uint32_t)s->bitmap_size-DEFAULT_KAFL_IJON_BITMAP_SIZE) - 1)) == 0 );
 
 	if(s->worker_id == 0xFFFF){
-		fprintf(stderr, "Invalid worker id...\n");
-		abort();
+		fprintf(stderr, "[QEMU-Nyx] Error: Invalid worker id...\n");
+		exit(1);
 	}
 
 	if(s->cow_primary_size){
@@ -360,8 +385,8 @@ static void pci_kafl_guest_realize(DeviceState *dev, Error **errp){
 	}
 
 	if (!s->workdir || !verify_workdir_state(s, errp)){
-		fprintf(stderr, "Invalid work dir...\n");
-		abort();
+		fprintf(stderr, "[QEMU-Nyx] Error:  work dir...\n");
+		exit(1);
 	}
 
 	if (!s->sharedir || !verify_sharedir_state(s, errp)){
@@ -372,25 +397,12 @@ static void pci_kafl_guest_realize(DeviceState *dev, Error **errp){
 		sharedir_set_dir(GET_GLOBAL_STATE()->sharedir, s->sharedir);
 	}
 
-	if(&s->chr)
+	if(&s->chr){
 		qemu_chr_fe_set_handlers(&s->chr, kafl_guest_can_receive, kafl_guest_receive, kafl_guest_event, NULL, s, NULL, true);
-
-	for(uint8_t i = 0; i < INTEL_PT_MAX_RANGES; i++){
-		if(s->ip_filter[i][0] && s->ip_filter[i][1]){
-			if(i >= 1){
-				check_range(i);
-			}
-			tmp0 = CONVERT_UINT64(s->ip_filter[i][0]);
-			tmp1 = CONVERT_UINT64(s->ip_filter[i][1]);
-			if (tmp0 < tmp1){
-				//if(s->filter_bitmap[i]){
-				//	tmp = kafl_guest_setup_filter_bitmap(s, s->filter_bitmap[i], (uint64_t)(s->bitmap_size));
-				//}
-				pt_setup_ip_filters(i, tmp0, tmp1);
-			}
-		}
 	}
 
+	check_available_ipt_ranges(s);
+	
 	if(s->debug_mode){
 		GET_GLOBAL_STATE()->enable_hprintf = true;
 	}
