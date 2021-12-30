@@ -33,20 +33,20 @@ int get_capstone_mode(int word_width_in_bits){
 	}
 }
 
-void fuzz_bitmap_reset(void){
+void coverage_bitmap_reset(void){
 	if(GET_GLOBAL_STATE()->shared_bitmap_ptr){
-    //fprintf(stderr, "%s: %lx %lx\n", __func__, fuzz_bitmap, fuzz_bitmap_size);
+    //fprintf(stderr, "%s: %lx %lx\n", __func__, coverage_bitmap, coverage_bitmap_size);
 		memset(GET_GLOBAL_STATE()->shared_bitmap_ptr, 0x00, GET_GLOBAL_STATE()->shared_bitmap_size + GET_GLOBAL_STATE()->shared_ijon_bitmap_size);
 	}
 }
 
-void fuzz_bitmap_copy_to_buffer(void* buffer){
+void coverage_bitmap_copy_to_buffer(void* buffer){
 	if(GET_GLOBAL_STATE()->shared_bitmap_ptr){
 		memcpy(buffer, GET_GLOBAL_STATE()->shared_bitmap_ptr, GET_GLOBAL_STATE()->shared_bitmap_size + GET_GLOBAL_STATE()->shared_ijon_bitmap_size);
 	}
 }
 
-void fuzz_bitmap_copy_from_buffer(void* buffer){
+void coverage_bitmap_copy_from_buffer(void* buffer){
 	if(GET_GLOBAL_STATE()->shared_bitmap_ptr){
 		memcpy(GET_GLOBAL_STATE()->shared_bitmap_ptr, buffer, GET_GLOBAL_STATE()->shared_bitmap_size + GET_GLOBAL_STATE()->shared_ijon_bitmap_size);
 	}

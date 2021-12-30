@@ -129,7 +129,7 @@ bool handle_hypercall_kafl_next_payload(struct kvm_run *run, CPUState *cpu, uint
 					fprintf(stderr, "[QEMU-Nyx] coverage mode: compile-time instrumentation\n");
 				}
 
-				fuzz_bitmap_reset();
+				coverage_bitmap_reset();
 				request_fast_vm_reload(GET_GLOBAL_STATE()->reload_state, REQUEST_SAVE_SNAPSHOT_ROOT_FIX_RIP);
 				setup_snapshot_once = true;
 

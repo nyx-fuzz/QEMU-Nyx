@@ -61,3 +61,9 @@
 [submodule "roms/qboot"]
 	path = roms/qboot
 	url = https://github.com/bonzini/qboot
+[submodule "libxdc"]
+	path = libxdc
+	url = https://github.com/nyx-fuzz/libxdc.git
+[submodule "capstone_v4"]
+	path = capstone_v4
+	url = https://github.com/aquynh/capstone.git

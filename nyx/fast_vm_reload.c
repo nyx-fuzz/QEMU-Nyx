@@ -521,7 +521,7 @@ void fast_reload_create_tmp_snapshot(fast_reload_t* self){
             self->bitmap_copy = malloc(GET_GLOBAL_STATE()->shared_bitmap_size+GET_GLOBAL_STATE()->shared_ijon_bitmap_size);
         }
     }
-    fuzz_bitmap_copy_to_buffer(self->bitmap_copy);
+    coverage_bitmap_copy_to_buffer(self->bitmap_copy);
 
     //GET_GLOBAL_STATE()->cow_cache_full = false;
 
@@ -589,7 +589,7 @@ uint32_t get_dirty_page_num(fast_reload_t* self){
 
 bool fast_reload_set_bitmap(fast_reload_t* self){
     if(self->incremental_snapshot_enabled){
-        fuzz_bitmap_copy_from_buffer(self->bitmap_copy);
+        coverage_bitmap_copy_from_buffer(self->bitmap_copy);
         return true;
     }
     return false;

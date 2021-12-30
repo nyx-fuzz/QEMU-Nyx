@@ -223,7 +223,7 @@ void pt_dump(CPUState *cpu, int bytes){
 
 int pt_enable(CPUState *cpu, bool hmp_mode){
 	if(!fast_reload_set_bitmap(get_fast_reload_snapshot())){
-		fuzz_bitmap_reset();
+		coverage_bitmap_reset();
 	}
 	//pt_reset_bitmap();
   pt_trucate_pt_trace_file();

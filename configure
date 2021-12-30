@@ -951,6 +951,10 @@ for opt do
   ;;
   --enable-nyx) nyx="yes"
   ;;
+  --enable-nyx-static) nyx_static="yes"
+  ;;
+  --enable-nyx-flto) nyx_flto="yes"
+  ;;
   --version|-V) exec cat $source_path/VERSION
   ;;
   --prefix=*) prefix="$optarg"
@@ -1729,6 +1733,9 @@ Optional features, enabled with --enable-FEATURE and
 disabled with --disable-FEATURE, default is enabled if available:
 
   nyx             build QEMU-NYX
+  nyx-static      statically link libxdc and libcapstone4
+  nyx-flto        enable LTO 
+
   system          all system emulation targets
   user            supported user emulation targets
   linux-user      all linux usermode emulation targets
@@ -6094,18 +6101,31 @@ esac
 
 write_c_skeleton
 
-if test "$gcov" = "yes" ; then
+if test "$nyx" = "yes" ; then
+  CFLAGS="-DNESTED_PATCH -Wno-error=maybe-uninitialized -DQEMU_NYX -g -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2 $QEMU_CFLAGS"
+
+  if test "$nyx_static" = "yes" ; then
+    LIBS="-L$PWD/capstone_v4/ -l:libcapstone.a -L$PWD/libxdc/ -l:libxdc.a -I$PWD/capstone_v4/include/ -I$PWD/libxdc/ $LIBS"
+    QEMU_INCLUDES=" -I$PWD/capstone_v4/include/ -I$PWD/libxdc/ $QEMU_INCLUDES"
+  else
+    LIBS="-lcapstone -lxdc $LIBS"
+  fi
+
+  if test "$nyx_flto" = "yes" ; then
+    CFLAGS="-flto $CFLAGS"
+    LDFLAGS="-flto $LDFLAGS"
+  fi
+elif test "$gcov" = "yes" ; then
   CFLAGS="-fprofile-arcs -ftest-coverage -g $CFLAGS"
   LDFLAGS="-fprofile-arcs -ftest-coverage $LDFLAGS"
 elif test "$fortify_source" = "yes" ; then
-  if test "$nyx" = "yes" ; then
-    CFLAGS="-DNESTED_PATCH -O3 -rdynamic -Wno-error=maybe-uninitialized -frename-registers -frename-registers -mtune=native -DQEMU_NYX -g -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2 $QEMU_CFLAGS"
-    LIBS="-lcapstone -lxdc $LIBS"
-  else
-    CFLAGS="-O2 -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2 $CFLAGS"
-  fi
-elif test "$debug" = "no"; then
-  CFLAGS="-O2 $CFLAGS"
+  CFLAGS="-O2 -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2 $CFLAGS"
+fi
+
+if test "$debug" = "no"; then
+  CFLAGS="-O3 -rdynamic -frename-registers -frename-registers -mtune=native $CFLAGS"
+else
+  CFLAGS="-O0 -g $CFLAGS"
 fi
 
 if test "$have_asan" = "yes"; then

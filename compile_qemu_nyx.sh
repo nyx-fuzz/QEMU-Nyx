@@ -18,35 +18,116 @@ set -e
 # You should have received a copy of the GNU General Public License
 # along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 
+error () {
+  echo "$0: <option>"
+  echo ""
+  echo "Available compile options: "
+  echo " -  dynamic    dynamically link libxdc and capstone4"
+  echo " -  static     statically link libxdc and capstone4"
+  echo " -  lto        statically link libxdc and capstone4 and enable LTO (up to 10% better performance)"
+  echo " -  debug      enable several debug options"
+  echo ""
+  exit 3
+}
 
-if [ ! -f "/usr/lib/libxdc.so" ] || [ ! -f "/usr/include/libxdc.h" ]; then
-  echo "[!] libxdc not found! Installing..."
-  if [ -d "capstone_v4/" ]; then
-    rm -rf capstone_v4
-  fi
-
-  if [ -d "libxdc/" ]; then
-    rm -rf libxdc
-  fi
-
-  git clone https://github.com/nyx-fuzz/libxdc.git
-  git clone https://github.com/aquynh/capstone.git capstone_v4
+compile_libraries (){
+  echo "[!] compiling capstone4..."
   cd capstone_v4
-  git checkout v4
-  make 
-  sudo make install 
+  make
   cd ..
+  echo "[!] capstone4 is ready!"
+
+  echo "[!] compiling libxdc..."
   cd libxdc
-  sudo make install
+  make
   cd ..
+  echo "[!] libxdc is ready!"
+}
+
+compile_and_install_libraries () {
+  if [ ! -f "/usr/lib/libcapstone.so" ] || [ ! -d "/usr/include/capstone/" ]; then
+    echo "[!] capstone not found! Installing..."
+    cd capstone_v4
+    make -j
+    echo "[ ] requesting permissions to install capstone4 ..."
+    sudo make install
+    echo "[!] done ..."
+    cd ..
+  fi
+
+  if [ ! -f "/usr/lib/libxdc.so" ] || [ ! -f "/usr/include/libxdc.h" ]; then
+    echo "[!] libxdc not found! Installing..."
+    cd libxdc
+    make -j
+    echo "[ ] requesting permissions to install libxdc ..."
+    sudo make install
+    echo "[!] done ..."
+    cd ..
+  fi
+}
+
+compile () {
+  if [ -f GNUmakefile ]; then
+    rm GNUmakefile 2> /dev/null
+  fi
+
+  make -j
+  echo "[!] QEMU-Nyx is ready!"
+}
+
+cd libxdc
+git submodule init
+git submodule update
+cd ..
+
+cd capstone_v4
+git submodule init
+git submodule update
+cd ..
+
+if [ "$#" == 0 ] ; then
+  error
 fi
 
-./configure --target-list=x86_64-softmmu --enable-gtk --disable-werror --disable-capstone --disable-libssh --enable-nyx --disable-tools
-#--enable-sanitizers
+if [ "$1" == "dynamic" ]; 
+then 
 
-if [ -f GNUmakefile ]; then
-  rm GNUmakefile 2> /dev/null
+  make clean
+  compile_and_install_libraries
+  ./configure --target-list=x86_64-softmmu --disable-docs --enable-gtk --disable-werror --disable-capstone --disable-libssh --enable-nyx --disable-tools
+  compile
+  exit 0
 fi
 
-make -j
+if [ "$1" == "debug" ]; 
+then 
 
+  make clean
+  compile_and_install_libraries
+  ./configure --target-list=x86_64-softmmu --disable-docs --enable-gtk --disable-werror --disable-capstone --disable-libssh --enable-nyx --enable-sanitizers --enable-debug --disable-tools
+  compile
+  exit 0
+fi
+
+if [ "$1" == "static" ]; 
+then 
+
+  make clean
+  compile_libraries
+  ./configure --target-list=x86_64-softmmu --disable-docs --enable-gtk --disable-werror --disable-capstone --disable-libssh --enable-nyx --enable-nyx-static --disable-tools
+  compile
+  exit 0
+fi
+
+if [ "$1" == "lto" ]; 
+then 
+
+  make clean
+  compile_libraries
+  ./configure --target-list=x86_64-softmmu --disable-docs --enable-gtk --disable-werror --disable-capstone --disable-libssh --enable-nyx --enable-nyx-static --enable-nyx-flto --disable-tools
+  compile
+  exit 0
+fi
+
+error
+exit 1
