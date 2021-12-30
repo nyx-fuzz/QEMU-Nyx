@@ -11,7 +11,7 @@ You can find more detailed information in our main repository.
 ## Build
 
 ```
-sh compile_qemu_nyx.sh
+./compile_qemu_nyx.sh lto
 ```
 
 ## Bug Reports and Contributions
