@@ -33,13 +33,13 @@ error () {
 compile_libraries (){
   echo "[!] compiling capstone4..."
   cd capstone_v4
-  make
+  make -j
   cd ..
   echo "[!] capstone4 is ready!"
 
   echo "[!] compiling libxdc..."
   cd libxdc
-  make
+  CFLAGS="-I../capstone_v4/include/" V=1 make libxdc.a
   cd ..
   echo "[!] libxdc is ready!"
 }
