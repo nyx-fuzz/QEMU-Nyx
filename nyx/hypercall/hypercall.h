@@ -123,26 +123,6 @@ int handle_kafl_hypercall(struct kvm_run *run, CPUState *cpu, uint64_t hypercall
 
 void skip_init(void);
 
-
-typedef struct host_config_s{
-  uint32_t bitmap_size;
-  uint32_t ijon_bitmap_size;
-	uint32_t payload_buffer_size;
-  /* more to come */
-} __attribute__((packed)) host_config_t;
-
-typedef struct agent_config_s{
-  uint8_t agent_timeout_detection;
-  uint8_t agent_tracing;
-  uint8_t agent_ijon_tracing;
-	uint8_t agent_non_reload_mode;
-	uint64_t trace_buffer_vaddr;
-	uint64_t ijon_trace_buffer_vaddr;
-  
-  uint8_t dump_payloads; /* set by hypervisor */
-  /* more to come */
-} __attribute__((packed)) agent_config_t;
-
 typedef struct kafl_dump_file_s{
   uint64_t file_name_str_ptr;
   uint64_t data_ptr;

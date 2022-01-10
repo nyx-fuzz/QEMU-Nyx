@@ -40,7 +40,7 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 
 
 #include "nyx/pt.h"
-#include "nyx/hypercall.h"
+#include "nyx/hypercall/hypercall.h"
 #include "nyx/memory_access.h"
 #include "nyx/interface.h"
 #include "nyx/printk.h"
@@ -55,6 +55,7 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 #include "nyx/fast_vm_reload_sync.h"
 
 #include "nyx/redqueen.h"
+#include "nyx/hypercall/configuration.h"
 
 //#define DEBUG_HPRINTF
 
@@ -974,59 +975,6 @@ void pt_disable_rqi_trace(CPUState *cpu){
 	}
 }
 
-static void handle_hypercall_kafl_get_host_config(struct kvm_run *run, CPUState *cpu, uint64_t hypercall_arg){
-	uint64_t vaddr = hypercall_arg;
-	host_config_t config;
-	memset((void*)&config, 0, sizeof(host_config_t));
-
-	config.bitmap_size = GET_GLOBAL_STATE()->shared_bitmap_size;
-	config.ijon_bitmap_size = GET_GLOBAL_STATE()->shared_ijon_bitmap_size;
-	config.payload_buffer_size = GET_GLOBAL_STATE()->shared_payload_buffer_size;
-
-	write_virtual_memory(vaddr, (uint8_t*)&config, sizeof(host_config_t), cpu);
-}
-
-static void handle_hypercall_kafl_set_agent_config(struct kvm_run *run, CPUState *cpu, uint64_t hypercall_arg){
-	uint64_t vaddr = hypercall_arg;
-	agent_config_t config;
-
-	X86CPU *cpux86 = X86_CPU(cpu);
-  CPUX86State *env = &cpux86->env;
-
-	if(read_virtual_memory(vaddr, (uint8_t*)&config, sizeof(agent_config_t), cpu)){
-
-		GET_GLOBAL_STATE()->cap_timeout_detection = config.agent_timeout_detection;
-		GET_GLOBAL_STATE()->cap_only_reload_mode = !!!config.agent_non_reload_mode; /* fix this */
-		GET_GLOBAL_STATE()->cap_compile_time_tracing = config.agent_tracing;
-
-		if(!GET_GLOBAL_STATE()->cap_compile_time_tracing && !GET_GLOBAL_STATE()->nyx_fdl){
-			fprintf(stderr, "[!] Error: Attempt to fuzz target without compile-time instrumentation - Intel PT is not supported on this KVM build!\n");
-			exit(1);
-		}
-
-		GET_GLOBAL_STATE()->cap_ijon_tracing = config.agent_ijon_tracing;
-
-		if(config.agent_tracing){
-			GET_GLOBAL_STATE()->cap_compile_time_tracing_buffer_vaddr = config.trace_buffer_vaddr;
-		}
-		if(config.agent_ijon_tracing){
-			GET_GLOBAL_STATE()->cap_ijon_tracing_buffer_vaddr = config.ijon_trace_buffer_vaddr;
-		}
-
-		GET_GLOBAL_STATE()->cap_cr3 = env->cr[3];
-
-		apply_capabilities(cpu);
-
-		if(getenv("DUMP_PAYLOAD_MODE")){
-			config.dump_payloads = 1;
-			write_virtual_memory(vaddr, (uint8_t*)&config, sizeof(agent_config_t), cpu);
-		}
-	}
-	else{
-		fprintf(stderr, "%s: failed (vaddr: 0x%lx)!\n", __func__, vaddr);
-	}
-}
-
 static void handle_hypercall_kafl_dump_file(struct kvm_run *run, CPUState *cpu, uint64_t hypercall_arg){
 
 	/* TODO: check via aux buffer if we should allow this hypercall during fuzzing */
@@ -1094,7 +1042,7 @@ static void handle_hypercall_kafl_dump_file(struct kvm_run *run, CPUState *cpu, 
 static void handle_hypercall_kafl_persist_page_past_snapshot(struct kvm_run *run, CPUState *cpu, uint64_t hypercall_arg){
 	CPUX86State *env = &(X86_CPU(cpu))->env;
 	kvm_arch_get_registers_fast(cpu);
-	hwaddr phys_addr = (hwaddr) get_paging_phys_addr(cpu, env->cr[3], hypercall_arg&(~0xFFF));
+	hwaddr phys_addr = (hwaddr) get_paging_phys_addr(cpu, env->cr[3], hypercall_arg&(~0xFFF), NULL);
 	assert(phys_addr != 0xffffffffffffffffULL);
 	fast_reload_blacklist_page(get_fast_reload_snapshot(), phys_addr);
 }
