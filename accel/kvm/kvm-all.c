@@ -46,7 +46,7 @@
 
 #ifdef QEMU_NYX
 #include "nyx/pt.h"
-#include "nyx/hypercall.h"
+#include "nyx/hypercall/hypercall.h"
 #include "nyx/synchronization.h"
 #include "nyx/debug.h"
 #include "nyx/state.h"

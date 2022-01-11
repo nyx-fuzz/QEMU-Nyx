@@ -2,7 +2,7 @@
 #include <linux/kvm.h>
 #include "qemu-common.h"
 #include "nyx/memory_access.h"
-#include "nyx/hypercall.h"
+#include "nyx/hypercall/hypercall.h"
 #include "nyx/printk.h"
 
 enum reg_types{RAX, RCX, RDX, RBX, RSP, RBP, RSI, RDI, R8, R9, R10, R11, R12, R13, R14, R15, RIP};

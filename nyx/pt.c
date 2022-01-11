@@ -44,11 +44,6 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 
 #define PT_BUFFER_MMAP_ADDR 0x3ffff0000000
 
-/*
-extern uint32_t kafl_bitmap_size;
-uint8_t* bitmap = NULL;
-*/
-
 uint32_t state_byte = 0;
 uint32_t last = 0;
 
@@ -67,14 +62,6 @@ void pt_trucate_pt_trace_file(void){
     assert(lseek(pt_trace_dump_fd, 0, SEEK_SET) == 0);
     assert(ftruncate(pt_trace_dump_fd, 0)==0);
   }
-}
-
-void pt_sync(void){
-	/*
-	if(bitmap){
-		msync(bitmap, kafl_bitmap_size, MS_SYNC);
-	}
-	*/
 }
 
 static void pt_set(CPUState *cpu, run_on_cpu_data arg){
@@ -111,58 +98,11 @@ static inline int pt_ioctl(int fd, unsigned long request, unsigned long arg){
 	return ioctl(fd, request, arg);
 }
 
-/*
-void pt_setup_bitmap(void* ptr){
-	bitmap = (uint8_t*)ptr;
-}
-
-void pt_reset_bitmap(void){
-	if(bitmap){
-		state_byte = 0;
-		last = 0;
-		memset(bitmap, 0x00, kafl_bitmap_size);
-	}
-}
-*/
-
 static inline uint64_t mix_bits(uint64_t v) {
   v ^= (v >> 31);
   v *= 0x7fb5d329728ea185;
-  /*
-  v ^= (v >> 27);
-  v *= 0x81dadef4bc2dd44d;
-  v ^= (v >> 33);
-  */
   return v;
 }
-
-/*
-void pt_bitmap(uint64_t from, uint64_t to){
-
-	//if(to == 0x400965 || (last == 0x400965 && to == 0x40087A)){
-	//	last = to;
-	//	state_byte = mix_bits(state_byte)^to;
-	//	bitmap[state_byte & (kafl_bitmap_size-1)]++; 
-	//}
-
-	//printf("from: %lx\tto: %lx\n", from, to);
-
-	uint32_t transition_value = 0;
-	#ifdef SAMPLE_DECODED
-	sample_decoded(from,to);
-	#endif
-	if(bitmap){		
-		transition_value = mix_bits(to)^(mix_bits(from)>>1);
-		//
-		//if ((from == 0x7ffff7884e8f && to == 0x7ffff7884eff) || (from == 0x7ffff7884f10 && to == 0x7ffff7884f12) || (from == 0x7ffff7884f14 && to == 0x7ffff7884e80)){
-		//	return;
-		//}
-		//fprintf(stderr, "%lx %lx %x\n", from, to, check_bitmap_byte(transition_value & (kafl_bitmap_size-1)));
-		if (check_bitmap_byte(transition_value & (kafl_bitmap_size-1)) == 0)
-			bitmap[transition_value & (kafl_bitmap_size-1)]++;
-	}
-}
-*/
 
 #ifdef DUMP_AND_DEBUG_PT
 void dump_pt_trace(void* buffer, int bytes){
@@ -497,13 +437,3 @@ void pt_post_kvm_run(CPUState *cpu){
 		//}
 	}
 }
-
-/*
-void pt_sync_kvm_run_lock(void){
-	pthread_mutex_lock(&pt_dump_mutex);
-}
-
-void pt_sync_kvm_run_unlock(void){
-	pthread_mutex_unlock(&pt_dump_mutex);
-}
-*/

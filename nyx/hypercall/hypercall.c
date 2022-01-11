@@ -56,6 +56,7 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "nyx/redqueen.h"
 #include "nyx/hypercall/configuration.h"
+#include "nyx/hypercall/debug.h"
 
 //#define DEBUG_HPRINTF
 
@@ -65,7 +66,6 @@ bool notifiers_enabled = false;
 
 bool hypercall_enabled = false;
 void* program_buffer = NULL;
-char info_buffer[INFO_SIZE];
 char hprintf_buffer[HPRINTF_SIZE];
 
 static bool init_state = true;
@@ -322,47 +322,9 @@ static void handle_hypercall_kafl_range_submit(struct kvm_run *run, CPUState *cp
 }
 
 static void handle_hypercall_get_program(struct kvm_run *run, CPUState *cpu, uint64_t hypercall_arg){
-
-		//fprintf(stderr, "%s\n", __func__);	
-	/*
-	return;
-
-	if(!get_fast_reload_snapshot()->qemu_state){
-		fast_reload_create_in_memory(get_fast_reload_snapshot(), true);
-	}
-	*/
-/*
-	qemu_mutex_lock_iothread();
-	fast_reload_restore(get_fast_reload_snapshot());
-
-	qemu_mutex_unlock_iothread();
-	return;
-	*/
-	kvm_arch_get_registers(cpu);
-	X86CPU *x86_cpu = X86_CPU(cpu);
-		CPUX86State *env = &x86_cpu->env;
-
-	if(hypercall_enabled){
-		if(program_buffer){
-
-			if (env->cr[4] & CR4_PAE_MASK) {
-        if (env->hflags & HF_LMA_MASK) {
-					//fprintf(stderr, "IN 64Bit MODE\n");
-				}
-				else{
-					debug_fprintf(stderr, "IN 32Bit PAE MODE\n");
-					abort();
-				}
-			}
-			else{
-				debug_fprintf(stderr, "IN 32Bit MODE\n");
-				abort();
-			}
-			
-			//print_48_paging2(env->cr[3]);
-			write_virtual_memory(hypercall_arg, program_buffer, PROGRAM_SIZE, cpu);
-		}
-	}
+	fprintf(stderr, "[QEMU-Nyx] Error: This hypercall (HYPERCALL_KAFL_GET_PAYLOAD) is deprecated -> use ./hget instead!\n");
+	set_abort_reason_auxiliary_buffer(GET_GLOBAL_STATE()->auxilary_buffer, (char*)"Deprecated hypercall called...", strlen("Deprecated hypercall called..."));
+	synchronization_lock();
 }
 
 
@@ -546,100 +508,6 @@ static void handle_hypercall_kafl_panic(struct kvm_run *run, CPUState *cpu, uint
 	}
 }
 
-static double get_time(void){
-	struct timeval t;
-	struct timezone tzp;
-	gettimeofday(&t, &tzp);
-	return t.tv_sec + t.tv_usec*1e-6;
-}
-
-static void print_time_diff(int iterations){
-
-	static bool init = true;
-	static double start_time = 0.0;
-	static double end_time = 0.0;
-
-	if(init){
-		init = false;
-		printf("start time is zero!\n");
-		start_time = get_time();
-	}
-	else{
-		end_time = get_time();
-		double elapsed_time = end_time - start_time;
-		printf("Done in %f seconds\n", elapsed_time);
-		printf("Performance: %f\n", iterations/elapsed_time);
-		start_time = get_time();
-	}
-}
-
-static void meassure_performance(void){
-	static int perf_counter = 0;
-	if ((perf_counter%1000) == 0){
-		//printf("perf_counter -> %d \n", perf_counter);
-		print_time_diff(1000);
-	}
-	perf_counter++;
-}
-static void handle_hypercall_kafl_debug_tmp_snapshot(struct kvm_run *run, CPUState *cpu, uint64_t hypercall_arg){
-	//X86CPU *x86_cpu = X86_CPU(cpu);
-	//CPUX86State *env = &x86_cpu->env;
-	static bool first = true;
-
-	//printf("CALLED %s: %lx\n", __func__, hypercall_arg);
-	switch(hypercall_arg&0xFFF){
-		case 0: /* create root snapshot */
-			if(!fast_snapshot_exists(GET_GLOBAL_STATE()->reload_state, REQUEST_ROOT_EXISTS)){
-				request_fast_vm_reload(GET_GLOBAL_STATE()->reload_state, REQUEST_SAVE_SNAPSHOT_ROOT);
-			}
-			break;
-		case 1: /* create tmp snapshot */
-			//printf("%s: create tmp...(RIP: %lx)\n", __func__, get_rip(cpu));
-			if(!fast_snapshot_exists(GET_GLOBAL_STATE()->reload_state, REQUEST_TMP_EXISTS)){
-				request_fast_vm_reload(GET_GLOBAL_STATE()->reload_state, REQUEST_SAVE_SNAPSHOT_TMP);
-			}
-			break;
-		case 2: /* load root snapshot (+ discard tmp snapshot) */
-			//printf("%s: load root...(RIP: %lx)\n", __func__, get_rip(cpu));
-			if(fast_snapshot_exists(GET_GLOBAL_STATE()->reload_state, REQUEST_TMP_EXISTS)){
-				reload_request_discard_tmp(GET_GLOBAL_STATE()->reload_state);
-			}
-			request_fast_vm_reload(GET_GLOBAL_STATE()->reload_state, REQUEST_LOAD_SNAPSHOT_ROOT);
-			//meassure_performance();
-			break;
-		case 3: /* load tmp snapshot */
-			if(fast_snapshot_exists(GET_GLOBAL_STATE()->reload_state, REQUEST_TMP_EXISTS)){
-				request_fast_vm_reload(GET_GLOBAL_STATE()->reload_state, REQUEST_LOAD_SNAPSHOT_TMP);
-				//meassure_performance();
-			}
-			break;
-		case 5: // firefox debug hypercall
-			if(first){
-				first = false;
-				request_fast_vm_reload(GET_GLOBAL_STATE()->reload_state, REQUEST_SAVE_SNAPSHOT_ROOT);
-				//request_fast_vm_reload(GET_GLOBAL_STATE()->reload_state, REQUEST_SAVE_SNAPSHOT_TMP);
-
-				break;
-			}
-			else{
-				request_fast_vm_reload(GET_GLOBAL_STATE()->reload_state, REQUEST_LOAD_SNAPSHOT_ROOT);
-				break;
-			}
-		/*
-		case 6:
-			printf("%s: -> request to add 0x%lx to block-list\n", __func__, hypercall_arg&(~0xFFF));
-			CPUX86State *env = &(X86_CPU(cpu))->env;
-    	kvm_arch_get_registers_fast(cpu);
-    	hwaddr phys_addr = (hwaddr) get_paging_phys_addr(cpu, env->cr[3], hypercall_arg&(~0xFFF));
-	    fast_reload_blacklist_page(get_fast_reload_snapshot(), phys_addr);
-
-			break;
-	 */
-		default:
-			abort();
-	}
-}
-
 static void handle_hypercall_kafl_create_tmp_snapshot(struct kvm_run *run, CPUState *cpu, uint64_t hypercall_arg){
 	//X86CPU *x86_cpu = X86_CPU(cpu);
 	//CPUX86State *env = &x86_cpu->env;
@@ -647,7 +515,6 @@ static void handle_hypercall_kafl_create_tmp_snapshot(struct kvm_run *run, CPUSt
 
 		/* decode PT data */
 		pt_disable(qemu_get_cpu(0), false);
-		pt_sync();
 
 		/*
 		kvm_arch_get_registers(cpu);
@@ -764,84 +631,23 @@ qemu_mutex_lock_iothread();
 }
 
 static void handle_hypercall_kafl_info(struct kvm_run *run, CPUState *cpu, uint64_t hypercall_arg){
-	if(setup_snapshot_once)
-		return;
-		
-	debug_printf("%s\n", __func__);
-/*
-	printf("[*] EXEC: %s\t%lx %lx\n", __func__, get_rip(cpu), get_rsp(cpu));
-	hexdump_virtual_memory(get_rsp(cpu), 0x100, cpu);
-
-	kvm_arch_get_registers(cpu);
-	kvm_arch_put_registers(cpu, KVM_PUT_FULL_STATE);
-*/
-	/*
-	qemu_mutex_lock_iothread();
-	//fast_reload_restore((fast_reload_t*)cpu->fast_reload_snapshot);
-	fast_reload_restore(get_fast_reload_snapshot());
-	//kvm_arch_put_registers(cpu, KVM_PUT_FULL_STATE);
-	qemu_mutex_unlock_iothread();
-	return;
-	*/
-/*
-		kvm_arch_put_registers(cpu, KVM_PUT_FULL_STATE);
-
-
-	printf("[*] EXIT: %s\t%lx %lx\n", __func__, get_rip(cpu), get_rsp(cpu));
-	hexdump_virtual_memory(get_rsp(cpu), 0x100, cpu);
-*/
-//	return; 
-
-	read_virtual_memory(hypercall_arg, (uint8_t*)info_buffer, INFO_SIZE, cpu);
-	FILE* info_file_fd = fopen(INFO_FILE, "w");
-	fprintf(info_file_fd, "%s\n", info_buffer);
-	fclose(info_file_fd);
-	if(hypercall_enabled){
-		//hypercall_snd_char(KAFL_PROTO_INFO);
-		QEMU_PT_PRINTF_DEBUG("Protocol - SEND: KAFL_PROTO_INFO");
-		abort();
-
-	}
-	qemu_system_shutdown_request(SHUTDOWN_CAUSE_GUEST_SHUTDOWN);
+	fprintf(stderr, "[QEMU-Nyx] Error: This hypercall (HYPERCALL_KAFL_INFO) is deprecated -> use hprintf() & ./habort instead!\n");
+	set_abort_reason_auxiliary_buffer(GET_GLOBAL_STATE()->auxilary_buffer, (char*)"Deprecated hypercall called...", strlen("Deprecated hypercall called..."));
+	synchronization_lock();
 }
 
 void enable_notifies(void){
 	notifiers_enabled = true;
 }
 
-
-/*
-void hprintf(char* msg){
-	char file_name[256];
-	if(!(hprintf_counter >= HPRINTF_LIMIT) && GET_GLOBAL_STATE()->enable_hprintf){
-		if(hypercall_enabled){
-			snprintf(file_name, 256, "%s.%d", HPRINTF_FILE, hprintf_counter);
-			//printf("%s: %s\n", __func__, msg);
-			FILE* printf_file_fd = fopen(file_name, "w");
-			fprintf(printf_file_fd, "%s", msg);
-			fclose(printf_file_fd);
-			//hypercall_snd_char(KAFL_PROTO_PRINTF);
-			QEMU_PT_PRINTF_DEBUG("Protocol - SEND: KAFL_PROTO_PRINTF");
-
-		}
-		hprintf_counter++;
-
-	}		
-}
-*/
-
 static void handle_hypercall_kafl_printf(struct kvm_run *run, CPUState *cpu, uint64_t hypercall_arg){
-	//fprintf(stderr, "%s\n", __func__);
-	//if( /* !(hprintf_counter >= HPRINTF_LIMIT) && */ GET_GLOBAL_STATE()->enable_hprintf){ // && !GET_GLOBAL_STATE()->in_fuzzing_mode){
-		read_virtual_memory(hypercall_arg, (uint8_t*)hprintf_buffer, HPRINTF_SIZE, cpu);
-		//hprintf(hprintf_buffer);
+	read_virtual_memory(hypercall_arg, (uint8_t*)hprintf_buffer, HPRINTF_SIZE, cpu);
 #ifdef DEBUG_HPRINTF
-		fprintf(stderr, "%s %s\n", __func__, hprintf_buffer);
+	fprintf(stderr, "%s %s\n", __func__, hprintf_buffer);
 #else
-		set_hprintf_auxiliary_buffer(GET_GLOBAL_STATE()->auxilary_buffer, hprintf_buffer, strnlen(hprintf_buffer, HPRINTF_SIZE)+1);
-		synchronization_lock();
+	set_hprintf_auxiliary_buffer(GET_GLOBAL_STATE()->auxilary_buffer, hprintf_buffer, strnlen(hprintf_buffer, HPRINTF_SIZE)+1);
+	synchronization_lock();
 #endif
-	//}
 }
 
 

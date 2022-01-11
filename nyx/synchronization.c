@@ -1,5 +1,5 @@
 #include "nyx/synchronization.h"
-#include "nyx/hypercall.h"
+#include "nyx/hypercall/hypercall.h"
 #include "nyx/interface.h"
 #include "nyx/fast_vm_reload.h"
 #include "qemu-common.h"
@@ -237,7 +237,7 @@ bool in_fuzzing_loop = false;
 
 void synchronization_lock_hprintf(void){
 	pthread_mutex_lock(&synchronization_lock_mutex);
-	interface_send_char(KAFL_PING);
+	interface_send_char(NYX_INTERFACE_PING);
 
 	pthread_cond_wait(&synchronization_lock_condition, &synchronization_lock_mutex);
 	pthread_mutex_unlock(&synchronization_lock_mutex);
@@ -286,8 +286,7 @@ void synchronization_lock(void){
 		fsync_all_traces();		
 	}
 
-	interface_send_char(KAFL_PING);
-	//QEMU_PT_PRINTF_DEBUG("Protocol - SEND: KAFL_PING");
+	interface_send_char(NYX_INTERFACE_PING);
 
 	pthread_cond_wait(&synchronization_lock_condition, &synchronization_lock_mutex);
 	pthread_mutex_unlock(&synchronization_lock_mutex);
@@ -326,7 +325,6 @@ void synchronization_lock_crash_found(void){
 	}
 
 	pt_disable(qemu_get_cpu(0), false);
-	pt_sync();
 
 	handle_tmp_snapshot_state();
 
@@ -346,7 +344,6 @@ void synchronization_lock_asan_found(void){
 	}
 
 	pt_disable(qemu_get_cpu(0), false);
-	pt_sync();
 
 	handle_tmp_snapshot_state();
 
@@ -369,7 +366,6 @@ void synchronization_lock_timeout_found(void){
 	}	
 
 	pt_disable(qemu_get_cpu(0), false);
-	pt_sync();
 
 	handle_tmp_snapshot_state();
 
@@ -388,7 +384,6 @@ void synchronization_lock_shutdown_detected(void){
 	}
 
 	pt_disable(qemu_get_cpu(0), false);
-	pt_sync();
 
 	handle_tmp_snapshot_state();
 
@@ -406,7 +401,6 @@ void synchronization_payload_buffer_write_detected(void){
 	}
 	
 	pt_disable(qemu_get_cpu(0), false);
-	pt_sync();
 
 	handle_tmp_snapshot_state();
 
@@ -426,7 +420,6 @@ void synchronization_cow_full_detected(void){
 	}
 
 	pt_disable(qemu_get_cpu(0), false);
-	pt_sync();
 
 	handle_tmp_snapshot_state();
 
@@ -450,7 +443,6 @@ void synchronization_disable_pt(CPUState *cpu){
 	}
 
 	pt_disable(qemu_get_cpu(0), false);
-	pt_sync();
 
 	handle_tmp_snapshot_state();
 

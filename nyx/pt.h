@@ -24,7 +24,6 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 
 void pt_init_decoder(CPUState *cpu);
 
-void pt_sync(void);
 void pt_reset_bitmap(void);
 void pt_setup_bitmap(void* ptr);
 
