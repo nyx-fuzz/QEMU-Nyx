@@ -6125,7 +6125,7 @@ fi
 if test "$debug" = "no"; then
   CFLAGS="-O3 -rdynamic -frename-registers -frename-registers -mtune=native $CFLAGS"
 else
-  CFLAGS="-O0 -g $CFLAGS"
+  CFLAGS="-O0 -rdynamic -g $CFLAGS"
 fi
 
 if test "$have_asan" = "yes"; then

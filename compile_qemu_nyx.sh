@@ -22,10 +22,11 @@ error () {
   echo "$0: <option>"
   echo ""
   echo "Available compile options: "
-  echo " -  dynamic    dynamically link libxdc and capstone4"
-  echo " -  static     statically link libxdc and capstone4"
-  echo " -  lto        statically link libxdc and capstone4 and enable LTO (up to 10% better performance)"
-  echo " -  debug      enable several debug options"
+  echo " -  dynamic       dynamically link libxdc and capstone4"
+  echo " -  static        statically link libxdc and capstone4"
+  echo " -  lto           statically link libxdc and capstone4 and enable LTO (up to 10% better performance)"
+  echo " -  debug         enable several debug options"
+  echo " -  debug_static  enable several debug options and statically link libxdc and capstone4"
   echo ""
   exit 3
 }
@@ -105,6 +106,16 @@ then
   make clean
   compile_and_install_libraries
   ./configure --target-list=x86_64-softmmu --disable-docs --enable-gtk --disable-werror --disable-capstone --disable-libssh --enable-nyx --enable-sanitizers --enable-debug --disable-tools
+  compile
+  exit 0
+fi
+
+if [ "$1" == "debug_static" ]; 
+then 
+
+  make clean
+  compile_libraries
+  ./configure --target-list=x86_64-softmmu --disable-docs --enable-gtk --disable-werror --disable-capstone --disable-libssh --enable-nyx --enable-sanitizers --enable-debug --enable-nyx-static --disable-tools
   compile
   exit 0
 fi
