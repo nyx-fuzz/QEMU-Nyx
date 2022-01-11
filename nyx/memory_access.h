@@ -42,16 +42,15 @@ bool write_physical_memory(uint64_t address, uint8_t* data, uint32_t size, CPUSt
 bool remap_payload_slot(uint64_t phys_addr, uint32_t slot, CPUState *cpu);
 bool remap_payload_slot_protected(uint64_t phys_addr, uint32_t slot, CPUState *cpu);
 bool remap_payload_buffer(uint64_t virt_guest_addr, CPUState *cpu);
+
+bool remap_slots(uint64_t addr, uint32_t slots, CPUState *cpu, int fd, uint64_t shm_size, bool virtual, uint64_t cr3);
 bool remap_slot(uint64_t addr, uint32_t slot, CPUState *cpu, int fd, uint64_t shm_size, bool virtual, uint64_t cr3);
 
 bool read_virtual_memory_cr3(uint64_t address, uint8_t* data, uint32_t size, CPUState *cpu, uint64_t cr3);
-bool write_virtual_memory_cr3(uint64_t address, uint8_t* data, uint32_t size, CPUState *cpu, uint64_t cr3);
-bool write_virtual_shadow_memory_cr3(uint64_t address, uint8_t* data, uint32_t size, CPUState *cpu, uint64_t cr3);
 
 bool read_virtual_memory(uint64_t address, uint8_t* data, uint32_t size, CPUState *cpu);
 bool write_virtual_memory(uint64_t address, uint8_t* data, uint32_t size, CPUState *cpu);
 void hexdump_virtual_memory(uint64_t address, uint32_t size, CPUState *cpu);
-bool write_virtual_shadow_memory(uint64_t address, uint8_t* data, uint32_t size, CPUState *cpu);
 bool is_addr_mapped(uint64_t address, CPUState *cpu);
 bool is_addr_mapped_cr3(uint64_t address, CPUState *cpu, uint64_t cr3);
 
@@ -68,5 +67,7 @@ void print_48_paging2(uint64_t cr3);
 
 bool dump_page_ht(uint64_t address, uint8_t* data, CPUState *cpu);
 
+void resize_coverage_bitmap(uint32_t new_size);
+void resize_payload_buffer(uint32_t new_size);
 
 #endif

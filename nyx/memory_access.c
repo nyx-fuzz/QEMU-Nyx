@@ -26,7 +26,7 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 #include "qemu/rcu_queue.h"
 
 #include "memory_access.h"
-#include "hypercall.h"
+#include "nyx/hypercall/hypercall.h"
 #include "debug.h"
 #include "nyx/fast_vm_reload.h"
 #include "exec/gdbstub.h"
@@ -34,8 +34,9 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 #include "sysemu/kvm.h"
 #include "nyx/helpers.h"
 
-static uint64_t get_48_paging_phys_addr(uint64_t cr3, uint64_t addr);
-static uint64_t get_48_paging_phys_addr_snapshot(uint64_t cr3, uint64_t addr);
+#define INVALID_ADDRESS 0xFFFFFFFFFFFFFFFFULL
+
+static uint64_t get_48_paging_phys_addr(uint64_t cr3, uint64_t addr, bool read_from_snapshot);
 
 #define x86_64_PAGE_SIZE        0x1000
 #define x86_64_PAGE_MASK        ~(x86_64_PAGE_SIZE - 1)
@@ -91,7 +92,7 @@ uint64_t get_paging_phys_addr(CPUState *cpu, uint64_t cr3, uint64_t addr){
             fprintf(stderr, "mem_mode: mm_32_pae not implemented!\n");
             abort();
         case mm_64_l4_paging:
-            return get_48_paging_phys_addr(cr3, addr);
+            return get_48_paging_phys_addr(cr3, addr, false);
         case mm_64_l5_paging:
             fprintf(stderr, "mem_mode: mm_64_l5_paging not implemented!\n");
             abort();
@@ -117,7 +118,7 @@ static uint64_t get_paging_phys_addr_snapshot(CPUState *cpu, uint64_t cr3, uint6
             fprintf(stderr, "mem_mode: mm_32_pae not implemented!\n");
             abort();
         case mm_64_l4_paging:
-            return get_48_paging_phys_addr_snapshot(cr3, addr);
+            return get_48_paging_phys_addr(cr3, addr, true);
         case mm_64_l5_paging:
             fprintf(stderr, "mem_mode: mm_64_l5_paging not implemented!\n");
             abort();
@@ -127,9 +128,6 @@ static uint64_t get_paging_phys_addr_snapshot(CPUState *cpu, uint64_t cr3, uint6
     }
     return 0;
 }
-
-
-//bool is_addr_mapped_ht(uint64_t address, CPUState *cpu, uint64_t cr3, bool host);
 
 bool read_physical_memory(uint64_t address, uint8_t* data, uint32_t size, CPUState *cpu){
     kvm_arch_get_registers(cpu);
@@ -160,19 +158,6 @@ static void refresh_kvm_non_dirty(CPUState *cpu){
     }
 }
 
-//uint8_t* buffer = NULL; 
-/*
-void set_illegal_payload(void){
-    printf("%s\n", __func__);
-    if(buffer){
-        memset(buffer, 0xff, 4);
-    }
-    else{
-        abort();
-    }   
-}
-*/
-
 bool remap_payload_slot(uint64_t phys_addr, uint32_t slot, CPUState *cpu){
     //assert(0); /* nested code -> test me later */ 
 
@@ -202,7 +187,7 @@ bool remap_payload_slot(uint64_t phys_addr, uint32_t slot, CPUState *cpu){
 }
 
 bool remap_slot(uint64_t addr, uint32_t slot, CPUState *cpu, int fd, uint64_t shm_size, bool virtual, uint64_t cr3){
-
+    //printf("%s ---> \n", __func__);
     assert(fd && shm_size);
     assert((slot*x86_64_PAGE_SIZE) < shm_size);
 
@@ -223,6 +208,8 @@ bool remap_slot(uint64_t addr, uint32_t slot, CPUState *cpu, int fd, uint64_t sh
 
         phys_addr = address_to_ram_offset(phys_addr);
     }
+
+    //printf("phys_addr -> %lx\n", phys_addr);
         
     debug_fprintf(stderr, "%s: addr => %lx phys_addr => %lx\n", __func__, addr, phys_addr);
 
@@ -242,8 +229,6 @@ bool remap_slot(uint64_t addr, uint32_t slot, CPUState *cpu, int fd, uint64_t sh
     
     return true;
 }
-
-
 
 bool remap_payload_slot_protected(uint64_t phys_addr, uint32_t slot, CPUState *cpu){
     //assert(0); /* nested code -> test me later */ 
@@ -274,18 +259,43 @@ bool remap_payload_slot_protected(uint64_t phys_addr, uint32_t slot, CPUState *c
     return true;
 }
 
+void resize_coverage_bitmap(uint32_t new_size){
+    assert(GET_GLOBAL_STATE()->shared_bitmap_fd && GET_GLOBAL_STATE()->shared_bitmap_size);
+    fprintf(stderr, "shared_bitmap_size -> %x - new_size: %x\n", GET_GLOBAL_STATE()->shared_bitmap_size, new_size);
+    assert(GET_GLOBAL_STATE()->shared_bitmap_size <= (new_size+0x1000) && !(new_size & 0xFFF));
+    assert(!GET_GLOBAL_STATE()->pt_trace_mode);
+    assert(!GET_GLOBAL_STATE()->in_fuzzing_mode);
+    assert(ftruncate(GET_GLOBAL_STATE()->shared_bitmap_fd, new_size+0x1000) == 0);
+
+    printf("MUNMAP: %d\n", GET_GLOBAL_STATE()->shared_bitmap_size);
+    munmap((void*)GET_GLOBAL_STATE()->shared_bitmap_ptr , GET_GLOBAL_STATE()->shared_bitmap_size+0x1000);
+	GET_GLOBAL_STATE()->shared_bitmap_ptr = (void*)mmap(0, new_size+0x1000, PROT_READ|PROT_WRITE, MAP_SHARED, GET_GLOBAL_STATE()->shared_bitmap_fd, 0);;
+
+    GET_GLOBAL_STATE()->shared_bitmap_size = new_size;
+    GET_GLOBAL_STATE()->auxilary_buffer->capabilites.agent_coverage_bitmap_size = new_size;
+}
+
+void resize_payload_buffer(uint32_t new_size){
+    assert(GET_GLOBAL_STATE()->shared_payload_buffer_fd && GET_GLOBAL_STATE()->shared_payload_buffer_size);
+    assert(GET_GLOBAL_STATE()->shared_payload_buffer_size < new_size && !(new_size & 0xFFF));
+    assert(!GET_GLOBAL_STATE()->in_fuzzing_mode);
+    assert(ftruncate(GET_GLOBAL_STATE()->shared_payload_buffer_fd, new_size) == 0);
+
+    GET_GLOBAL_STATE()->shared_payload_buffer_size = new_size;
+    GET_GLOBAL_STATE()->auxilary_buffer->capabilites.agent_input_buffer_size = new_size;
+}
+
 bool remap_payload_buffer(uint64_t virt_guest_addr, CPUState *cpu){
     assert(GET_GLOBAL_STATE()->shared_payload_buffer_fd && GET_GLOBAL_STATE()->shared_payload_buffer_size);
     RAMBlock *block;
     refresh_kvm_non_dirty(cpu);
-
 
     for(uint32_t i = 0; i < (GET_GLOBAL_STATE()->shared_payload_buffer_size/x86_64_PAGE_SIZE); i++){
         //MemTxAttrs attrs = MEMTXATTRS_UNSPECIFIED;
         //hwaddr phys_addr = cpu_get_phys_page_attrs_debug(cpu, ((virt_guest_addr+(i*x86_64_PAGE_SIZE)) & x86_64_PAGE_MASK), &attrs);
         uint64_t phys_addr = get_paging_phys_addr(cpu, GET_GLOBAL_STATE()->parent_cr3, ((virt_guest_addr+(i*x86_64_PAGE_SIZE)) & x86_64_PAGE_MASK));
 
-        assert(phys_addr != 0xFFFFFFFFFFFFFFFFULL);
+        assert(phys_addr != INVALID_ADDRESS);
 
         phys_addr = address_to_ram_offset(phys_addr);
 
@@ -318,299 +328,6 @@ bool remap_payload_buffer(uint64_t virt_guest_addr, CPUState *cpu){
     }
     return true;
 }
-
-/*
-bool set_guest_pages_readonly(uint64_t virt_guest_addr, uint64_t to, CPUState *cpu){
-    RAMBlock *block;
-    refresh_kvm_non_dirty(cpu);
-
-    void* cp = malloc(0x1000);
-
-
-    for(uint32_t i = 0; i < ((to-virt_guest_addr)/x86_64_PAGE_SIZE); i++){
-        printf("%s -> %lx %lx\n", __func__, virt_guest_addr, virt_guest_addr+(i*0x1000));
-        MemTxAttrs attrs = MEMTXATTRS_UNSPECIFIED;
-        //hwaddr phys_addr = cpu_get_phys_page_attrs_debug(cpu, ((virt_guest_addr+(i*x86_64_PAGE_SIZE)) & x86_64_PAGE_MASK), &attrs);
-        uint64_t phys_addr = get_48_paging_phys_addr(GET_GLOBAL_STATE()->parent_cr3, ((virt_guest_addr+(i*x86_64_PAGE_SIZE)) & x86_64_PAGE_MASK));
-
-        assert(phys_addr != 0xFFFFFFFFFFFFFFFFULL);
-
-        QLIST_FOREACH_RCU(block, &ram_list.blocks, next) {
-            if(!memcmp(block->idstr, "pc.ram", 6)){
-
-                if(mprotect((void*)(((uint64_t)block->host) + phys_addr), 0x1000, PROT_READ)){
-                    fprintf(stderr, "mprotect failed!\n");
-                    //exit(1);
-                    assert(false);
-                }
-*/
-                /*
-
-                //printf("MMUNMAP: %d\n", munmap((void*)(((uint64_t)block->host) + phys_addr), x86_64_PAGE_SIZE));
-                memcpy(cp, (void*)(((uint64_t)block->host) + phys_addr), 0x1000);
-                if(munmap((void*)(((uint64_t)block->host) + phys_addr), x86_64_PAGE_SIZE) ==  -1){
-                    fprintf(stderr, "munmap failed!\n");
-                    //exit(1);
-                    assert(false);
-                }
-                //printf("MMAP: %lx\n", mmap((void*)(((uint64_t)block->host) + phys_addr), 0x1000, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, shared_payload_buffer_fd, (i*x86_64_PAGE_SIZE)));
-
-                if(mmap((void*)(((uint64_t)block->host) + phys_addr), 0x1000, PROT_READ , MAP_ANONYMOUS | MAP_FIXED, 0, 0) == MAP_FAILED){
-                    fprintf(stderr, "mmap failed!\n");
-                    //exit(1);
-                    assert(false);
-                }
-                memcpy((void*)(((uint64_t)block->host) + phys_addr), cp, 0x1000);
-
-
-                if(i == 0){
-                    buffer = (uint8_t*)(((uint64_t)block->host) + phys_addr);
-                }
-                //fast_reload_blacklist_page(get_fast_reload_snapshot(), phys_addr);
-                break;
-                */
-                /*
-               break;
-            }
-        }
-    }
-    free(cp);
-    return true;
-}
-*/
-
-/*
-bool read_virtual_memory_cr3(uint64_t address, uint8_t* data, uint32_t size, CPUState *cpu, uint64_t cr3){
-    fprintf(stderr, "%s -> %lx\n", __func__, address);
-    CPUX86State *env = &(X86_CPU(cpu))->env;
-    uint64_t old_cr3 = 0;
-    bool return_value = false;
-
-
-    uint64_t old_cr4 = 0;
-    uint64_t old_hflags = 0;
-
-    refresh_kvm(cpu);
-
-    //refresh_kvm(cpu);
-    //old_cr3 = env->cr[3];
-    //env->cr[3] = cr3;
-    //return_value = read_virtual_memory(address, data, size, cpu);
-    //env->cr[3] = old_cr3;
-    
-
-
-    old_cr3 = env->cr[3];
-    env->cr[3] = cr3;
-
-    old_cr4 = env->cr[4];
-    env->cr[4] = CR4_PAE_MASK | old_cr4;
-
-    old_hflags = env->hflags;
-    env->hflags = HF_LMA_MASK | old_hflags;
-
-    return_value = read_virtual_memory(address, data, size, cpu);
-    env->cr[3] = old_cr3;
-    env->cr[4] = old_cr4;
-    env->hflags = old_hflags;
-
-    return return_value;
-}
-*/
-
-bool write_virtual_memory_cr3(uint64_t address, uint8_t* data, uint32_t size, CPUState *cpu, uint64_t cr3){
-    CPUX86State *env = &(X86_CPU(cpu))->env;
-    uint64_t old_cr3 = 0;
-    bool return_value = false;
-
-
-    uint64_t old_cr4 = 0;
-    uint64_t old_hflags = 0;
-
-    refresh_kvm(cpu);
-
-    old_cr3 = env->cr[3];
-    env->cr[3] = cr3;
-
-    old_cr4 = env->cr[4];
-    env->cr[4] = CR4_PAE_MASK | old_cr4;
-
-    old_hflags = env->hflags;
-    env->hflags = HF_LMA_MASK | old_hflags;
-    return_value = write_virtual_memory(address, data, size, cpu);
-    env->cr[3] = old_cr3;
-    env->cr[4] = old_cr4;
-    env->hflags = old_hflags;
-
-
-    return return_value;
-}
-
-bool write_virtual_shadow_memory_cr3(uint64_t address, uint8_t* data, uint32_t size, CPUState *cpu, uint64_t cr3){
-    debug_fprintf(stderr, "%s\n", __func__);
-    CPUX86State *env = &(X86_CPU(cpu))->env;
-    uint64_t old_cr3 = 0;
-    bool return_value = false;
-    uint64_t old_cr4 = 0;
-    uint64_t old_hflags = 0;
-
-    refresh_kvm(cpu);
-     old_cr3 = env->cr[3];
-    env->cr[3] = cr3;
-
-    old_cr4 = env->cr[4];
-    env->cr[4] = CR4_PAE_MASK | old_cr4;
-
-    old_hflags = env->hflags;
-    env->hflags = HF_LMA_MASK | old_hflags;
-    return_value = write_virtual_shadow_memory(address, data, size, cpu);
-    env->cr[3] = old_cr3;
-    env->cr[4] = old_cr4;
-    env->hflags = old_hflags;
-
-    return return_value;
-}
-
-/*
-bool read_virtual_memory(uint64_t address, uint8_t* data, uint32_t size, CPUState *cpu){
-    uint8_t tmp_buf[x86_64_PAGE_SIZE];
-    MemTxAttrs attrs;
-    hwaddr phys_addr;
-    int asidx;
-    
-    uint64_t amount_copied = 0;
-    
-    refresh_kvm(cpu);
-
-    // copy per page 
-    while(amount_copied < size){
-        uint64_t len_to_copy = (size - amount_copied);
-        if(len_to_copy > x86_64_PAGE_SIZE)
-            len_to_copy = x86_64_PAGE_SIZE;
-
-        asidx = cpu_asidx_from_attrs(cpu, MEMTXATTRS_UNSPECIFIED);
-        attrs = MEMTXATTRS_UNSPECIFIED;
-        phys_addr = cpu_get_phys_page_attrs_debug(cpu, (address & x86_64_PAGE_MASK), &attrs);
-
-        if (phys_addr == -1){
-            uint64_t next_page = (address & x86_64_PAGE_MASK) + x86_64_PAGE_SIZE;
-            uint64_t len_skipped =next_page-address;  
-            if(len_skipped > size-amount_copied){
-                len_skipped = size-amount_copied;
-            }
-
-            fprintf(stderr, "Warning, read from unmapped memory:\t%lx, skipping to %lx", address, next_page);
-            QEMU_PT_PRINTF(MEM_PREFIX, "Warning, read from unmapped memory:\t%lx, skipping to %lx", address, next_page);
-            memset( data+amount_copied, ' ',  len_skipped);
-            address += len_skipped;
-            amount_copied += len_skipped;
-            continue;
-        }
-        
-        phys_addr += (address & ~x86_64_PAGE_MASK);
-        uint64_t remaining_on_page = x86_64_PAGE_SIZE - (address & ~x86_64_PAGE_MASK);
-        if(len_to_copy > remaining_on_page){
-            len_to_copy = remaining_on_page;
-        }
-
-        MemTxResult txt = address_space_rw(cpu_get_address_space(cpu, asidx), phys_addr, MEMTXATTRS_UNSPECIFIED, tmp_buf, len_to_copy, 0);
-        if(txt){
-            QEMU_PT_PRINTF(MEM_PREFIX, "Warning, read failed:\t%lx", address);
-        }
-        
-        memcpy(data+amount_copied, tmp_buf, len_to_copy);
-        
-        address += len_to_copy;
-        amount_copied += len_to_copy;
-    }
-    
-    return true;
-}
-*/
-
-/*
-bool is_addr_mapped2(uint64_t address, CPUState *cpu){
-    MemTxAttrs attrs;
-    hwaddr phys_addr;
-    refresh_kvm(cpu);
-    attrs = MEMTXATTRS_UNSPECIFIED;
-    phys_addr = cpu_get_phys_page_attrs_debug(cpu, (address & x86_64_PAGE_MASK), &attrs);
-    return phys_addr != -1;
-}
-
-
-bool is_addr_mapped(uint64_t address, CPUState *cpu){
-    //fprintf(stderr, "%s -> %lx\n", __func__, address);
-
-    CPUX86State *env = &(X86_CPU(cpu))->env;
-
-    return is_addr_mapped_ht(address, cpu, env->cr[3], true);
-
-
-
-    uint64_t old_cr4 = 0;
-    uint64_t old_hflags = 0;
-    bool return_value = false;
-
-    refresh_kvm(cpu);
-
-    old_cr4 = env->cr[4];
-    env->cr[4] = CR4_PAE_MASK | old_cr4;
-
-    old_hflags = env->hflags;
-    env->hflags = HF_LMA_MASK | old_hflags;
-
-    return_value = is_addr_mapped2(address, cpu);
-    env->cr[4] = old_cr4;
-    env->hflags = old_hflags;
-
-    assert(return_value == is_addr_mapped_ht(address, cpu, env->cr[3], true));
-
-    return return_value;
-}
-
-bool is_addr_mapped_cr3(uint64_t address, CPUState *cpu, uint64_t cr3){
-    return is_addr_mapped_ht(address, cpu, cr3, true);
-    fprintf(stderr, "%s -> %lx\n", __func__, address);
-
-    CPUX86State *env = &(X86_CPU(cpu))->env;
-    uint64_t old_cr3 = 0;
-    uint64_t old_cr4 = 0;
-    uint64_t old_hflags = 0;
-    bool return_value = false;
-    bool return_value2 = false;
-
-    fprintf(stderr, "%s: TRY TO REFRESH KVM\n", __func__);
-    refresh_kvm(cpu);
-    fprintf(stderr, "%s: TRY TO REFRESH KVM DONE\n", __func__);
-
-    old_cr3 = env->cr[3];
-    env->cr[3] = cr3;
-
-    old_cr4 = env->cr[4];
-    env->cr[4] = CR4_PAE_MASK | old_cr4;
-
-    old_hflags = env->hflags;
-    env->hflags = HF_LMA_MASK | old_hflags;
-
-    fprintf(stderr, "%s: TRY TO CALL is_addr_mapped2\n", __func__);
-
-    return_value = is_addr_mapped2(address, cpu);
-
-    fprintf(stderr, "%s: TRY TO CALL is_addr_mapped2 DONE\n", __func__);
-
-    env->cr[3] = old_cr3;
-    env->cr[4] = old_cr4;
-    env->hflags = old_hflags;
-
-    return_value2 = is_addr_mapped_ht(address, cpu, cr3, true);
-
-    printf("%s: %d %d\n", __func__, return_value, return_value2);
-    assert(return_value == return_value2);
-
-    return return_value;
-}
-*/
 
 bool write_virtual_memory(uint64_t address, uint8_t* data, uint32_t size, CPUState *cpu)
 {
@@ -690,64 +407,6 @@ void hexdump_virtual_memory(uint64_t address, uint32_t size, CPUState *cpu){
     free(data);
 }
 
-
-bool write_virtual_shadow_memory(uint64_t address, uint8_t* data, uint32_t size, CPUState *cpu)
-{
-    debug_fprintf(stderr, "%s\n", __func__);
-    /* Todo: later &address_space_memory + phys_addr -> mmap SHARED */
-    int asidx;
-    MemTxAttrs attrs;
-    hwaddr phys_addr;
-    MemTxResult res;
-
-    uint64_t counter, l, i;
-
-    void* shadow_memory = NULL;
-
-    counter = size;
-    while(counter != 0){
-        l = x86_64_PAGE_SIZE;
-        if (l > counter)
-            l = counter;
-
-        refresh_kvm(cpu);
-        kvm_cpu_synchronize_state(cpu);
-        asidx = cpu_asidx_from_attrs(cpu, MEMTXATTRS_UNSPECIFIED);
-        attrs = MEMTXATTRS_UNSPECIFIED;
-        phys_addr = cpu_get_phys_page_attrs_debug(cpu, (address & x86_64_PAGE_MASK), &attrs);
-
-        if (phys_addr == -1){
-            QEMU_PT_PRINTF(MEM_PREFIX, "phys_addr == -1:\t%lx", address);
-            return false;
-        }
-        
-        res = address_space_rw(cpu_get_address_space(cpu, asidx), (phys_addr + (address & ~x86_64_PAGE_MASK)), MEMTXATTRS_UNSPECIFIED, data, l, true);
-        if (res != MEMTX_OK){
-            QEMU_PT_PRINTF(MEM_PREFIX, "!MEMTX_OK:\t%lx", address);
-            return false;
-        }   
-
-        shadow_memory = fast_reload_get_physmem_shadow_ptr(get_fast_reload_snapshot(), phys_addr);
-        if (shadow_memory){
-              memcpy(shadow_memory + (address & ~x86_64_PAGE_MASK), data, l);
-        }
-        else{
-            QEMU_PT_PRINTF(MEM_PREFIX, "get_physmem_shadow_ptr(%lx) == NULL", phys_addr);
-            assert(false);
-            return false;
-        }
-
-        phys_addr += (address & ~x86_64_PAGE_MASK);   
-
-
-        i++;
-        data += l;
-        address += l;
-        counter -= l;
-    }
-
-    return true;
-}
 
 static int redqueen_insert_sw_breakpoint(CPUState *cs, struct kvm_sw_breakpoint *bp)
 {
@@ -934,27 +593,19 @@ void remove_all_breakpoints(CPUState *cpu){
 
 
 static void write_address(uint64_t address, uint64_t size, uint64_t prot){
-    //fprintf(stderr, "%s %lx\n", __func__, address);
+    //fprintf(stderr, "%s %lx %lx %lx\n", __func__, address, size, prot);
     static uint64_t next_address = PAGETABLE_MASK;
     static uint64_t last_address = 0x0; 
     static uint64_t last_prot = 0;
-    if(address != next_address || prot != last_prot){
+
+    if((address != next_address || prot != last_prot)){
         /* do not print guard pages or empty pages without any permissions */
-        if(last_address && (CHECK_BIT(last_prot, 1) || !CHECK_BIT(last_prot, 63))){
-            if(CHECK_BIT(last_prot, 1) && !CHECK_BIT(last_prot, 63)){
-                fprintf(stderr, "%016lx - %016lx %c%c%c [WARNING]\n",
-                    last_address, next_address,
-                    CHECK_BIT(last_prot, 1) ? 'W' : '-', 
-                    CHECK_BIT(last_prot, 2) ? 'U' : 'K', 
-                    !CHECK_BIT(last_prot, 63)? 'X' : '-');
-            }
-            else{
-                fprintf(stderr, "%016lx - %016lx %c%c%c\n",
-                    last_address, next_address,
-                    CHECK_BIT(last_prot, 1) ? 'W' : '-', 
-                    CHECK_BIT(last_prot, 2) ? 'U' : 'K', 
-                    !CHECK_BIT(last_prot, 63)? 'X' : '-');
-            }
+        if(last_address && prot && (last_address+size != next_address || prot != last_prot)){
+            fprintf(stderr, "%016lx - %016lx %c%c%c\n",
+                last_address, next_address,
+                CHECK_BIT(last_prot, 1) ? 'W' : '-', 
+                CHECK_BIT(last_prot, 2) ? 'U' : 'K', 
+                !CHECK_BIT(last_prot, 63)? 'X' : '-');
         }
         last_address = address;
     }
@@ -1029,225 +680,82 @@ void print_48_paging2(uint64_t cr3){
 }
 
 
-
-
-/* FIX ME */
-static uint64_t get_48_paging_phys_addr(uint64_t cr3, uint64_t addr){
-    static int once = 0;
-    if(once){
-        print_48_paging2(cr3);
-        once = 0;
-    }
-
-    //if(addr == 0x7ffff7f4e000){
-        //fprintf(stderr, "GDB ME NOW\n");
-        //while(true){}
-    //    print_48_paging2(cr3);
-    //}
-
-    //fprintf(stderr, "CALLING: %s (%lx) %lx\n", __func__, cr3, addr);
-
-    /* signedness broken af -> fix me! */
-    uint16_t pml_4_index = (addr & 0xFF8000000000ULL) >> 39;
-    uint16_t pml_3_index = (addr & 0x0007FC0000000UL) >> 30;
-    uint16_t pml_2_index = (addr & 0x000003FE00000UL) >> 21;
-    uint16_t pml_1_index = (addr & 0x00000001FF000UL) >> 12;
-
-    //if(addr == 0x7ffff7f4e000){
-    //    printf("pml_4_index: %lx\n", pml_4_index);
-    //    printf("pml_3_index: %lx\n", pml_3_index);
-    //    printf("pml_2_index: %lx\n", pml_2_index);
-    //    printf("pml_1_index: %lx\n", pml_1_index);
-    //
-    //}
-
-    uint64_t address_identifier_4;
-    uint64_t paging_entries_buffer[PENTRIES];
-
-    cpu_physical_memory_rw((cr3&PAGETABLE_MASK), (uint8_t *) paging_entries_buffer, PPAGE_SIZE, false);
-    if(paging_entries_buffer[pml_4_index]){
-        address_identifier_4 = ((uint64_t)pml_4_index) << PLEVEL_1_SHIFT;
-        if (pml_4_index & SIGN_EXTEND_TRESHOLD){
-            address_identifier_4 |= SIGN_EXTEND;
-        }
-        if(CHECK_BIT(paging_entries_buffer[pml_4_index], 0)){ /* otherwise swapped out */ 
-            cpu_physical_memory_rw((paging_entries_buffer[pml_4_index]&PAGETABLE_MASK), (uint8_t *) paging_entries_buffer, PPAGE_SIZE, false);
-            if(paging_entries_buffer[pml_3_index]){
-
-                //address_identifier_3 = (((uint64_t)pml_3_index) << PLEVEL_2_SHIFT) + address_identifier_4;
-                if (CHECK_BIT(paging_entries_buffer[pml_3_index], 0)){ /* otherwise swapped out */ 
-
-                    if (CHECK_BIT(paging_entries_buffer[pml_3_index], 7)){
-                        /* 1GB PAGE */
-                        return (paging_entries_buffer[pml_3_index] & PML3_ENTRY_MASK) | (0x7FFFFFFF & addr); 
-                    }
-                    else{
-                        cpu_physical_memory_rw((paging_entries_buffer[pml_3_index]&PAGETABLE_MASK), (uint8_t *) paging_entries_buffer, PPAGE_SIZE, false);
-                        if(paging_entries_buffer[pml_2_index]){
-                            //address_identifier_2 = (((uint64_t)pml_2_index) << PLEVEL_3_SHIFT) + address_identifier_3;
-                            if (CHECK_BIT(paging_entries_buffer[pml_2_index], 0)){ /* otherwise swapped out */ 
-                                if (CHECK_BIT(paging_entries_buffer[pml_2_index], 7)){
-                                    /* 2MB PAGE */
-                                    return (paging_entries_buffer[pml_2_index] & PML2_ENTRY_MASK) | (0x3FFFFF & addr); 
-                                }
-                                else{
-                                    cpu_physical_memory_rw((paging_entries_buffer[pml_2_index]&PAGETABLE_MASK), (uint8_t *) paging_entries_buffer, PPAGE_SIZE, false);
-                                    if(paging_entries_buffer[pml_1_index]){
-                                        //uint64_t address_identifier_1 = (((uint64_t)pml_1_index) << PLEVEL_4_SHIFT) + address_identifier_2;
-                                        if (CHECK_BIT(paging_entries_buffer[pml_1_index], 0)){
-                                            /* 4 KB PAGE */
-                                            return (paging_entries_buffer[pml_1_index] & PML4_ENTRY_MASK) | (0xFFF & addr); 
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-    
-    //fprintf(stderr, "FAILED: %s %lx\n", __func__, addr);
-    //qemu_backtrace();
-    //print_48_paging2(cr3);
-    return 0xFFFFFFFFFFFFFFFFULL; /* invalid */
-}
-
-/* FIX ME */
-static uint64_t get_48_paging_phys_addr_snapshot(uint64_t cr3, uint64_t addr){
-    //if(addr == 0x7ffff7f4e000){
-        //fprintf(stderr, "GDB ME NOW\n");
-        //while(true){}
-    //    print_48_paging2(cr3);
-    //}
-
-    //fprintf(stderr, "CALLING: %s (%lx) %lx\n", __func__, cr3, addr);
-
-    /* signedness broken af -> fix me! */
-    uint16_t pml_4_index = (addr & 0xFF8000000000ULL) >> 39;
-    uint16_t pml_3_index = (addr & 0x0007FC0000000UL) >> 30;
-    uint16_t pml_2_index = (addr & 0x000003FE00000UL) >> 21;
-    uint16_t pml_1_index = (addr & 0x00000001FF000UL) >> 12;
-
-    //if(addr == 0x7ffff7f4e000){
-    //    printf("pml_4_index: %lx\n", pml_4_index);
-    //    printf("pml_3_index: %lx\n", pml_3_index);
-    //    printf("pml_2_index: %lx\n", pml_2_index);
-    //    printf("pml_1_index: %lx\n", pml_1_index);
-    //
-    //}
-
-    /*
-    printf("pml_4_index: %lx\n", pml_4_index);
-    printf("pml_3_index: %lx\n", pml_3_index);
-    printf("pml_2_index: %lx\n", pml_2_index);
-    printf("pml_1_index: %lx\n", pml_1_index);
-    */
-
-    fast_reload_t* snapshot = get_fast_reload_snapshot();
-
-    uint64_t address_identifier_4;
-    uint64_t paging_entries_buffer[PENTRIES];
-
-    read_snapshot_memory(snapshot, (cr3&PAGETABLE_MASK), (uint8_t *) paging_entries_buffer, PPAGE_SIZE);   
-    //cpu_physical_memory_rw((cr3&PAGETABLE_MASK), (uint8_t *) paging_entries_buffer, PPAGE_SIZE, false);
-    if(paging_entries_buffer[pml_4_index]){
-        address_identifier_4 = ((uint64_t)pml_4_index) << PLEVEL_1_SHIFT;
-        if (pml_4_index & SIGN_EXTEND_TRESHOLD){
-            address_identifier_4 |= SIGN_EXTEND;
-        }
-        if(CHECK_BIT(paging_entries_buffer[pml_4_index], 0)){ /* otherwise swapped out */ 
-            read_snapshot_memory(snapshot, (paging_entries_buffer[pml_4_index]&PAGETABLE_MASK), (uint8_t *) paging_entries_buffer, PPAGE_SIZE);   
-            //cpu_physical_memory_rw((paging_entries_buffer[pml_4_index]&PAGETABLE_MASK), (uint8_t *) paging_entries_buffer, PPAGE_SIZE, false);
-            if(paging_entries_buffer[pml_3_index]){
-
-                //address_identifier_3 = (((uint64_t)pml_3_index) << PLEVEL_2_SHIFT) + address_identifier_4;
-                if (CHECK_BIT(paging_entries_buffer[pml_3_index], 0)){ /* otherwise swapped out */ 
-
-                    if (CHECK_BIT(paging_entries_buffer[pml_3_index], 7)){
-                        /* 1GB PAGE */
-                        return (paging_entries_buffer[pml_3_index] & PML3_ENTRY_MASK) | (0x7FFFFFFF & addr); 
-                    }
-                    else{
-                        read_snapshot_memory(snapshot, (paging_entries_buffer[pml_3_index]&PAGETABLE_MASK), (uint8_t *) paging_entries_buffer, PPAGE_SIZE);   
-                        //cpu_physical_memory_rw((paging_entries_buffer[pml_3_index]&PAGETABLE_MASK), (uint8_t *) paging_entries_buffer, PPAGE_SIZE, false);
-                        if(paging_entries_buffer[pml_2_index]){
-                            //address_identifier_2 = (((uint64_t)pml_2_index) << PLEVEL_3_SHIFT) + address_identifier_3;
-                            if (CHECK_BIT(paging_entries_buffer[pml_2_index], 0)){ /* otherwise swapped out */ 
-                                if (CHECK_BIT(paging_entries_buffer[pml_2_index], 7)){
-                                    /* 2MB PAGE */
-                                    return (paging_entries_buffer[pml_2_index] & PML2_ENTRY_MASK) | (0x3FFFFF & addr); 
-                                }
-                                else{
-                                    read_snapshot_memory(snapshot, (paging_entries_buffer[pml_2_index]&PAGETABLE_MASK), (uint8_t *) paging_entries_buffer, PPAGE_SIZE);   
-                                    //cpu_physical_memory_rw((paging_entries_buffer[pml_2_index]&PAGETABLE_MASK), (uint8_t *) paging_entries_buffer, PPAGE_SIZE, false);
-                                    if(paging_entries_buffer[pml_1_index]){
-                                        //address_identifier_1 = (((uint64_t)pml_1_index) << PLEVEL_4_SHIFT) + address_identifier_2;
-                                        if (CHECK_BIT(paging_entries_buffer[pml_1_index], 0)){
-                                            /* 4 KB PAGE */
-                                            return (paging_entries_buffer[pml_1_index] & PML4_ENTRY_MASK) | (0xFFF & addr); 
-                            
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-    
-    debug_fprintf(stderr, "FAILED: %s %lx\n", __func__, addr);
-    //qemu_backtrace();
-    //print_48_paging2(cr3);
-    return 0xFFFFFFFFFFFFFFFFULL; /* invalid */
-}
-
-/*
-bool is_addr_mapped_ht(uint64_t address, CPUState *cpu, uint64_t cr3, bool host){
-    return (get_48_paging_phys_addr(cr3, address) != 0xFFFFFFFFFFFFFFFFULL);
-
-    fprintf(stderr, "CALLING: %s\n", __func__);
-    kvm_arch_get_registers_fast(cpu);
-    fprintf(stderr, "CALLING: 2 %s\n", __func__);
-
-    CPUX86State *env = &(X86_CPU(cpu))->env;
-
-    fprintf(stderr, "CALLING: 3 %s\n", __func__);
-
-
-    if (!(env->cr[0] & CR0_PG_MASK)) {
-        fprintf(stderr, "PG disabled\n");
-        abort();
+static uint64_t* load_page_table(uint64_t page_table_address, uint64_t* paging_entries_buffer, uint8_t level, bool read_from_snapshot){
+    if (read_from_snapshot){
+        read_snapshot_memory(get_fast_reload_snapshot(), page_table_address, (uint8_t *) paging_entries_buffer, PPAGE_SIZE);   
     }
     else{
-        if (env->cr[4] & CR4_PAE_MASK) {
-            if (env->efer & (1 << 10)) {
-                if (env->cr[0] & CR4_LA57_MASK) {
-                    fprintf(stderr,  "mem_info_la57\n");
-                    abort();
-                    //mem_info_la57(mon, env);
-                } else {
-                    return (get_48_paging_phys_addr(cr3, address) != 0xFFFFFFFFFFFFFFFFULL);
+        cpu_physical_memory_rw(page_table_address, (uint8_t *) paging_entries_buffer, PPAGE_SIZE, false);
+    }
+    return paging_entries_buffer;
+}
+
+static uint64_t get_48_paging_phys_addr(uint64_t cr3, uint64_t addr, bool read_from_snapshot){
+    /* signedness broken af -> fix me! */
+    uint16_t pml_4_index = (addr & 0xFF8000000000ULL) >> 39;
+    uint16_t pml_3_index = (addr & 0x0007FC0000000UL) >> 30;
+    uint16_t pml_2_index = (addr & 0x000003FE00000UL) >> 21;
+    uint16_t pml_1_index = (addr & 0x00000001FF000UL) >> 12;
+
+    uint64_t address_identifier_4;
+    uint64_t paging_entries_buffer[PENTRIES];
+    uint64_t* paging_entries_buffer_ptr = NULL;
+    uint64_t page_table_address = 0;
+
+    page_table_address = (cr3&PAGETABLE_MASK);
+    paging_entries_buffer_ptr = load_page_table(page_table_address, paging_entries_buffer, 0, read_from_snapshot);
+
+    if(paging_entries_buffer_ptr[pml_4_index]){
+        address_identifier_4 = ((uint64_t)pml_4_index) << PLEVEL_1_SHIFT;
+        if (pml_4_index & SIGN_EXTEND_TRESHOLD){
+            address_identifier_4 |= SIGN_EXTEND;
+        }
+        if(CHECK_BIT(paging_entries_buffer_ptr[pml_4_index], 0)){ /* otherwise swapped out */ 
+
+            page_table_address = (paging_entries_buffer_ptr[pml_4_index]&PAGETABLE_MASK);
+            paging_entries_buffer_ptr = load_page_table(page_table_address, paging_entries_buffer, 1, read_from_snapshot);
+
+            if(paging_entries_buffer_ptr[pml_3_index]){
+
+                if (CHECK_BIT(paging_entries_buffer_ptr[pml_3_index], 0)){ /* otherwise swapped out */ 
+
+                    if (CHECK_BIT(paging_entries_buffer_ptr[pml_3_index], 7)){
+                        /* 1GB PAGE */
+                        return (paging_entries_buffer_ptr[pml_3_index] & PML3_ENTRY_MASK) | (0x7FFFFFFF & addr); 
+                    }
+                    else{
+
+                        page_table_address = (paging_entries_buffer_ptr[pml_3_index]&PAGETABLE_MASK);
+                        paging_entries_buffer_ptr = load_page_table(page_table_address, paging_entries_buffer, 2, read_from_snapshot);
+
+                        if(paging_entries_buffer_ptr[pml_2_index]){
+                            if (CHECK_BIT(paging_entries_buffer_ptr[pml_2_index], 0)){ /* otherwise swapped out */ 
+                                if (CHECK_BIT(paging_entries_buffer_ptr[pml_2_index], 7)){
+                                    /* 2MB PAGE */
+                                    return (paging_entries_buffer_ptr[pml_2_index] & PML2_ENTRY_MASK) | (0x3FFFFF & addr); 
+                                }
+                                else{
+
+                                    page_table_address = (paging_entries_buffer_ptr[pml_2_index]&PAGETABLE_MASK);
+                                    paging_entries_buffer_ptr = load_page_table(page_table_address, paging_entries_buffer, 3, read_from_snapshot);
+
+                                    if(paging_entries_buffer_ptr[pml_1_index]){
+                                        if (CHECK_BIT(paging_entries_buffer_ptr[pml_1_index], 0)){
+                                            /* 4 KB PAGE */
+                                            return (paging_entries_buffer_ptr[pml_1_index] & PML4_ENTRY_MASK) | (0xFFF & addr); 
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
-            } 
-            else{
-                fprintf(stderr,  "mem_info_pae32\n");
-                abort();
-                //mem_info_pae32(mon, env);
             }
-        } 
-        else {
-            fprintf(stderr,  "mem_info_32\n");
-            abort();
-            //mem_info_32(mon, env);
         }
     }
-    return false;
+    
+    return INVALID_ADDRESS;
 }
-*/
 
 //#define DEBUG_48BIT_WALK
 
@@ -1280,7 +788,7 @@ bool read_virtual_memory(uint64_t address, uint8_t* data, uint32_t size, CPUStat
         assert(phys_addr == phys_addr_2);
 #endif
 
-        if (phys_addr == 0xFFFFFFFFFFFFFFFFULL){
+        if (phys_addr == INVALID_ADDRESS){
             uint64_t next_page = (address & x86_64_PAGE_MASK) + x86_64_PAGE_SIZE;
             uint64_t len_skipped =next_page-address;  
             if(len_skipped > size-amount_copied){
@@ -1316,17 +824,17 @@ bool read_virtual_memory(uint64_t address, uint8_t* data, uint32_t size, CPUStat
 }
 
 bool is_addr_mapped_cr3(uint64_t address, CPUState *cpu, uint64_t cr3){
-    return (get_paging_phys_addr(cpu, cr3, address) != 0xFFFFFFFFFFFFFFFFULL);
+    return (get_paging_phys_addr(cpu, cr3, address) != INVALID_ADDRESS);
 } 
 
 bool is_addr_mapped(uint64_t address, CPUState *cpu){
     CPUX86State *env = &(X86_CPU(cpu))->env;
     kvm_arch_get_registers_fast(cpu);
-    return (get_paging_phys_addr(cpu, env->cr[3], address) != 0xFFFFFFFFFFFFFFFFULL);
+    return (get_paging_phys_addr(cpu, env->cr[3], address) != INVALID_ADDRESS);
 } 
 
 bool is_addr_mapped_cr3_snapshot(uint64_t address, CPUState *cpu, uint64_t cr3){
-    return (get_paging_phys_addr_snapshot(cpu, cr3, address) != 0xFFFFFFFFFFFFFFFFULL);
+    return (get_paging_phys_addr_snapshot(cpu, cr3, address) != INVALID_ADDRESS);
 } 
 
 bool dump_page_cr3_snapshot(uint64_t address, uint8_t* data, CPUState *cpu, uint64_t cr3){

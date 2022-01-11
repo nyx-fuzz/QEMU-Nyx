@@ -1,5 +1,4 @@
 obj-y += \
-hypercall.o \
 memory_access.o \
 interface.o \
 fast_vm_reload.o \
@@ -29,5 +28,8 @@ snapshot/memory/block_list.o \
 snapshot/memory/backend/nyx_debug.o \
 snapshot/memory/backend/nyx_fdl.o \
 snapshot/memory/backend/nyx_dirty_ring.o \
+hypercall/hypercall.o \
+hypercall/configuration.o \
+hypercall/debug.o \
 pt.o
 
