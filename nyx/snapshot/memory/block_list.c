@@ -37,7 +37,7 @@ snapshot_page_blocklist_t* snapshot_page_blocklist_init(void){
   }
 
   self->pages_num = 0;
-  self->pages_size = 0;
+  self->pages_size = REALLOC_SIZE;
 	self->pages = malloc(sizeof(uint64_t) * REALLOC_SIZE);
 
   return self;
