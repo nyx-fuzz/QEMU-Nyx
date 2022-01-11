@@ -45,7 +45,8 @@ compile_libraries (){
 
   echo "[!] compiling libxdc..."
   cd libxdc
-  CFLAGS="-I../capstone_v4/include/" V=1 make libxdc.a
+  git checkout 641de7539e99f7faf5c8e8f1c8a4b37a9df52a5f
+  sudo make install
   cd ..
   echo "[!] libxdc is ready!"
 }
