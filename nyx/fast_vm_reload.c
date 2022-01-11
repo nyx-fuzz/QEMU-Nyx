@@ -498,7 +498,6 @@ void fast_reload_blacklist_page(fast_reload_t* self, uint64_t physaddr){
 
     assert(self->blocklist);
     snapshot_page_blocklist_add(self->blocklist, physaddr);
-    return;
 }
 
 bool fast_reload_snapshot_exists(fast_reload_t* self){
