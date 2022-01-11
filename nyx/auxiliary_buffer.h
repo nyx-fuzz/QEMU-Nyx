@@ -27,7 +27,7 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 
 #define AUX_MAGIC 0x54502d554d4551
 
-#define QEMU_PT_VERSION 2 /* let's start at 1 for the initial version using the aux buffer */
+#define QEMU_PT_VERSION 3 /* let's start at 1 for the initial version using the aux buffer */
 
 #define HEADER_SIZE 128
 #define CAP_SIZE 256
@@ -46,10 +46,12 @@ typedef struct auxilary_buffer_header_s{
 
 typedef struct auxilary_buffer_cap_s{
   uint8_t redqueen;
-  uint8_t agent_timeout_detection;  /* agent implements own timeout detection; host timeout detection is still in used, but treshold is increased by x2; */
-  uint8_t agent_trace_bitmap;       /* agent implements own tracing mechanism; PT tracing is disabled */
+  uint8_t agent_timeout_detection;  /* agent implements its own timeout detection; host timeout detection is still in used, but treshold is increased by x2; */
+  uint8_t agent_trace_bitmap;       /* agent implements its own tracing mechanism; PT tracing is disabled */
   uint8_t agent_ijon_trace_bitmap;  /* agent uses the ijon shm buffer */
 
+  uint32_t agent_input_buffer_size;     /* agent requests a custom input buffer size (if the size is 0, the minimum buffer size is used) */
+  uint32_t agent_coverage_bitmap_size;  /* agent requests a custom coverage bitmap size (if the size is 0, the minimum buffer size is used) */
   /* more to come */
 } __attribute__((packed)) auxilary_buffer_cap_t;
 
