@@ -25,7 +25,7 @@ void redqueen_trace_free(redqueen_trace_t* self){
 	free(self);
 }
 
-void redqueen_trace_register_transition(redqueen_trace_t* self, uint64_t from, uint64_t to){
+void redqueen_trace_register_transition(redqueen_trace_t* self, disassembler_mode_t mode, uint64_t from, uint64_t to){
 	khiter_t k;
 	int ret;
 	uint128_t key = (((uint128_t)from)<<64) | ((uint128_t)to);

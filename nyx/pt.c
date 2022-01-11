@@ -30,7 +30,7 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 #include "sysemu/kvm_int.h"
 #include "sysemu/kvm.h"
 #include "sysemu/cpus.h"
-#include "nyx/hypercall.h"
+#include "nyx/hypercall/hypercall.h"
 #include "nyx/memory_access.h"
 #include "nyx/interface.h"
 #include "nyx/debug.h"
@@ -307,7 +307,7 @@ void pt_init_decoder(CPUState *cpu){
 	assert(GET_GLOBAL_STATE()->shared_bitmap_size != 0);
 	GET_GLOBAL_STATE()->decoder = libxdc_init(filters, (void* (*)(void*, uint64_t, bool*))page_cache_fetch2, GET_GLOBAL_STATE()->page_cache, GET_GLOBAL_STATE()->shared_bitmap_ptr, GET_GLOBAL_STATE()->shared_bitmap_size);
 
-	libxdc_register_bb_callback(GET_GLOBAL_STATE()->decoder, (void (*)(void*, uint64_t, uint64_t))redqueen_callback, GET_GLOBAL_STATE()->redqueen_state);
+	libxdc_register_bb_callback(GET_GLOBAL_STATE()->decoder, (void (*)(void*, disassembler_mode_t, uint64_t, uint64_t))redqueen_callback, GET_GLOBAL_STATE()->redqueen_state);
 }
 
 int pt_disable_ip_filtering(CPUState *cpu, uint8_t addrn, bool hmp_mode){

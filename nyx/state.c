@@ -33,12 +33,14 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 /* global singleton */
 struct state_qemu_pt global_state;
 
+#define LIBXDC_RELEASE_VERSION_REQUIRED 2
+
 void state_init_global(void){
 #ifdef STATE_VERBOSE
     fprintf(stderr, "--> %s <--\n", __func__);
 #endif
     /* safety first */
-    assert(libxdc_get_release_version() == LIBXDC_RELEASE_VERSION);
+    assert(libxdc_get_release_version() == LIBXDC_RELEASE_VERSION_REQUIRED);
 
     global_state.nyx_fdl = false;
 

@@ -233,7 +233,7 @@ static void redqueen_trace_enabled(redqueen_t* self){
 
     //libxdc_enable_tracing(GET_GLOBAL_STATE()->decoder);
     libxdc_enable_tracing(GET_GLOBAL_STATE()->decoder);
-	  libxdc_register_edge_callback(GET_GLOBAL_STATE()->decoder, (void (*)(void*, uint64_t, uint64_t))&redqueen_trace_register_transition, self->trace_state);
+	  libxdc_register_edge_callback(GET_GLOBAL_STATE()->decoder, (void (*)(void*, disassembler_mode_t, uint64_t, uint64_t))&redqueen_trace_register_transition, self->trace_state);
 		//redqueen_trace_register_transition(self->trace_state, INIT_TRACE_IP, ip);
     //last_ip = ip;
 	} 

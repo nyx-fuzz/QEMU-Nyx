@@ -1,5 +1,6 @@
 #pragma once
 #include "khash.h"
+#include <libxdc.h>
 
 typedef unsigned __int128 uint128_t;
 typedef uint128_t khint128_t;
@@ -38,5 +39,5 @@ typedef struct redqueen_trace_s{
 redqueen_trace_t* redqueen_trace_new(void);
 void redqueen_trace_reset(redqueen_trace_t* self);
 void redqueen_trace_free(redqueen_trace_t* self);
-void redqueen_trace_register_transition(redqueen_trace_t* self, uint64_t from, uint64_t to);
+void redqueen_trace_register_transition(redqueen_trace_t* self, disassembler_mode_t mode, uint64_t from, uint64_t to);
 void redqueen_trace_write_file(redqueen_trace_t* self, int fd);
