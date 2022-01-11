@@ -21,7 +21,6 @@
 #endif
 
 
-#define PAGE_SIZE 0x1000UL
 #define PAGE_CACHE_ADDR_LINE_SIZE sizeof(uint64_t)
 
 #define UNMAPPED_PAGE 0xFFFFFFFFFFFFFFFFULL
