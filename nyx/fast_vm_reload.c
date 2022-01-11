@@ -123,41 +123,6 @@ static void fast_snapshot_init_operation(fast_reload_t* self, const char* snapsh
     }
 }
 
-static void fast_snapshot_init_from_snapshot_operation(fast_reload_t* self, const char* folder){
-
-    self->device_state = nyx_device_state_init();
-
-    self->shadow_memory_state = shadow_memory_init();
-
-    switch(mode){
-        case RELOAD_MEMORY_MODE_DEBUG:
-            break;
-        case RELOAD_MEMORY_MODE_DEBUG_QUIET:
-            break;
-        case RELOAD_MEMORY_MODE_FDL:
-            self->fdl_state = nyx_fdl_init(self->shadow_memory_state);
-            break;
-        case RELOAD_MEMORY_MODE_FDL_DEBUG:
-            self->fdl_state = nyx_fdl_init(self->shadow_memory_state);
-            break;
-        case RELOAD_MEMORY_MODE_DIRTY_RING:
-            self->dirty_ring_state = nyx_dirty_ring_init(self->shadow_memory_state);
-            break;
-        case RELOAD_MEMORY_MODE_DIRTY_RING_DEBUG:
-            self->dirty_ring_state = nyx_dirty_ring_init(self->shadow_memory_state);
-            break;
-    }
-
-    self->fdl_user_state = nyx_fdl_user_init(self->shadow_memory_state);
-
-    nyx_fdl_user_enable(self->fdl_user_state);
-
-    self->block_state = nyx_block_snapshot_init();
-
-    memory_global_dirty_log_start();
-    self->root_snapshot_created = true;
-}
-
 static void fast_snapshot_restore_operation(fast_reload_t* self){
 
     switch(mode){

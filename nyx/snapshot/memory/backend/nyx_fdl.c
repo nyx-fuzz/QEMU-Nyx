@@ -95,32 +95,6 @@ nyx_fdl_t* nyx_fdl_init(shadow_memory_t* shadow_memory){
     return self;
 }
 
-
-/* TODO? */
-static void nyx_snapshot_nyx_fdl_unset_blocklisted_pages(nyx_fdl_t* self, shadow_memory_t* shadow_memory_state, snapshot_page_blocklist_t* blocklist){
-
-    for(uint32_t i = 0; i < blocklist->pages_num; i++){
-        //cpu_physical_memory_test_and_clear_dirty(base_offset+self->black_list_pages[i], TARGET_PAGE_SIZE, DIRTY_MEMORY_MIGRATION);
-
-        if(blocklist->pages[i] >= MEM_SPLIT_START){
-
-
-            uint64_t offset_addr = blocklist->pages[i]-MEM_SPLIT_START;
-
-            //fprintf(stderr, "%s: %lx -> %lx\n", __func__, self->black_list_pages[i], offset_addr);
-            //abort();
-            clear_bit((long)offset_addr>>12, (unsigned long *)self->entry[1].bitmap);
-            //clear_bit((long)offset_addr>>12, (unsigned long *)self->fdl_data2.entry[1].fdl_user_bitmap);
-        }
-        else{
-            uint64_t offset_addr = blocklist->pages[i];
-
-            clear_bit((long)offset_addr>>12, (unsigned long *)self->entry[0].bitmap);
-            //clear_bit((long)offset_addr>>12, (unsigned long *)self->fdl_data2.entry[0].fdl_user_bitmap);
-        }
-    }
-}
-
 #define MEMSET_BITMAP
 
 #ifdef MEMSET_BITMAP
