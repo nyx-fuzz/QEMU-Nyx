@@ -124,13 +124,11 @@ bool patcher_validate_patches(patcher_t *self){
 
 
 static void _patcher_apply_patch(patcher_t *self, size_t index) {
-  patch_info_t *info = &self->patches[index];
-	write_virtual_shadow_memory_cr3(info->addr, (uint8_t*)cmp_patch, info->size, self->cpu, GET_GLOBAL_STATE()->parent_cr3); //self->cpu->parent_cr3);
+  abort(); // deprecated function -> remove this code later
 }
 
 static void _patcher_restore_patch(patcher_t *self, size_t index){
-  patch_info_t *info = &self->patches[index];
-	write_virtual_shadow_memory_cr3(info->addr, (uint8_t*)&info->orig_bytes[0], info->size, self->cpu, GET_GLOBAL_STATE()->parent_cr3); //self->cpu->parent_cr3);
+  abort(); // deprecated function -> remove this code later
 }
 
 static void _patcher_save_patch(patcher_t *self, size_t index, uint8_t* data, size_t instruction_size, uint64_t addr) {
