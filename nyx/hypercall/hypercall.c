@@ -511,7 +511,7 @@ static void handle_hypercall_kafl_panic(struct kvm_run *run, CPUState *cpu, uint
 			//assert(0);
 		}
 #endif
-		if(fast_reload_snapshot_exists(get_fast_reload_snapshot())){
+		if(fast_reload_snapshot_exists(get_fast_reload_snapshot()) && GET_GLOBAL_STATE()->in_fuzzing_mode){
 
 			if(hypercall_arg & 0x8000000000000000ULL){
 
@@ -538,13 +538,10 @@ static void handle_hypercall_kafl_panic(struct kvm_run *run, CPUState *cpu, uint
 
 			}
 			synchronization_lock_crash_found();
-			//synchronization_stop_vm_crash(cpu);
 		} else{
-			fprintf(stderr, "Panic detected during initialization of stage 1 or stage 2 loader (%lx)\n", hypercall_arg);
-			abort();
-			//hypercall_snd_char(KAFL_PROTO_CRASH);
-			QEMU_PT_PRINTF_DEBUG("Protocol - SEND: KAFL_PROTO_CRASH");
-
+			#define AGENT_HAS_CRASHED_REPORT "Agent has crashed before initializing the fuzzing loop..."
+			set_abort_reason_auxiliary_buffer(GET_GLOBAL_STATE()->auxilary_buffer, (char*)AGENT_HAS_CRASHED_REPORT, strlen(AGENT_HAS_CRASHED_REPORT));
+			synchronization_lock();
 		}
 	}
 }
@@ -695,20 +692,17 @@ static void handle_hypercall_kafl_create_tmp_snapshot(struct kvm_run *run, CPUSt
 }
 
 static void handle_hypercall_kafl_panic_extended(struct kvm_run *run, CPUState *cpu, uint64_t hypercall_arg){
-		if(fast_reload_snapshot_exists(get_fast_reload_snapshot())){
+		if(fast_reload_snapshot_exists(get_fast_reload_snapshot()) && GET_GLOBAL_STATE()->in_fuzzing_mode){
 			read_virtual_memory(hypercall_arg, (uint8_t*)hprintf_buffer, HPRINTF_SIZE, cpu);
 			set_crash_reason_auxiliary_buffer(GET_GLOBAL_STATE()->auxilary_buffer, hprintf_buffer, strlen(hprintf_buffer));
 			synchronization_lock_crash_found();
 		} else{
-      read_virtual_memory(hypercall_arg, (uint8_t*)hprintf_buffer, HPRINTF_SIZE, cpu);
-			fprintf(stderr, "Panic detected during initialization of stage 1 or stage 2 loader\n");
-			fprintf(stderr, "REASON:\n%s\n", hprintf_buffer);
-			abort();
-			QEMU_PT_PRINTF(CORE_PREFIX, "Panic detected during initialization of stage 1 or stage 2 loader");
-			//hypercall_snd_char(KAFL_PROTO_CRASH);
-			QEMU_PT_PRINTF_DEBUG("Protocol - SEND: KAFL_PROTO_CRASH");
-			//read_virtual_memory(hypercall_arg, (uint8_t*)hprintf_buffer, HPRINTF_SIZE, cpu);
-			//fprintf(stderr, "-> %s\n", hprintf_buffer);
+      		read_virtual_memory(hypercall_arg, (uint8_t*)hprintf_buffer, HPRINTF_SIZE, cpu);
+			char* report = NULL;
+			assert(asprintf(&report, "Agent has crashed before initializing the fuzzing loop: %s", hprintf_buffer) != -1);
+		
+			set_abort_reason_auxiliary_buffer(GET_GLOBAL_STATE()->auxilary_buffer, report, strlen(report));
+			synchronization_lock();
 		}
 }
 
@@ -1042,7 +1036,7 @@ static void handle_hypercall_kafl_dump_file(struct kvm_run *run, CPUState *cpu, 
 static void handle_hypercall_kafl_persist_page_past_snapshot(struct kvm_run *run, CPUState *cpu, uint64_t hypercall_arg){
 	CPUX86State *env = &(X86_CPU(cpu))->env;
 	kvm_arch_get_registers_fast(cpu);
-	hwaddr phys_addr = (hwaddr) get_paging_phys_addr(cpu, env->cr[3], hypercall_arg&(~0xFFF), NULL);
+	hwaddr phys_addr = (hwaddr) get_paging_phys_addr(cpu, env->cr[3], hypercall_arg&(~0xFFF));
 	assert(phys_addr != 0xffffffffffffffffULL);
 	fast_reload_blacklist_page(get_fast_reload_snapshot(), phys_addr);
 }
