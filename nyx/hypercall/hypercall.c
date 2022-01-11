@@ -60,12 +60,8 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 
 //#define DEBUG_HPRINTF
 
-bool reload_mode_temp = false;
 bool notifiers_enabled = false;
-//uint32_t hprintf_counter = 0;
-
 bool hypercall_enabled = false;
-void* program_buffer = NULL;
 char hprintf_buffer[HPRINTF_SIZE];
 
 static bool init_state = true;
@@ -97,11 +93,6 @@ void hypercall_commit_filter(void){
 }
 
 bool setup_snapshot_once = false;
-
-
-void pt_setup_program(void* ptr){
-	program_buffer = ptr;
-}
 
 
 bool handle_hypercall_kafl_next_payload(struct kvm_run *run, CPUState *cpu, uint64_t hypercall_arg){
@@ -344,26 +335,9 @@ void handle_hypercall_kafl_release(struct kvm_run *run, CPUState *cpu, uint64_t 
 	if(hypercall_enabled){
 		if (init_state){
 			init_state = false;	
-
-			
-
-			//hypercall_snd_char(KAFL_PROTO_RELEASE);
-			//QEMU_PT_PRINTF_DEBUG("Protocol - SEND: KAFL_PROTO_RELEASE");
-
 		} else {
-
-
 			synchronization_disable_pt(cpu);
 			release_print_once(cpu);
-			/*
-			if(reload_mode || reload_mode_temp){
-				qemu_mutex_lock_iothread();
-				//QEMU_PT_PRINTF(CORE_PREFIX, "...GOOOOOO 2 !!!!");
-				fast_reload_restore(get_fast_reload_snapshot());
-				//QEMU_PT_PRINTF(CORE_PREFIX, "...DONE 2 !!!!");
-				qemu_mutex_unlock_iothread();
-			}
-			*/
 		}
 	}
 }
@@ -730,17 +704,12 @@ static void handle_hypercall_kafl_user_abort(struct kvm_run *run, CPUState *cpu,
 }
 
 void pt_enable_rqi(CPUState *cpu){
-	reload_mode_temp = true;
-	//cpu->redqueen_enable_pending = true;
 	GET_GLOBAL_STATE()->redqueen_enable_pending = true;
 }
 
 void pt_disable_rqi(CPUState *cpu){
-	reload_mode_temp = false;
-	//cpu->redqueen_disable_pending = true;
 	GET_GLOBAL_STATE()->redqueen_disable_pending = true;
 	GET_GLOBAL_STATE()->redqueen_instrumentation_mode = REDQUEEN_NO_INSTRUMENTATION;
-	//cpu->redqueen_instrumentation_mode = REDQUEEN_NO_INSTRUMENTATION;
 }
 
 void pt_set_enable_patches_pending(CPUState *cpu){
@@ -748,13 +717,11 @@ void pt_set_enable_patches_pending(CPUState *cpu){
 }
 
 void pt_set_redqueen_instrumentation_mode(CPUState *cpu, int redqueen_mode){
-  //cpu->redqueen_instrumentation_mode = redqueen_mode;
 	GET_GLOBAL_STATE()->redqueen_instrumentation_mode = redqueen_mode;
 }
 
 void pt_set_redqueen_update_blacklist(CPUState *cpu, bool newval){
   assert(!newval || !GET_GLOBAL_STATE()->redqueen_update_blacklist);
-  //cpu->redqueen_update_blacklist = newval;
 	GET_GLOBAL_STATE()->redqueen_update_blacklist = newval;
 }
 
