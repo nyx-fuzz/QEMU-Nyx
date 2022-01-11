@@ -2,7 +2,7 @@
 
 Copyright (C) 2017 Sergej Schumilo
 
-This file is part of QEMU-PT (kAFL).
+This file is part of QEMU-PT (Nyx).
 
 QEMU-PT is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -41,7 +41,7 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include "pt.h"
-#include "nyx/hypercall.h"
+#include "nyx/hypercall/hypercall.h"
 #include "nyx/interface.h"
 #include "nyx/debug.h"
 #include "nyx/synchronization.h"
@@ -58,18 +58,16 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 
 #define CONVERT_UINT64(x) (uint64_t)(strtoull(x, NULL, 16))
 
-#define TYPE_KAFLMEM "kafl"
-#define KAFLMEM(obj) \
-		OBJECT_CHECK(nyx_interface_state, (obj), TYPE_KAFLMEM)
+#define TYPE_NYX_MEM "nyx"
+#define NYX_MEM(obj) \
+		OBJECT_CHECK(nyx_interface_state, (obj), TYPE_NYX_MEM)
 
-uint32_t kafl_bitmap_size = DEFAULT_KAFL_BITMAP_SIZE;
-
-static void pci_kafl_guest_realize(DeviceState *dev, Error **errp);
+static void nyx_realize(DeviceState *dev, Error **errp);
 
 typedef struct nyx_interface_state {
 	DeviceState parent_obj;
 
-	Chardev *kafl_chr_drv_state;
+	Chardev *nyx_chr_drv_state;
 	CharBackend chr;
 
 	char* sharedir;
@@ -97,19 +95,19 @@ typedef struct nyx_interface_state {
 	
 } nyx_interface_state;
 
-static void kafl_guest_event(void *opaque, int event){
+static void nyx_interface_event(void *opaque, int event){
 }
 
 static void send_char(char val, void* tmp_s){
 	nyx_interface_state *s = tmp_s;
 
-	assert(val == KAFL_PING);
+	assert(val == NYX_INTERFACE_PING);
 	__sync_synchronize();
 
 	qemu_chr_fe_write(&s->chr, (const uint8_t *) &val, 1);
 }
 
-static int kafl_guest_can_receive(void * opaque){
+static int nyx_interface_can_receive(void * opaque){
 	return sizeof(int64_t);
 }
 
@@ -128,12 +126,11 @@ bool interface_send_char(char val){
 	return false;
 }
 
-static void kafl_guest_receive(void *opaque, const uint8_t * buf, int size){
+static void nyx_interface_receive(void *opaque, const uint8_t * buf, int size){
 	int i;				
 	for(i = 0; i < size; i++){
 		switch(buf[i]){
-			case KAFL_PING:
-				//fprintf(stderr, "Protocol - RECV: KAFL_PING\n");
+			case NYX_INTERFACE_PING:
 				synchronization_unlock();
 				break;
 			case '\n':
@@ -147,39 +144,33 @@ static void kafl_guest_receive(void *opaque, const uint8_t * buf, int size){
 	}
 }
 
-static int kafl_guest_create_memory_bar(nyx_interface_state *s, int region_num, uint64_t bar_size, const char* file, Error **errp){
+static int nyx_create_payload_buffer(nyx_interface_state *s, uint64_t buffer_size, const char* file, Error **errp){
 	void * ptr;
 	int fd;
 	struct stat st;
 	
 	fd = open(file, O_CREAT|O_RDWR, S_IRWXU|S_IRWXG|S_IRWXO);
-	assert(ftruncate(fd, bar_size) == 0);
+	assert(ftruncate(fd, buffer_size) == 0);
 	stat(file, &st);
-	QEMU_PT_PRINTF(INTERFACE_PREFIX, "new shm file: (max size: %lx) %lx", bar_size, st.st_size);
+	QEMU_PT_PRINTF(INTERFACE_PREFIX, "new shm file: (max size: %lx) %lx", buffer_size, st.st_size);
 	
-	assert(bar_size == st.st_size);
-	ptr = mmap(0, bar_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+	assert(buffer_size == st.st_size);
+	ptr = mmap(0, buffer_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
 
 	if (ptr == MAP_FAILED) {
 		error_setg_errno(errp, errno, "Failed to mmap memory");
 		return -1;
 	}
 
-	switch(region_num){
-		case 1:	pt_setup_program((void*)ptr);
-				break;
-		case 2:	
-				GET_GLOBAL_STATE()->shared_payload_buffer_fd = fd;
-				GET_GLOBAL_STATE()->shared_payload_buffer_size = bar_size;
-				break;
-	}
+	GET_GLOBAL_STATE()->shared_payload_buffer_fd = fd;
+	GET_GLOBAL_STATE()->shared_payload_buffer_size = buffer_size;
 
 	init_send_char(s);
 
 	return 0;
 }
 
-static void kafl_guest_setup_bitmap(nyx_interface_state *s, char* filename, uint32_t bitmap_size){
+static void nyx_guest_setup_bitmap(nyx_interface_state *s, char* filename, uint32_t bitmap_size){
 	void * ptr;
 	int fd;
 	struct stat st;
@@ -191,8 +182,27 @@ static void kafl_guest_setup_bitmap(nyx_interface_state *s, char* filename, uint
 	ptr = mmap(0, bitmap_size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
 	GET_GLOBAL_STATE()->shared_bitmap_ptr = (void*)ptr;
 	GET_GLOBAL_STATE()->shared_bitmap_fd = fd;
-	GET_GLOBAL_STATE()->shared_bitmap_size = bitmap_size-DEFAULT_KAFL_IJON_BITMAP_SIZE;
-	GET_GLOBAL_STATE()->shared_ijon_bitmap_size = DEFAULT_KAFL_IJON_BITMAP_SIZE;
+	GET_GLOBAL_STATE()->shared_bitmap_size = bitmap_size;
+}
+
+
+static void nyx_guest_setup_ijon_buffer(nyx_interface_state *s, char* filename){
+	void * ptr;
+	int fd;
+	struct stat st;
+	
+	fd = open(filename, O_CREAT|O_RDWR, S_IRWXU|S_IRWXG|S_IRWXO);
+	assert(ftruncate(fd, DEFAULT_NYX_IJON_BITMAP_SIZE) == 0);
+	stat(filename, &st);
+	assert(DEFAULT_NYX_IJON_BITMAP_SIZE == st.st_size);
+	ptr = mmap(0, DEFAULT_NYX_IJON_BITMAP_SIZE, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+	
+	/*
+	GET_GLOBAL_STATE()->shared_bitmap_ptr = (void*)ptr;
+	GET_GLOBAL_STATE()->shared_bitmap_fd = fd;
+	GET_GLOBAL_STATE()->shared_bitmap_size = bitmap_size-DEFAULT_NYX_IJON_BITMAP_SIZE;
+	GET_GLOBAL_STATE()->shared_ijon_bitmap_size = DEFAULT_NYX_IJON_BITMAP_SIZE;
+	*/
 }
 
 static bool verify_workdir_state(nyx_interface_state *s, Error **errp){
@@ -228,7 +238,7 @@ static bool verify_workdir_state(nyx_interface_state *s, Error **errp){
 		return false;
 	}
 	else {
-		kafl_guest_create_memory_bar(s, 2, PAYLOAD_SIZE, tmp, errp);
+		nyx_create_payload_buffer(s, PAYLOAD_SIZE, tmp, errp);
 	}
 	free(tmp);
 
@@ -238,10 +248,19 @@ static bool verify_workdir_state(nyx_interface_state *s, Error **errp){
 		free(tmp);
 		return false;
 	} else {
-		kafl_guest_setup_bitmap(s, tmp, s->bitmap_size);
+		nyx_guest_setup_bitmap(s, tmp, s->bitmap_size);
 	}
 	free(tmp);
 
+	assert(asprintf(&tmp, "%s/ijon_%d", workdir, id) != -1);
+	if (!file_exits(tmp)){
+		fprintf(stderr,  "%s does not exist...\n", tmp);
+		free(tmp);
+		return false;
+	} else {
+		nyx_guest_setup_ijon_buffer(s, tmp);
+	}
+	free(tmp);
 
 	assert(asprintf(&tmp, "%s/page_cache.lock", workdir) != -1);
 	if (!file_exits(tmp)){
@@ -365,15 +384,15 @@ static bool verify_sharedir_state(nyx_interface_state *s, Error **errp){
 }
 
 
-static void pci_kafl_guest_realize(DeviceState *dev, Error **errp){
-	nyx_interface_state *s = KAFLMEM(dev);
+static void nyx_realize(DeviceState *dev, Error **errp){
+	nyx_interface_state *s = NYX_MEM(dev);
 
 	if(s->bitmap_size <= 0){
-		s->bitmap_size = DEFAULT_KAFL_BITMAP_SIZE;
+		s->bitmap_size = DEFAULT_NYX_BITMAP_SIZE;
 	}
 
-	assert((uint32_t)s->bitmap_size > (0x1000 + DEFAULT_KAFL_IJON_BITMAP_SIZE));
-	assert((((uint32_t)s->bitmap_size-DEFAULT_KAFL_IJON_BITMAP_SIZE) & (((uint32_t)s->bitmap_size-DEFAULT_KAFL_IJON_BITMAP_SIZE) - 1)) == 0 );
+	assert((uint32_t)s->bitmap_size > (0x1000 + DEFAULT_NYX_IJON_BITMAP_SIZE));
+	assert((((uint32_t)s->bitmap_size-DEFAULT_NYX_IJON_BITMAP_SIZE) & (((uint32_t)s->bitmap_size-DEFAULT_NYX_IJON_BITMAP_SIZE) - 1)) == 0 );
 
 	if(s->worker_id == 0xFFFF){
 		fprintf(stderr, "[QEMU-Nyx] Error: Invalid worker id...\n");
@@ -398,7 +417,7 @@ static void pci_kafl_guest_realize(DeviceState *dev, Error **errp){
 	}
 
 	if(&s->chr){
-		qemu_chr_fe_set_handlers(&s->chr, kafl_guest_can_receive, kafl_guest_receive, kafl_guest_event, NULL, s, NULL, true);
+		qemu_chr_fe_set_handlers(&s->chr, nyx_interface_can_receive, nyx_interface_receive, nyx_interface_event, NULL, s, NULL, true);
 	}
 
 	check_available_ipt_ranges(s);
@@ -415,7 +434,7 @@ static void pci_kafl_guest_realize(DeviceState *dev, Error **errp){
 	init_crash_handler();
 }
 
-static Property kafl_guest_properties[] = {
+static Property nyx_interface_properties[] = {
 	DEFINE_PROP_CHR("chardev", nyx_interface_state, chr),
 
 	DEFINE_PROP_STRING("sharedir", nyx_interface_state, sharedir),
@@ -439,7 +458,7 @@ static Property kafl_guest_properties[] = {
 	DEFINE_PROP_STRING("ip3_b", nyx_interface_state, ip_filter[3][1]),
 
 
-	DEFINE_PROP_UINT64("bitmap_size", nyx_interface_state, bitmap_size, DEFAULT_KAFL_BITMAP_SIZE),
+	DEFINE_PROP_UINT64("bitmap_size", nyx_interface_state, bitmap_size, DEFAULT_NYX_BITMAP_SIZE),
 	DEFINE_PROP_BOOL("debug_mode", nyx_interface_state, debug_mode, false),
 	DEFINE_PROP_BOOL("crash_notifier", nyx_interface_state, notifier, true),
 	DEFINE_PROP_BOOL("dump_pt_trace", nyx_interface_state, dump_pt_trace, false),
@@ -448,29 +467,29 @@ static Property kafl_guest_properties[] = {
 	DEFINE_PROP_END_OF_LIST(),
 };
 
-static void kafl_guest_class_init(ObjectClass *klass, void *data){
+static void nyx_interface_class_init(ObjectClass *klass, void *data){
 	DeviceClass *dc = DEVICE_CLASS(klass);
 	//PCIDeviceClass *k = PCI_DEVICE_CLASS(klass);
-	dc->realize = pci_kafl_guest_realize;
+	dc->realize = nyx_realize;
 	//k->class_id = PCI_CLASS_MEMORY_RAM;
-	dc->props = kafl_guest_properties;
+	dc->props = nyx_interface_properties;
 	set_bit(DEVICE_CATEGORY_MISC, dc->categories);
-	dc->desc = "KAFL Inter-VM shared memory";
+	dc->desc = "Nyx Interface";
 }
 
-static void kafl_guest_init(Object *obj){
+static void nyx_interface_init(Object *obj){
 }
 
-static const TypeInfo kafl_guest_info = {
-	.name          = TYPE_KAFLMEM,
+static const TypeInfo nyx_interface_info = {
+	.name          = TYPE_NYX_MEM,
 	.parent        = TYPE_DEVICE,
 	.instance_size = sizeof(nyx_interface_state),
-	.instance_init = kafl_guest_init,
-	.class_init    = kafl_guest_class_init,
+	.instance_init = nyx_interface_init,
+	.class_init    = nyx_interface_class_init,
 };
 
-static void kafl_guest_register_types(void){
-	type_register_static(&kafl_guest_info);
+static void nyx_interface_register_types(void){
+	type_register_static(&nyx_interface_info);
 }
 
-type_init(kafl_guest_register_types)
+type_init(nyx_interface_register_types)
