@@ -37,6 +37,7 @@ if [ ! -f "/usr/lib/libxdc.so" ] || [ ! -f "/usr/include/libxdc.h" ]; then
   sudo make install 
   cd ..
   cd libxdc
+  git checkout 641de7539e99f7faf5c8e8f1c8a4b37a9df52a5f
   sudo make install
   cd ..
 fi
