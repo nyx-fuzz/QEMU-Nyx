@@ -242,7 +242,8 @@ nyx_dirty_ring_t* nyx_dirty_ring_init(shadow_memory_t* shadow_memory){
   return self;
 }
 
-static void restore_memory(nyx_dirty_ring_t* self, shadow_memory_t* shadow_memory_state, snapshot_page_blocklist_t* blocklist){
+static uint32_t restore_memory(nyx_dirty_ring_t* self, shadow_memory_t* shadow_memory_state, snapshot_page_blocklist_t* blocklist){
+    uint32_t num_dirty_pages = 0;
 	void* host_addr = NULL;
 	void* snapshot_addr = NULL;
 	uint64_t physical_addr = 0;
@@ -272,13 +273,15 @@ static void restore_memory(nyx_dirty_ring_t* self, shadow_memory_t* shadow_memor
     			snapshot_addr = shadow_memory_state->ram_regions[kvm_region_slot->region_id].snapshot_region_ptr + entry_offset_addr;
 				}
 
-    		memcpy(host_addr, snapshot_addr, TARGET_PAGE_SIZE);
+    			memcpy(host_addr, snapshot_addr, TARGET_PAGE_SIZE);
 
 				clear_bit(gfn, (void*)kvm_region_slot->bitmap);
+				num_dirty_pages++;
 			}
 			kvm_region_slot->stack_ptr = 0;
 		}
 	}
+	return num_dirty_pages;
 }
 
 static void save_root_pages(nyx_dirty_ring_t* self, shadow_memory_t* shadow_memory_state, snapshot_page_blocklist_t* blocklist){
@@ -318,8 +321,7 @@ static void save_root_pages(nyx_dirty_ring_t* self, shadow_memory_t* shadow_memo
 //entry = &ring->dirty_gfns[ring->reset_index & (ring->size - 1)];
 
 
-void nyx_snapshot_nyx_dirty_ring_restore(nyx_dirty_ring_t* self, shadow_memory_t* shadow_memory_state, snapshot_page_blocklist_t* blocklist){
-
+uint32_t nyx_snapshot_nyx_dirty_ring_restore(nyx_dirty_ring_t* self, shadow_memory_t* shadow_memory_state, snapshot_page_blocklist_t* blocklist){
 /*
 	static int perf_counter = 0;
 
@@ -330,8 +332,8 @@ void nyx_snapshot_nyx_dirty_ring_restore(nyx_dirty_ring_t* self, shadow_memory_t
 	perf_counter++;
 */
 
-  dirty_ring_flush_and_collect(self, shadow_memory_state, blocklist, kvm_get_vm_fd(kvm_state));
-	restore_memory(self, shadow_memory_state, blocklist);
+  	dirty_ring_flush_and_collect(self, shadow_memory_state, blocklist, kvm_get_vm_fd(kvm_state));
+	return restore_memory(self, shadow_memory_state, blocklist);
 }
 
 void nyx_snapshot_nyx_dirty_ring_save_root_pages(nyx_dirty_ring_t* self, shadow_memory_t* shadow_memory_state, snapshot_page_blocklist_t* blocklist){

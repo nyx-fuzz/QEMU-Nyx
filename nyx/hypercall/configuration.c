@@ -1,7 +1,8 @@
 #include "qemu/osdep.h"
-#include "nyx/state.h"
+#include "nyx/state/state.h"
 #include "nyx/hypercall/configuration.h"
 #include "nyx/memory_access.h"
+#include "nyx/helpers.h"
 
 void handle_hypercall_kafl_get_host_config(struct kvm_run *run, CPUState *cpu, uint64_t hypercall_arg){
 	uint64_t vaddr = hypercall_arg;
@@ -15,6 +16,20 @@ void handle_hypercall_kafl_get_host_config(struct kvm_run *run, CPUState *cpu, u
 	config.payload_buffer_size = GET_GLOBAL_STATE()->shared_payload_buffer_size;
 
 	write_virtual_memory(vaddr, (uint8_t*)&config, sizeof(host_config_t), cpu);
+}
+
+static void resize_coverage_bitmap(uint32_t new_bitmap_size){
+	uint32_t new_bitmap_shm_size = new_bitmap_size;
+
+	if (new_bitmap_shm_size % 64 > 0) {
+    	new_bitmap_shm_size = ((new_bitmap_shm_size + 64) >> 6) << 6;
+    }
+
+	GET_GLOBAL_STATE()->shared_bitmap_real_size = new_bitmap_shm_size;
+	resize_shared_memory(new_bitmap_shm_size, &GET_GLOBAL_STATE()->shared_bitmap_size, &GET_GLOBAL_STATE()->shared_bitmap_ptr, GET_GLOBAL_STATE()->shared_bitmap_fd);
+
+	/* pass the actual bitmap buffer size to the front-end */
+	GET_GLOBAL_STATE()->auxilary_buffer->capabilites.agent_coverage_bitmap_size = new_bitmap_size;
 }
 
 void handle_hypercall_kafl_set_agent_config(struct kvm_run *run, CPUState *cpu, uint64_t hypercall_arg){
@@ -60,12 +75,14 @@ void handle_hypercall_kafl_set_agent_config(struct kvm_run *run, CPUState *cpu, 
         if (config.coverage_bitmap_size){
 			resize_coverage_bitmap(config.coverage_bitmap_size);
 		}
-
+		
 		if (config.input_buffer_size){
-			resize_payload_buffer(config.coverage_bitmap_size);
+			resize_payload_buffer(config.input_buffer_size);
 		}
 
-		apply_capabilities(cpu);
+		if(apply_capabilities(cpu) == false){
+			nyx_abort((char*)"applying agent configuration failed...");
+		}
 
 		if(getenv("DUMP_PAYLOAD_MODE")){
 			config.dump_payloads = 1;

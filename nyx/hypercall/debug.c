@@ -2,7 +2,7 @@
 #include <sys/time.h>
 #include "nyx/synchronization.h"
 #include "nyx/fast_vm_reload.h"
-#include "nyx/state.h"
+#include "nyx/state/state.h"
 #include "nyx/hypercall/debug.h"
 
 //#define NYX_ENABLE_DEBUG_HYPERCALLS

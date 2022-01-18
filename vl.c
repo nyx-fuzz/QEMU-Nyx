@@ -137,7 +137,7 @@ int main(int argc, char **argv)
 #include "nyx/hypercall/hypercall.h"
 #include "nyx/synchronization.h"
 #include "nyx/fast_vm_reload.h"
-#include "nyx/state.h"
+#include "nyx/state/state.h"
 #include "nyx/fast_vm_reload_sync.h"
 #endif
 

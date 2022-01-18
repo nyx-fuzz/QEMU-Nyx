@@ -30,7 +30,7 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 #include "debug.h"
 #include "nyx/fast_vm_reload.h"
 #include "exec/gdbstub.h"
-#include "nyx/state.h"
+#include "nyx/state/state.h"
 #include "sysemu/kvm.h"
 #include "nyx/helpers.h"
 
@@ -200,7 +200,7 @@ bool remap_slot(uint64_t addr, uint32_t slot, CPUState *cpu, int fd, uint64_t sh
     if(virtual){
         phys_addr = get_paging_phys_addr(cpu, cr3, (addr & x86_64_PAGE_MASK));
 
-        if(phys_addr == (uint64_t)-1){
+        if(phys_addr == INVALID_ADDRESS){
 			fprintf(stderr, "[QEMU-Nyx] Error: failed to translate v_addr (0x%lx) to p_addr!\n", addr);
             fprintf(stderr, "[QEMU-Nyx] Check if the buffer is present in the guest's memory...\n");
             exit(1);
@@ -259,21 +259,36 @@ bool remap_payload_slot_protected(uint64_t phys_addr, uint32_t slot, CPUState *c
     return true;
 }
 
-void resize_coverage_bitmap(uint32_t new_size){
-    assert(GET_GLOBAL_STATE()->shared_bitmap_fd && GET_GLOBAL_STATE()->shared_bitmap_size);
-    fprintf(stderr, "shared_bitmap_size -> %x - new_size: %x\n", GET_GLOBAL_STATE()->shared_bitmap_size, new_size);
-    assert(GET_GLOBAL_STATE()->shared_bitmap_size <= (new_size+0x1000) && !(new_size & 0xFFF));
+void resize_shared_memory(uint32_t new_size, uint32_t* shm_size, void** shm_ptr, int fd){
+    assert(fd && *shm_size);
+
+    /* check if the new_size is a multiple of PAGE_SIZE */
+    if(new_size & (PAGE_SIZE-1)){
+        new_size = (new_size & ~(PAGE_SIZE-1)) + PAGE_SIZE;
+    }
+
+    if(*shm_size >= new_size){
+        /* no need no resize the buffer -> early exit */
+        return;
+    }
+
     assert(!GET_GLOBAL_STATE()->pt_trace_mode);
     assert(!GET_GLOBAL_STATE()->in_fuzzing_mode);
-    assert(ftruncate(GET_GLOBAL_STATE()->shared_bitmap_fd, new_size+0x1000) == 0);
+    assert(ftruncate(fd, new_size) == 0);
 
-    printf("MUNMAP: %d\n", GET_GLOBAL_STATE()->shared_bitmap_size);
-    munmap((void*)GET_GLOBAL_STATE()->shared_bitmap_ptr , GET_GLOBAL_STATE()->shared_bitmap_size+0x1000);
-	GET_GLOBAL_STATE()->shared_bitmap_ptr = (void*)mmap(0, new_size+0x1000, PROT_READ|PROT_WRITE, MAP_SHARED, GET_GLOBAL_STATE()->shared_bitmap_fd, 0);;
-
-    GET_GLOBAL_STATE()->shared_bitmap_size = new_size;
-    GET_GLOBAL_STATE()->auxilary_buffer->capabilites.agent_coverage_bitmap_size = new_size;
+    if(shm_ptr){
+        munmap(*shm_ptr , *shm_size);
+	    *shm_ptr = (void*)mmap(0, new_size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+        assert(*shm_ptr != MAP_FAILED);
+    }
+    else{
+        fprintf(stderr, "=> shm_ptr is NULL\n");
+        abort();
+    }
+    *shm_size = new_size;
 }
+
+
 
 void resize_payload_buffer(uint32_t new_size){
     assert(GET_GLOBAL_STATE()->shared_payload_buffer_fd && GET_GLOBAL_STATE()->shared_payload_buffer_size);
@@ -302,7 +317,7 @@ bool remap_payload_buffer(uint64_t virt_guest_addr, CPUState *cpu){
         QLIST_FOREACH_RCU(block, &ram_list.blocks, next) {
             if(!memcmp(block->idstr, "pc.ram", 6)){
                 //printf("MMUNMAP: %d\n", munmap((void*)(((uint64_t)block->host) + phys_addr), x86_64_PAGE_SIZE));
-                if(munmap((void*)(((uint64_t)block->host) + phys_addr), x86_64_PAGE_SIZE) ==  -1){
+                if(munmap((void*)(((uint64_t)block->host) + phys_addr), x86_64_PAGE_SIZE) == -1){
                     fprintf(stderr, "munmap failed!\n");
                     //exit(1);
                     assert(false);
@@ -351,7 +366,7 @@ bool write_virtual_memory(uint64_t address, uint8_t* data, uint32_t size, CPUSta
         attrs = MEMTXATTRS_UNSPECIFIED;
         phys_addr = cpu_get_phys_page_attrs_debug(cpu, (address & x86_64_PAGE_MASK), &attrs);
 
-        if (phys_addr == -1){
+        if (phys_addr == INVALID_ADDRESS){
             QEMU_PT_PRINTF(MEM_PREFIX, "phys_addr == -1:\t%lx", address);
             return false;
         }
@@ -680,12 +695,17 @@ void print_48_paging2(uint64_t cr3){
 }
 
 
-static uint64_t* load_page_table(uint64_t page_table_address, uint64_t* paging_entries_buffer, uint8_t level, bool read_from_snapshot){
+static uint64_t* load_page_table(uint64_t page_table_address, uint64_t* paging_entries_buffer, uint8_t level, bool read_from_snapshot, bool *success){
+    if(page_table_address == INVALID_ADDRESS){
+        *success = false;
+    }
+
     if (read_from_snapshot){
-        read_snapshot_memory(get_fast_reload_snapshot(), page_table_address, (uint8_t *) paging_entries_buffer, PPAGE_SIZE);   
+        *success = read_snapshot_memory(get_fast_reload_snapshot(), page_table_address, (uint8_t *) paging_entries_buffer, PPAGE_SIZE);   
     }
     else{
         cpu_physical_memory_rw(page_table_address, (uint8_t *) paging_entries_buffer, PPAGE_SIZE, false);
+        *success = true; /* fix this */
     }
     return paging_entries_buffer;
 }
@@ -702,8 +722,14 @@ static uint64_t get_48_paging_phys_addr(uint64_t cr3, uint64_t addr, bool read_f
     uint64_t* paging_entries_buffer_ptr = NULL;
     uint64_t page_table_address = 0;
 
+    bool success = false;
+
     page_table_address = (cr3&PAGETABLE_MASK);
-    paging_entries_buffer_ptr = load_page_table(page_table_address, paging_entries_buffer, 0, read_from_snapshot);
+    paging_entries_buffer_ptr = load_page_table(page_table_address, paging_entries_buffer, 0, read_from_snapshot, &success);
+
+    if (unlikely(success == false)){
+        goto fail;
+    }
 
     if(paging_entries_buffer_ptr[pml_4_index]){
         address_identifier_4 = ((uint64_t)pml_4_index) << PLEVEL_1_SHIFT;
@@ -713,7 +739,11 @@ static uint64_t get_48_paging_phys_addr(uint64_t cr3, uint64_t addr, bool read_f
         if(CHECK_BIT(paging_entries_buffer_ptr[pml_4_index], 0)){ /* otherwise swapped out */ 
 
             page_table_address = (paging_entries_buffer_ptr[pml_4_index]&PAGETABLE_MASK);
-            paging_entries_buffer_ptr = load_page_table(page_table_address, paging_entries_buffer, 1, read_from_snapshot);
+            paging_entries_buffer_ptr = load_page_table(page_table_address, paging_entries_buffer, 1, read_from_snapshot, &success);
+
+            if (unlikely(success == false)){
+                goto fail;
+            }
 
             if(paging_entries_buffer_ptr[pml_3_index]){
 
@@ -726,7 +756,11 @@ static uint64_t get_48_paging_phys_addr(uint64_t cr3, uint64_t addr, bool read_f
                     else{
 
                         page_table_address = (paging_entries_buffer_ptr[pml_3_index]&PAGETABLE_MASK);
-                        paging_entries_buffer_ptr = load_page_table(page_table_address, paging_entries_buffer, 2, read_from_snapshot);
+                        paging_entries_buffer_ptr = load_page_table(page_table_address, paging_entries_buffer, 2, read_from_snapshot, &success);
+
+                        if (unlikely(success == false)){
+                            goto fail;
+                        }
 
                         if(paging_entries_buffer_ptr[pml_2_index]){
                             if (CHECK_BIT(paging_entries_buffer_ptr[pml_2_index], 0)){ /* otherwise swapped out */ 
@@ -737,7 +771,11 @@ static uint64_t get_48_paging_phys_addr(uint64_t cr3, uint64_t addr, bool read_f
                                 else{
 
                                     page_table_address = (paging_entries_buffer_ptr[pml_2_index]&PAGETABLE_MASK);
-                                    paging_entries_buffer_ptr = load_page_table(page_table_address, paging_entries_buffer, 3, read_from_snapshot);
+                                    paging_entries_buffer_ptr = load_page_table(page_table_address, paging_entries_buffer, 3, read_from_snapshot, &success);
+
+                                    if (unlikely(success == false)){
+                                         goto fail;
+                                    }
 
                                     if(paging_entries_buffer_ptr[pml_1_index]){
                                         if (CHECK_BIT(paging_entries_buffer_ptr[pml_1_index], 0)){
@@ -753,6 +791,8 @@ static uint64_t get_48_paging_phys_addr(uint64_t cr3, uint64_t addr, bool read_f
             }
         }
     }
+
+    fail:
     
     return INVALID_ADDRESS;
 }
@@ -839,15 +879,21 @@ bool is_addr_mapped_cr3_snapshot(uint64_t address, CPUState *cpu, uint64_t cr3){
 
 bool dump_page_cr3_snapshot(uint64_t address, uint8_t* data, CPUState *cpu, uint64_t cr3){
     fast_reload_t* snapshot = get_fast_reload_snapshot();
-    return read_snapshot_memory(snapshot, get_paging_phys_addr_snapshot(cpu, cr3, address), data, PPAGE_SIZE);   
+    uint64_t phys_addr = get_paging_phys_addr_snapshot(cpu, cr3, address);
+    if(phys_addr == INVALID_ADDRESS){
+        return false;
+    }
+    else{
+        return read_snapshot_memory(snapshot, phys_addr, data, PPAGE_SIZE);   
+    }
 }
 
 
 bool dump_page_cr3_ht(uint64_t address, uint8_t* data, CPUState *cpu, uint64_t cr3){
     hwaddr phys_addr = (hwaddr) get_paging_phys_addr(cpu, cr3, address);
     int asidx = cpu_asidx_from_attrs(cpu, MEMTXATTRS_UNSPECIFIED);
-    if(phys_addr == 0xffffffffffffffffULL || address_space_rw(cpu_get_address_space(cpu, asidx), phys_addr, MEMTXATTRS_UNSPECIFIED, data, 0x1000, 0)){
-        if(phys_addr != 0xffffffffffffffffULL){
+    if(phys_addr == INVALID_ADDRESS || address_space_rw(cpu_get_address_space(cpu, asidx), phys_addr, MEMTXATTRS_UNSPECIFIED, data, 0x1000, 0)){
+        if(phys_addr != INVALID_ADDRESS){
             fprintf(stderr, "%s: Warning, read failed:\t%lx (%lx)\n", __func__, address, phys_addr);
         }
         return false;

@@ -60,7 +60,7 @@
 #endif
 
 #ifdef QEMU_NYX
-#include "nyx/state.h"
+#include "nyx/state/state.h"
 #endif
 
 #include "disas/capstone.h"

@@ -37,7 +37,6 @@ void synchronization_lock_hprintf(void);
 
 void synchronization_lock(void);
 void synchronization_lock_crash_found(void);
-void synchronization_lock_asan_found(void);
 void synchronization_lock_timeout_found(void);
 void synchronization_lock_shutdown_detected(void);
 void synchronization_cow_full_detected(void);

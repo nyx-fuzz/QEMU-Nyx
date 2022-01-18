@@ -22,7 +22,6 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 #pragma once 
 
 #define PAYLOAD_BUFFER_SIZE		26
-#define PRINTK_PAYLOAD_SIZE		4
 
 #define KAFL_MODE_64	0
 #define KAFL_MODE_32	1
@@ -100,7 +99,6 @@ void handle_hypercall_kafl_page_dump_bp(struct kvm_run *run, CPUState *cpu, uint
 
 
 void hprintf(char* msg);
-void enable_notifies(void);
 
 bool handle_hypercall_kafl_next_payload(struct kvm_run *run, CPUState *cpu, uint64_t hypercall_arg);
 void hypercall_reset_hprintf_counter(void);

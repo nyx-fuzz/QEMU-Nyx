@@ -5,7 +5,7 @@
 #include "debug.h"
 #include "nested_hypercalls.h"
 #include "interface.h"
-#include "state.h"
+#include "state/state.h"
 #include "pt.h"
 #include "sysemu/sysemu.h"
 #include "sysemu/kvm.h"

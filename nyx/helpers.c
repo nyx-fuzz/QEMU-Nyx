@@ -10,9 +10,15 @@
 #include "qemu/main-loop.h"
 #include "sysemu/kvm_int.h"
 #include "sysemu/kvm.h"
-#include "nyx/state.h"
+#include "nyx/state/state.h"
 #include "nyx/memory_access.h"
 #include "nyx/debug.h"
+#include "nyx/helpers.h"
+
+void nyx_abort(char* msg){
+	set_abort_reason_auxiliary_buffer(GET_GLOBAL_STATE()->auxilary_buffer, msg, strlen(msg));
+	synchronization_lock();
+}
 
 uint64_t get_rip(CPUState *cpu){
 	kvm_arch_get_registers(cpu);
@@ -33,26 +39,49 @@ int get_capstone_mode(int word_width_in_bits){
 	}
 }
 
+nyx_coverage_bitmap_copy_t* new_coverage_bitmaps(void){
+	nyx_coverage_bitmap_copy_t* bitmaps = malloc(sizeof(nyx_coverage_bitmap_copy_t));
+	memset(bitmaps, 0, sizeof(nyx_coverage_bitmap_copy_t));
+
+	assert(GET_GLOBAL_STATE()->shared_bitmap_size);
+	bitmaps->coverage_bitmap = malloc(GET_GLOBAL_STATE()->shared_bitmap_size);
+
+	assert(GET_GLOBAL_STATE()->shared_ijon_bitmap_size);
+	bitmaps->ijon_bitmap_buffer = malloc(GET_GLOBAL_STATE()->shared_ijon_bitmap_size);
+
+	return bitmaps;
+}
+
 void coverage_bitmap_reset(void){
 	if(GET_GLOBAL_STATE()->shared_bitmap_ptr){
-    //fprintf(stderr, "%s: %lx %lx\n", __func__, coverage_bitmap, coverage_bitmap_size);
-		memset(GET_GLOBAL_STATE()->shared_bitmap_ptr, 0x00, GET_GLOBAL_STATE()->shared_bitmap_size + GET_GLOBAL_STATE()->shared_ijon_bitmap_size);
+		memset(GET_GLOBAL_STATE()->shared_bitmap_ptr, 0x00, GET_GLOBAL_STATE()->shared_bitmap_real_size);
+	}
+	if (GET_GLOBAL_STATE()->shared_ijon_bitmap_ptr && GET_GLOBAL_STATE()->shared_ijon_bitmap_size){
+		memset(GET_GLOBAL_STATE()->shared_ijon_bitmap_ptr, 0x00, GET_GLOBAL_STATE()->shared_ijon_bitmap_size);
 	}
 }
 
-void coverage_bitmap_copy_to_buffer(void* buffer){
+void coverage_bitmap_copy_to_buffer(nyx_coverage_bitmap_copy_t* buffer){
+
 	if(GET_GLOBAL_STATE()->shared_bitmap_ptr){
-		memcpy(buffer, GET_GLOBAL_STATE()->shared_bitmap_ptr, GET_GLOBAL_STATE()->shared_bitmap_size + GET_GLOBAL_STATE()->shared_ijon_bitmap_size);
+		memcpy(buffer->coverage_bitmap, GET_GLOBAL_STATE()->shared_bitmap_ptr, GET_GLOBAL_STATE()->shared_bitmap_real_size);
+	}
+	if (GET_GLOBAL_STATE()->shared_ijon_bitmap_ptr){
+		memcpy(buffer->ijon_bitmap_buffer, GET_GLOBAL_STATE()->shared_ijon_bitmap_ptr, GET_GLOBAL_STATE()->shared_ijon_bitmap_size);
 	}
 }
 
-void coverage_bitmap_copy_from_buffer(void* buffer){
+void coverage_bitmap_copy_from_buffer(nyx_coverage_bitmap_copy_t* buffer){
+
 	if(GET_GLOBAL_STATE()->shared_bitmap_ptr){
-		memcpy(GET_GLOBAL_STATE()->shared_bitmap_ptr, buffer, GET_GLOBAL_STATE()->shared_bitmap_size + GET_GLOBAL_STATE()->shared_ijon_bitmap_size);
+		memcpy(GET_GLOBAL_STATE()->shared_bitmap_ptr, buffer->coverage_bitmap, GET_GLOBAL_STATE()->shared_bitmap_real_size);
+	}
+	if (GET_GLOBAL_STATE()->shared_ijon_bitmap_ptr){
+		memcpy(GET_GLOBAL_STATE()->shared_ijon_bitmap_ptr, buffer->ijon_bitmap_buffer, GET_GLOBAL_STATE()->shared_ijon_bitmap_size);
 	}
 }
 
-void apply_capabilities(CPUState *cpu){
+bool apply_capabilities(CPUState *cpu){
 	//X86CPU *cpux86 = X86_CPU(cpu);
   //CPUX86State *env = &cpux86->env;
 
@@ -74,7 +103,8 @@ void apply_capabilities(CPUState *cpu){
 		debug_printf("--------------------------\n");
 
 		if(GET_GLOBAL_STATE()->cap_compile_time_tracing_buffer_vaddr&0xfff){
-			fprintf(stderr, "[QEMU-Nyx] Warning: guest's trace bitmap v_addr (0x%lx) is not page aligned!\n", GET_GLOBAL_STATE()->cap_compile_time_tracing_buffer_vaddr);
+			fprintf(stderr, "[QEMU-Nyx] Error: guest's trace bitmap v_addr (0x%lx) is not page aligned!\n", GET_GLOBAL_STATE()->cap_compile_time_tracing_buffer_vaddr);
+			return false;
 		}
 
 		for(uint64_t i = 0; i < GET_GLOBAL_STATE()->shared_bitmap_size; i += 0x1000){
@@ -84,18 +114,20 @@ void apply_capabilities(CPUState *cpu){
 	}
 	
 	if(GET_GLOBAL_STATE()->cap_ijon_tracing){
-		debug_fprintf(stderr, "%s: agent trace buffer at vaddr: %lx\n", __func__, GET_GLOBAL_STATE()->cap_ijon_tracing_buffer_vaddr);
+		debug_printf(stderr, "%s: agent trace buffer at vaddr: %lx\n", __func__, GET_GLOBAL_STATE()->cap_ijon_tracing_buffer_vaddr);
 
 		if(GET_GLOBAL_STATE()->cap_ijon_tracing_buffer_vaddr&0xfff){
-			fprintf(stderr, "[QEMU-Nyx] Warning: guest's ijon buffer v_addr (0x%lx) is not page aligned!\n", GET_GLOBAL_STATE()->cap_ijon_tracing_buffer_vaddr);
+			fprintf(stderr, "[QEMU-Nyx] Error: guest's ijon buffer v_addr (0x%lx) is not page aligned!\n", GET_GLOBAL_STATE()->cap_ijon_tracing_buffer_vaddr);
+			return false;
 		}
 
 		kvm_arch_get_registers_fast(cpu);
 		for(uint64_t i = 0; i < GET_GLOBAL_STATE()->shared_ijon_bitmap_size; i += 0x1000){
-			assert(remap_slot(GET_GLOBAL_STATE()->cap_ijon_tracing_buffer_vaddr + i, (GET_GLOBAL_STATE()->shared_bitmap_size+i)/0x1000, cpu, GET_GLOBAL_STATE()->shared_bitmap_fd, GET_GLOBAL_STATE()->shared_bitmap_size+GET_GLOBAL_STATE()->shared_ijon_bitmap_size, true, GET_GLOBAL_STATE()->cap_cr3));
+			assert(remap_slot(GET_GLOBAL_STATE()->cap_ijon_tracing_buffer_vaddr + i, i/0x1000, cpu, GET_GLOBAL_STATE()->shared_ijon_bitmap_fd, GET_GLOBAL_STATE()->shared_ijon_bitmap_size+GET_GLOBAL_STATE()->shared_ijon_bitmap_size, true, GET_GLOBAL_STATE()->cap_cr3));
 		}
 		set_cap_agent_ijon_trace_bitmap(GET_GLOBAL_STATE()->auxilary_buffer, true);
 	}
+	return true;
 }
 
 bool folder_exits(const char* path){

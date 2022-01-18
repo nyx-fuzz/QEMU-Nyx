@@ -37,6 +37,15 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 
 #define ADD_PADDING(max, type) uint8_t type ## _padding [max - sizeof(type)]
 
+enum nyx_result_codes {
+  rc_success = 0,
+  rc_crash = 1,
+  rc_hprintf = 2,
+  rc_timeout = 3,
+  rc_input_buffer_write = 4,
+  rc_aborted = 5,
+};
+
 typedef struct auxilary_buffer_header_s{
   uint64_t magic;   /* 0x54502d554d4551 */
   uint16_t version; 
@@ -93,40 +102,21 @@ typedef struct auxilary_buffer_result_s{
       3 -> ready to fuzz
   */
   uint8_t state; 
-  /* snapshot extension */
-  uint8_t tmp_snapshot_created;
-
-  /* FML */
-  uint8_t padding_1;
-  uint8_t padding_2;
-
-  uint32_t bb_coverage; 
-
-  uint8_t padding_3;
-  uint8_t padding_4;
-
-  uint8_t hprintf;
-  uint8_t exec_done; 
-
-  uint8_t crash_found; 
-  uint8_t asan_found; 
-
-  uint8_t timeout_found; 
+  uint8_t exec_done;
+  uint8_t exec_result_code;
   uint8_t reloaded;
 
   uint8_t pt_overflow;
-  uint8_t runtime_sec;
-  
   uint8_t page_not_found;
-  uint8_t success;
+  uint8_t tmp_snapshot_created; /* incremental snapshot extension */
+  uint8_t padding_3;
 
-  uint32_t runtime_usec;
   uint64_t page_addr; 
   uint32_t dirty_pages; 
-  uint32_t pt_trace_size; 
-
-  uint8_t payload_buffer_write_attempt_found;
-  uint8_t abort; 
+  uint32_t pt_trace_size;
+  uint32_t bb_coverage; 
+  uint32_t runtime_usec;
+  uint32_t runtime_sec;
 
   /* more to come */
 } __attribute__((packed)) auxilary_buffer_result_t;
@@ -158,19 +148,16 @@ typedef struct auxilary_buffer_s{
 void init_auxiliary_buffer(auxilary_buffer_t* auxilary_buffer);
 void check_auxiliary_config_buffer(auxilary_buffer_t* auxilary_buffer, auxilary_buffer_config_t* shadow_config);
 
-void flush_hprintf_auxiliary_buffer(auxilary_buffer_t* auxilary_buffer);
-
 void set_crash_auxiliary_result_buffer(auxilary_buffer_t* auxilary_buffer);
-void set_asan_auxiliary_result_buffer(auxilary_buffer_t* auxilary_buffer);
 void set_timeout_auxiliary_result_buffer(auxilary_buffer_t* auxilary_buffer);
 void set_reload_auxiliary_result_buffer(auxilary_buffer_t* auxilary_buffer);
 void set_pt_overflow_auxiliary_result_buffer(auxilary_buffer_t* auxilary_buffer);
-void flush_auxiliary_result_buffer(auxilary_buffer_t* auxilary_buffer);
-void set_exec_done_auxiliary_result_buffer(auxilary_buffer_t* auxilary_buffer, uint8_t sec, uint32_t usec);
+void set_exec_done_auxiliary_result_buffer(auxilary_buffer_t* auxilary_buffer, uint8_t sec, uint32_t usec, uint32_t num_dirty_pages);
 void set_state_auxiliary_result_buffer(auxilary_buffer_t* auxilary_buffer, uint8_t state);
 void set_hprintf_auxiliary_buffer(auxilary_buffer_t* auxilary_buffer, char* msg, uint32_t len);
 
 void set_page_not_found_result_buffer(auxilary_buffer_t* auxilary_buffer, uint64_t page_addr);
+void reset_page_not_found_result_buffer(auxilary_buffer_t* auxilary_buffer);
 void set_success_auxiliary_result_buffer(auxilary_buffer_t* auxilary_buffer, uint8_t success);
 void set_crash_reason_auxiliary_buffer(auxilary_buffer_t* auxilary_buffer, char* msg, uint32_t len);
 void set_abort_reason_auxiliary_buffer(auxilary_buffer_t* auxilary_buffer, char* msg, uint32_t len);

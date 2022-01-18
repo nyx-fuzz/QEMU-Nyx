@@ -43,7 +43,7 @@ enum mem_mode {
 	mm_64_l5_paging,    /* 32 Bit / L5 Paging */
 };
 
-struct state_qemu_pt{
+typedef struct qemu_nyx_state_s{
 
     /* set if FDL backend is used (required to perform some additional runtime tests) */
     bool nyx_fdl;
@@ -91,11 +91,16 @@ struct state_qemu_pt{
 
     /* mmap Options (not migratable) */
     int shared_bitmap_fd;
-    uint32_t shared_bitmap_size;
-    uint32_t shared_ijon_bitmap_size;
+    uint32_t shared_bitmap_size;        /* size of the shared memory file */
+    uint32_t shared_bitmap_real_size;   /* actual size of the bitmap */
+    void* shared_bitmap_ptr;
+
     int shared_payload_buffer_fd;
     uint32_t shared_payload_buffer_size;
-    void* shared_bitmap_ptr;
+
+    int shared_ijon_bitmap_fd;
+    uint32_t shared_ijon_bitmap_size;
+    void* shared_ijon_bitmap_ptr;
 
     /* Intel PT Options (migratable) */
     bool pt_ip_filter_configured[4];
@@ -103,7 +108,6 @@ struct state_qemu_pt{
     uint64_t pt_ip_filter_b[4];
 
     /* OPTIONS (MIGRATABLE VIA FAST SNAPSHOTS) */
-    bool enable_hprintf; 
     uint64_t parent_cr3;
     uint8_t disassembler_word_width;
     bool nested; 
@@ -132,6 +136,8 @@ struct state_qemu_pt{
 
     bool in_redqueen_reload_mode;
 
+    uint32_t num_dirty_pages;
+
     /* capabilites */
     uint8_t cap_timeout_detection;
     uint8_t cap_only_reload_mode;
@@ -146,9 +152,9 @@ struct state_qemu_pt{
     sharedir_t* sharedir;
 
     QTAILQ_HEAD(, kvm_sw_breakpoint) redqueen_breakpoints;
-};
+} qemu_nyx_state_t;
 
-extern struct state_qemu_pt global_state;
+extern qemu_nyx_state_t global_state;
 
 #define GET_GLOBAL_STATE() (&global_state)
 
@@ -168,9 +174,6 @@ page_cache_t* get_page_cache(void);
 void init_redqueen_state(void);
 
 redqueen_t* get_redqueen_state(void);
-
-void dump_global_state(const char* filename_prefix);
-void load_global_state(const char* filename_prefix);
 
 void init_aux_buffer(const char* filename);
 void set_fast_reload_pre_path(const char* path);

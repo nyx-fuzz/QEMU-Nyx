@@ -51,7 +51,8 @@ static void nyx_snapshot_user_fdl_reset(nyx_fdl_user_t* self){
 }
 
 /* reset operation */
-void nyx_snapshot_user_fdl_restore(nyx_fdl_user_t* self, shadow_memory_t* shadow_memory_state, snapshot_page_blocklist_t* blocklist){
+uint32_t nyx_snapshot_user_fdl_restore(nyx_fdl_user_t* self, shadow_memory_t* shadow_memory_state, snapshot_page_blocklist_t* blocklist){
+    uint32_t num_dirty_pages = 0;
     if(self){
 
         void* current_region = NULL;
@@ -85,6 +86,7 @@ void nyx_snapshot_user_fdl_restore(nyx_fdl_user_t* self, shadow_memory_t* shadow
 #endif
                 clear_bit(entry_offset_addr>>12, (void*)self->entry[i].bitmap);
                 memcpy(host_addr, snapshot_addr, TARGET_PAGE_SIZE);
+                num_dirty_pages++;
             }
 
         }
@@ -92,6 +94,7 @@ void nyx_snapshot_user_fdl_restore(nyx_fdl_user_t* self, shadow_memory_t* shadow
     }
 
     nyx_snapshot_user_fdl_reset(self);
+    return num_dirty_pages;
 }
 
 /* set operation (mark pf as dirty) */ 

@@ -4,7 +4,7 @@
 #include "nyx/debug.h"
 #include "exec/ram_addr.h"
 #include "qemu/rcu_queue.h"
-#include "nyx/state.h"
+#include "nyx/state/state.h"
 #include "sysemu/kvm.h"
 #include "pt.h"
 

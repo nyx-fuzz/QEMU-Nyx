@@ -8,7 +8,7 @@
 #include "sysemu/sysemu.h"
 #include "sysemu/kvm.h"
 #include "nyx/debug.h"
-#include "nyx/state.h"
+#include "nyx/state/state.h"
 #include <sys/syscall.h>
 #include <linux/kvm.h>
 #include "qemu/main-loop.h"
@@ -214,6 +214,7 @@ static inline bool synchronization_check_page_not_found(void){
 		kvm_remove_all_breakpoints(qemu_get_cpu(0));
 		kvm_vcpu_ioctl(qemu_get_cpu(0), KVM_VMX_PT_DISABLE_PAGE_DUMP_CR3);
 		kvm_vcpu_ioctl(qemu_get_cpu(0), KVM_VMX_PT_DISABLE_MTF);
+		reset_page_not_found_result_buffer(GET_GLOBAL_STATE()->auxilary_buffer);
 		failure = true;
 	}
 
@@ -241,9 +242,6 @@ void synchronization_lock_hprintf(void){
 
 	pthread_cond_wait(&synchronization_lock_condition, &synchronization_lock_mutex);
 	pthread_mutex_unlock(&synchronization_lock_mutex);
-
-	flush_hprintf_auxiliary_buffer(GET_GLOBAL_STATE()->auxilary_buffer);
-
 }
 void synchronization_lock(void){
 
@@ -255,7 +253,8 @@ void synchronization_lock(void){
 	}
 	set_exec_done_auxiliary_result_buffer(GET_GLOBAL_STATE()->auxilary_buffer,
 											GET_GLOBAL_STATE()->timeout_detector.timeout_sec - GET_GLOBAL_STATE()->timeout_detector.arm_timeout.it_value.tv_sec,
-											GET_GLOBAL_STATE()->timeout_detector.timeout_usec - (uint32_t)GET_GLOBAL_STATE()->timeout_detector.arm_timeout.it_value.tv_usec);
+											GET_GLOBAL_STATE()->timeout_detector.timeout_usec - (uint32_t)GET_GLOBAL_STATE()->timeout_detector.arm_timeout.it_value.tv_usec,
+											GET_GLOBAL_STATE()->num_dirty_pages);
 	/*
 	if(last_timeout){
 		reset_timeout_detector_timeout(&(GET_GLOBAL_STATE()->timeout_detector));
@@ -291,7 +290,6 @@ void synchronization_lock(void){
 	pthread_cond_wait(&synchronization_lock_condition, &synchronization_lock_mutex);
 	pthread_mutex_unlock(&synchronization_lock_mutex);
 
-	flush_auxiliary_result_buffer(GET_GLOBAL_STATE()->auxilary_buffer);
 	check_auxiliary_config_buffer(GET_GLOBAL_STATE()->auxilary_buffer, &GET_GLOBAL_STATE()->shadow_config);
 	set_success_auxiliary_result_buffer(GET_GLOBAL_STATE()->auxilary_buffer, 1);
 
@@ -329,25 +327,6 @@ void synchronization_lock_crash_found(void){
 	handle_tmp_snapshot_state();
 
 	set_crash_auxiliary_result_buffer(GET_GLOBAL_STATE()->auxilary_buffer);
-	
-	perform_reload();
-
-	//synchronization_lock();
-
-	in_fuzzing_loop = false;
-}
-
-void synchronization_lock_asan_found(void){
-	if(!in_fuzzing_loop){
-		fprintf(stderr, "<%d-%ld>\t%s [NOT IN FUZZING LOOP]\n", getpid(), run_counter, __func__);
-		set_success_auxiliary_result_buffer(GET_GLOBAL_STATE()->auxilary_buffer, 0);
-	}
-
-	pt_disable(qemu_get_cpu(0), false);
-
-	handle_tmp_snapshot_state();
-
-	set_asan_auxiliary_result_buffer(GET_GLOBAL_STATE()->auxilary_buffer);
 	
 	perform_reload();
 

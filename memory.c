@@ -36,7 +36,7 @@
 #include "migration/vmstate.h"
 
 #ifdef QEMU_NYX
-#include "nyx/state.h"
+#include "nyx/state/state.h"
 #include "nyx/fast_vm_reload.h"
 #endif
 

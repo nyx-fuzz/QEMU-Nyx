@@ -49,7 +49,7 @@
 #include "nyx/hypercall/hypercall.h"
 #include "nyx/synchronization.h"
 #include "nyx/debug.h"
-#include "nyx/state.h"
+#include "nyx/state/state.h"
 #include "nyx/interface.h"
 #include "nyx/fast_vm_reload_sync.h"
 #include "nyx/snapshot/memory/backend/nyx_dirty_ring.h"
@@ -2866,11 +2866,6 @@ int kvm_device_access(int fd, int group, uint64_t attr,
     return err;
 }
 
-#ifdef QEMU_NYX
-int kvm_has_vapic(void){
-    return !kvm_check_extension(kvm_state, KVM_CAP_VAPIC);
-}
-#endif
 
 bool kvm_has_sync_mmu(void)
 {

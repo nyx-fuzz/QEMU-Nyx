@@ -395,7 +395,7 @@ void shadow_memory_serialize(shadow_memory_t* self, const char* snapshot_folder)
 }
 
 bool shadow_memory_read_physical_memory(shadow_memory_t* self, uint64_t address, void* ptr, size_t size){
-
+    
     assert(size == 0x1000 && (address & 0xFFFULL) == 0); /* remove this limitation later */
 
     if(address < self->memory_size){

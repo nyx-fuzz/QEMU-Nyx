@@ -48,7 +48,7 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 #include "nyx/snapshot/devices/state_reallocation.h"
 #include "nyx/memory_access.h"
 #include <sys/ioctl.h>
-#include "nyx/state.h"
+#include "nyx/state/state.h"
 #include "nyx/sharedir.h"
 #include "nyx/helpers.h"
 
@@ -85,10 +85,9 @@ typedef struct nyx_interface_state {
 	char* filter_bitmap[4];
 	char* ip_filter[4][2];
 
-	uint64_t bitmap_size;
+	uint32_t bitmap_size;
+	uint32_t input_buffer_size;
 
-	bool debug_mode; 	/* support for hprintf */
-	bool notifier;
 	bool dump_pt_trace;
 
 	bool redqueen;
@@ -183,6 +182,7 @@ static void nyx_guest_setup_bitmap(nyx_interface_state *s, char* filename, uint3
 	GET_GLOBAL_STATE()->shared_bitmap_ptr = (void*)ptr;
 	GET_GLOBAL_STATE()->shared_bitmap_fd = fd;
 	GET_GLOBAL_STATE()->shared_bitmap_size = bitmap_size;
+	GET_GLOBAL_STATE()->shared_bitmap_real_size = bitmap_size;
 }
 
 
@@ -197,12 +197,9 @@ static void nyx_guest_setup_ijon_buffer(nyx_interface_state *s, char* filename){
 	assert(DEFAULT_NYX_IJON_BITMAP_SIZE == st.st_size);
 	ptr = mmap(0, DEFAULT_NYX_IJON_BITMAP_SIZE, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
 	
-	/*
-	GET_GLOBAL_STATE()->shared_bitmap_ptr = (void*)ptr;
-	GET_GLOBAL_STATE()->shared_bitmap_fd = fd;
-	GET_GLOBAL_STATE()->shared_bitmap_size = bitmap_size-DEFAULT_NYX_IJON_BITMAP_SIZE;
+	GET_GLOBAL_STATE()->shared_ijon_bitmap_ptr = (void*)ptr;
+	GET_GLOBAL_STATE()->shared_ijon_bitmap_fd = fd;
 	GET_GLOBAL_STATE()->shared_ijon_bitmap_size = DEFAULT_NYX_IJON_BITMAP_SIZE;
-	*/
 }
 
 static bool verify_workdir_state(nyx_interface_state *s, Error **errp){
@@ -238,7 +235,7 @@ static bool verify_workdir_state(nyx_interface_state *s, Error **errp){
 		return false;
 	}
 	else {
-		nyx_create_payload_buffer(s, PAYLOAD_SIZE, tmp, errp);
+		nyx_create_payload_buffer(s, s->input_buffer_size, tmp, errp);
 	}
 	free(tmp);
 
@@ -304,8 +301,8 @@ static bool verify_workdir_state(nyx_interface_state *s, Error **errp){
 
   if(s->dump_pt_trace){
 	  assert(asprintf(&tmp, "%s/pt_trace_dump_%d", workdir, id) != -1);
-    pt_open_pt_trace_file(tmp);
-    free(tmp);
+    	pt_open_pt_trace_file(tmp);
+    	free(tmp);
   }
 
 
@@ -391,8 +388,6 @@ static void nyx_realize(DeviceState *dev, Error **errp){
 		s->bitmap_size = DEFAULT_NYX_BITMAP_SIZE;
 	}
 
-	assert((uint32_t)s->bitmap_size > (0x1000 + DEFAULT_NYX_IJON_BITMAP_SIZE));
-	assert((((uint32_t)s->bitmap_size-DEFAULT_NYX_IJON_BITMAP_SIZE) & (((uint32_t)s->bitmap_size-DEFAULT_NYX_IJON_BITMAP_SIZE) - 1)) == 0 );
 
 	if(s->worker_id == 0xFFFF){
 		fprintf(stderr, "[QEMU-Nyx] Error: Invalid worker id...\n");
@@ -421,14 +416,6 @@ static void nyx_realize(DeviceState *dev, Error **errp){
 	}
 
 	check_available_ipt_ranges(s);
-	
-	if(s->debug_mode){
-		GET_GLOBAL_STATE()->enable_hprintf = true;
-	}
-
-	if(s->notifier){
-		enable_notifies();
-	}
 
 	pt_setup_enable_hypercalls();
 	init_crash_handler();
@@ -458,9 +445,8 @@ static Property nyx_interface_properties[] = {
 	DEFINE_PROP_STRING("ip3_b", nyx_interface_state, ip_filter[3][1]),
 
 
-	DEFINE_PROP_UINT64("bitmap_size", nyx_interface_state, bitmap_size, DEFAULT_NYX_BITMAP_SIZE),
-	DEFINE_PROP_BOOL("debug_mode", nyx_interface_state, debug_mode, false),
-	DEFINE_PROP_BOOL("crash_notifier", nyx_interface_state, notifier, true),
+	DEFINE_PROP_UINT32("bitmap_size", nyx_interface_state, bitmap_size, DEFAULT_NYX_BITMAP_SIZE),
+	DEFINE_PROP_UINT32("input_buffer_size", nyx_interface_state, input_buffer_size, DEFAULT_NYX_BITMAP_SIZE),
 	DEFINE_PROP_BOOL("dump_pt_trace", nyx_interface_state, dump_pt_trace, false),
 
 

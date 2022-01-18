@@ -23,7 +23,7 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 #include <string.h>
 #include <stdio.h>
 #include <stdbool.h>
-#include "nyx/state.h"
+#include "nyx/state/state.h"
 #include "nyx/debug.h"
 
 /* experimental feature (currently broken)
@@ -161,15 +161,11 @@ void check_auxiliary_config_buffer(auxilary_buffer_t* auxilary_buffer, auxilary_
 }
 
 void set_crash_auxiliary_result_buffer(auxilary_buffer_t* auxilary_buffer){
-  VOLATILE_WRITE_8(auxilary_buffer->result.crash_found, 1);
-}
-
-void set_asan_auxiliary_result_buffer(auxilary_buffer_t* auxilary_buffer){
-  VOLATILE_WRITE_8(auxilary_buffer->result.asan_found, 1);
+  VOLATILE_WRITE_8(auxilary_buffer->result.exec_result_code, rc_crash);
 }
 
 void set_timeout_auxiliary_result_buffer(auxilary_buffer_t* auxilary_buffer){
-  VOLATILE_WRITE_8(auxilary_buffer->result.timeout_found, 1);
+  VOLATILE_WRITE_8(auxilary_buffer->result.exec_result_code, rc_timeout);
 }
 
 void set_reload_auxiliary_result_buffer(auxilary_buffer_t* auxilary_buffer){
@@ -180,65 +176,32 @@ void set_pt_overflow_auxiliary_result_buffer(auxilary_buffer_t* auxilary_buffer)
   VOLATILE_WRITE_8(auxilary_buffer->result.pt_overflow, 1);
 }
 
-void set_exec_done_auxiliary_result_buffer(auxilary_buffer_t* auxilary_buffer, uint8_t sec, uint32_t usec){
+void set_exec_done_auxiliary_result_buffer(auxilary_buffer_t* auxilary_buffer, uint8_t sec, uint32_t usec, uint32_t num_dirty_pages){
   VOLATILE_WRITE_8(auxilary_buffer->result.exec_done, 1);
 
-  VOLATILE_WRITE_8(auxilary_buffer->result.runtime_sec, sec);
+  VOLATILE_WRITE_32(auxilary_buffer->result.runtime_sec, sec);
   VOLATILE_WRITE_32(auxilary_buffer->result.runtime_usec, usec);
+  VOLATILE_WRITE_32(auxilary_buffer->result.dirty_pages, num_dirty_pages);
 }
 
-void flush_auxiliary_result_buffer(auxilary_buffer_t* auxilary_buffer){
 
-  memset(&auxilary_buffer->result.hprintf, 0x0, sizeof(auxilary_buffer_result_t)-2);
-
-
-  //memset(&(auxilary_buffer->result) + offsetof(auxilary_buffer_result_t, hprintf), 0x0, sizeof(auxilary_buffer_result_t) - offsetof(auxilary_buffer_result_t, hprintf));
-
-  /*
-  VOLATILE_WRITE_8(auxilary_buffer->result.exec_done, 0);
-  VOLATILE_WRITE_8(auxilary_buffer->result.hprintf, 0);
-
-
-  VOLATILE_WRITE_8(auxilary_buffer->result.crash_found, 0);
-  VOLATILE_WRITE_8(auxilary_buffer->result.asan_found, 0);
-  VOLATILE_WRITE_8(auxilary_buffer->result.timeout_found, 0);
-  VOLATILE_WRITE_8(auxilary_buffer->result.reloaded, 0);
-  VOLATILE_WRITE_8(auxilary_buffer->result.pt_overflow, 0);
-
-  VOLATILE_WRITE_8(auxilary_buffer->result.runtime_sec, 0);
-  VOLATILE_WRITE_32(auxilary_buffer->result.runtime_usec, 0);
-
-  VOLATILE_WRITE_8(auxilary_buffer->result.page_not_found, 0);
-  VOLATILE_WRITE_64(auxilary_buffer->result.page_addr, 0);
-
-  VOLATILE_WRITE_8(auxilary_buffer->result.payload_buffer_write_attempt_found, 0);
-  
-  VOLATILE_WRITE_32(auxilary_buffer->result.dirty_pages, 0);
-  VOLATILE_WRITE_32(auxilary_buffer->result.pt_trace_size, 0);
-  */
-
-}
 
 void set_hprintf_auxiliary_buffer(auxilary_buffer_t* auxilary_buffer, char* msg, uint32_t len){
   VOLATILE_WRITE_16(auxilary_buffer->misc.len, MIN(len, MISC_SIZE-2));
   volatile_memcpy((void*)&auxilary_buffer->misc.data, (void*)msg, (size_t)MIN(len, MISC_SIZE-2));
-  VOLATILE_WRITE_8(auxilary_buffer->result.hprintf, 1);
+  VOLATILE_WRITE_8(auxilary_buffer->result.exec_result_code, rc_hprintf);
 }
 
 void set_crash_reason_auxiliary_buffer(auxilary_buffer_t* auxilary_buffer, char* msg, uint32_t len){
   VOLATILE_WRITE_16(auxilary_buffer->misc.len, MIN(len, MISC_SIZE-2));
   volatile_memcpy((void*)&auxilary_buffer->misc.data, (void*)msg, (size_t) MIN(len, MISC_SIZE-2));
-  VOLATILE_WRITE_8(auxilary_buffer->result.crash_found, 1);
+  VOLATILE_WRITE_8(auxilary_buffer->result.exec_result_code, rc_crash);
 }
 
 void set_abort_reason_auxiliary_buffer(auxilary_buffer_t* auxilary_buffer, char* msg, uint32_t len){
   VOLATILE_WRITE_16(auxilary_buffer->misc.len, MIN(len, MISC_SIZE-2));
   volatile_memcpy((void*)&auxilary_buffer->misc.data, (void*)msg, (size_t) MIN(len, MISC_SIZE-2));
-  VOLATILE_WRITE_8(auxilary_buffer->result.abort, 1);
-}
-
-void flush_hprintf_auxiliary_buffer(auxilary_buffer_t* auxilary_buffer){
-  VOLATILE_WRITE_8(auxilary_buffer->result.hprintf, 0);
+  VOLATILE_WRITE_8(auxilary_buffer->result.exec_result_code, rc_aborted);
 }
 
 void set_state_auxiliary_result_buffer(auxilary_buffer_t* auxilary_buffer, uint8_t state){
@@ -255,14 +218,18 @@ void set_page_not_found_result_buffer(auxilary_buffer_t* auxilary_buffer, uint64
   VOLATILE_WRITE_64(auxilary_buffer->result.page_addr, page_addr);
 }
 
+void reset_page_not_found_result_buffer(auxilary_buffer_t* auxilary_buffer){
+  VOLATILE_WRITE_8(auxilary_buffer->result.page_not_found, 0);
+}
+
 void set_success_auxiliary_result_buffer(auxilary_buffer_t* auxilary_buffer, uint8_t success){
-  VOLATILE_WRITE_8(auxilary_buffer->result.success, success);
+  VOLATILE_WRITE_8(auxilary_buffer->result.exec_result_code, rc_success);
 }
 
 void set_payload_buffer_write_reason_auxiliary_buffer(auxilary_buffer_t* auxilary_buffer, char* msg, uint32_t len){
   VOLATILE_WRITE_16(auxilary_buffer->misc.len, MIN(len, MISC_SIZE-2));
   volatile_memcpy((void*)&auxilary_buffer->misc.data, (void*)msg, (size_t) MIN(len, MISC_SIZE-2));
-  VOLATILE_WRITE_8(auxilary_buffer->result.payload_buffer_write_attempt_found, 1);
+  VOLATILE_WRITE_8(auxilary_buffer->result.exec_result_code, rc_input_buffer_write);
 }
 
 

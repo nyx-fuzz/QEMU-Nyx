@@ -38,7 +38,7 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 #include "nyx/redqueen_patch.h"
 #include "nyx/patcher.h"
 #include "nyx/page_cache.h"
-#include "nyx/state.h"
+#include "nyx/state/state.h"
 #include <libxdc.h>
 #include "nyx/helpers.h"
 
@@ -145,7 +145,7 @@ void pt_dump(CPUState *cpu, int bytes){
 					cpu->intel_pt_run_trashed = true;
 					break;
 				case decoder_page_fault:
-					fprintf(stderr, "Page not found => 0x%lx\n", libxdc_get_page_fault_addr(GET_GLOBAL_STATE()->decoder));
+					//fprintf(stderr, "Page not found => 0x%lx\n", libxdc_get_page_fault_addr(GET_GLOBAL_STATE()->decoder));
 					GET_GLOBAL_STATE()->decoder_page_fault = true;
 					GET_GLOBAL_STATE()->decoder_page_fault_addr = libxdc_get_page_fault_addr(GET_GLOBAL_STATE()->decoder);
 					break;
@@ -157,7 +157,7 @@ void pt_dump(CPUState *cpu, int bytes){
 					break;
 			}
 		}
-		}
+	}
 }
 
 

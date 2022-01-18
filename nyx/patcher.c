@@ -2,7 +2,7 @@
 #include "nyx/memory_access.h"
 #include "nyx/disassembler.h"
 #include "debug.h"
-#include "nyx/state.h"
+#include "nyx/state/state.h"
 
 uint8_t cmp_patch_data[] = { 0x38, 0xC0, [2 ... MAX_INSTRUCTION_SIZE]=0x90 }; // CMP AL,AL; NOP, NOP ... 
 const uint8_t *cmp_patch = &cmp_patch_data[0];

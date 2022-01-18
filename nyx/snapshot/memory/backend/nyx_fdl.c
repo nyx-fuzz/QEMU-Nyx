@@ -98,8 +98,9 @@ nyx_fdl_t* nyx_fdl_init(shadow_memory_t* shadow_memory){
 #define MEMSET_BITMAP
 
 #ifdef MEMSET_BITMAP
-static void nyx_snapshot_nyx_fdl_restore_new(nyx_fdl_t* self, shadow_memory_t* shadow_memory_state, snapshot_page_blocklist_t* blocklist){
+static uint32_t nyx_snapshot_nyx_fdl_restore_new(nyx_fdl_t* self, shadow_memory_t* shadow_memory_state, snapshot_page_blocklist_t* blocklist){
 
+    uint32_t num_dirty_pages = 0;
     void* current_region = NULL;
 
     struct fdl_result result;
@@ -142,24 +143,26 @@ static void nyx_snapshot_nyx_fdl_restore_new(nyx_fdl_t* self, shadow_memory_t* s
 
 			clear_bit(entry_offset_addr>>12, (void*)self->entry[i].bitmap);
             memcpy(host_addr, snapshot_addr, TARGET_PAGE_SIZE);
+            num_dirty_pages++;
         }
 
     }
 #ifdef RESET_VRAM
     //nyx_snapshot_nyx_fdl_restore_vram(self, shadow_memory_state);
 #endif
+    return num_dirty_pages;
 }
 
 #endif
 
 /* restore operation */
-void nyx_snapshot_nyx_fdl_restore(nyx_fdl_t* self, shadow_memory_t* shadow_memory_state, snapshot_page_blocklist_t* blocklist){
+uint32_t nyx_snapshot_nyx_fdl_restore(nyx_fdl_t* self, shadow_memory_t* shadow_memory_state, snapshot_page_blocklist_t* blocklist){
 
 /* not sure which one is faster -> benchmark ASAP */
 #ifdef MEMSET_BITMAP
-    nyx_snapshot_nyx_fdl_restore_new(self, shadow_memory_state, blocklist);
+    return nyx_snapshot_nyx_fdl_restore_new(self, shadow_memory_state, blocklist);
 #else
-    nyx_snapshot_nyx_fdl_restore_old(self, shadow_memory_state, blocklist);
+    return nyx_snapshot_nyx_fdl_restore_old(self, shadow_memory_state, blocklist);
 #endif
 
 }

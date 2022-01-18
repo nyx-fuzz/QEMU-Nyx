@@ -47,7 +47,8 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "nyx/fast_vm_reload.h"
 #include "nyx/debug.h"
-#include "nyx/state.h"
+#include "nyx/state/state.h"
+#include "nyx/state/snapshot_state.h"
 
 #include "sysemu/block-backend.h"
 #include "block/qapi.h"
@@ -125,33 +126,36 @@ static void fast_snapshot_init_operation(fast_reload_t* self, const char* snapsh
 
 static void fast_snapshot_restore_operation(fast_reload_t* self){
 
+    uint32_t num_dirty_pages = 0;
+
     switch(mode){
         case RELOAD_MEMORY_MODE_DEBUG:
-            nyx_snapshot_debug_restore(self->shadow_memory_state, self->blocklist, true);
+            num_dirty_pages += nyx_snapshot_debug_restore(self->shadow_memory_state, self->blocklist, true);
             break;
         case RELOAD_MEMORY_MODE_DEBUG_QUIET:
-            nyx_snapshot_debug_restore(self->shadow_memory_state, self->blocklist, false);
+            num_dirty_pages += nyx_snapshot_debug_restore(self->shadow_memory_state, self->blocklist, false);
             break;
         case RELOAD_MEMORY_MODE_FDL:
-            nyx_snapshot_nyx_fdl_restore(self->fdl_state, self->shadow_memory_state, self->blocklist);
+            num_dirty_pages += nyx_snapshot_nyx_fdl_restore(self->fdl_state, self->shadow_memory_state, self->blocklist);
             break;
         case RELOAD_MEMORY_MODE_FDL_DEBUG:
-            nyx_snapshot_nyx_fdl_restore(self->fdl_state, self->shadow_memory_state, self->blocklist);
-            nyx_snapshot_debug_restore(self->shadow_memory_state, self->blocklist, true);
+            num_dirty_pages += nyx_snapshot_nyx_fdl_restore(self->fdl_state, self->shadow_memory_state, self->blocklist);
+            num_dirty_pages += nyx_snapshot_debug_restore(self->shadow_memory_state, self->blocklist, true);
             break;
         case RELOAD_MEMORY_MODE_DIRTY_RING:
-            nyx_snapshot_nyx_dirty_ring_restore(self->dirty_ring_state, self->shadow_memory_state, self->blocklist);
+            num_dirty_pages += nyx_snapshot_nyx_dirty_ring_restore(self->dirty_ring_state, self->shadow_memory_state, self->blocklist);
             break;
         case RELOAD_MEMORY_MODE_DIRTY_RING_DEBUG:
-            nyx_snapshot_nyx_dirty_ring_restore(self->dirty_ring_state, self->shadow_memory_state, self->blocklist);
-            nyx_snapshot_debug_restore(self->shadow_memory_state, self->blocklist, true);
+            num_dirty_pages += nyx_snapshot_nyx_dirty_ring_restore(self->dirty_ring_state, self->shadow_memory_state, self->blocklist);
+            num_dirty_pages += nyx_snapshot_debug_restore(self->shadow_memory_state, self->blocklist, true);
             //assert(false);
             //sleep(1);
             break;
     }
 
-    nyx_snapshot_user_fdl_restore(self->fdl_user_state, self->shadow_memory_state, self->blocklist);
+    num_dirty_pages += nyx_snapshot_user_fdl_restore(self->fdl_user_state, self->shadow_memory_state, self->blocklist);
     //nyx_device_state_post_restore(self->device_state);
+    GET_GLOBAL_STATE()->num_dirty_pages = num_dirty_pages;
 }
 
 static inline void fast_snapshot_pre_create_incremental_operation(fast_reload_t* self){
@@ -279,7 +283,7 @@ inline static void wait_for_snapshot(const char* folder){
     free(lock_file);
 }
 
-void fast_reload_serialize_to_file(fast_reload_t* self, const char* folder){
+void fast_reload_serialize_to_file(fast_reload_t* self, const char* folder, bool is_pre_snapshot){
 
     //printf("================ %s => %s =============\n", __func__, folder);
 
@@ -299,7 +303,7 @@ void fast_reload_serialize_to_file(fast_reload_t* self, const char* folder){
     nyx_block_snapshot_serialize(self->block_state, folder);
     
     /* NYX's state */
-    dump_global_state(folder);
+    serialize_state(folder, is_pre_snapshot);
 
     /* finalize snapshot */
     unlock_snapshot(folder);
@@ -332,7 +336,7 @@ static void fast_reload_create_from_snapshot(fast_reload_t* self, const char* fo
     rcu_read_unlock();
 
     if(!pre_snapshot){
-        load_global_state(folder);
+        deserialize_state(folder);
     }
 
     cpu_synchronize_all_post_init();
@@ -480,10 +484,7 @@ void fast_reload_create_tmp_snapshot(fast_reload_t* self){
     fast_snapshot_pre_create_incremental_operation(self);
 
     if(!self->bitmap_copy){
-        if(GET_GLOBAL_STATE()->shared_bitmap_size+GET_GLOBAL_STATE()->shared_ijon_bitmap_size){
-            assert(GET_GLOBAL_STATE()->shared_bitmap_size+GET_GLOBAL_STATE()->shared_ijon_bitmap_size);
-            self->bitmap_copy = malloc(GET_GLOBAL_STATE()->shared_bitmap_size+GET_GLOBAL_STATE()->shared_ijon_bitmap_size);
-        }
+        self->bitmap_copy = new_coverage_bitmaps();
     }
     coverage_bitmap_copy_to_buffer(self->bitmap_copy);
 

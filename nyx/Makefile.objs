@@ -3,10 +3,9 @@ memory_access.o \
 interface.o \
 fast_vm_reload.o \
 fast_vm_reload_sync.o \
-printk.o synchronization.o \
+synchronization.o \
 page_cache.o \
 kvm_nested.o \
-state.o \
 debug.o \
 auxiliary_buffer.o \
 mmh3.o \
@@ -31,5 +30,7 @@ snapshot/memory/backend/nyx_dirty_ring.o \
 hypercall/hypercall.o \
 hypercall/configuration.o \
 hypercall/debug.o \
+state/state.o \
+state/snapshot_state.o \
 pt.o
 

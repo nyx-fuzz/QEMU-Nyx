@@ -11,7 +11,7 @@
 
 #include "nyx/snapshot/block/nyx_block_snapshot.h"
 #include "nyx/debug.h"
-#include "nyx/state.h"
+#include "nyx/state/state.h"
 
 typedef struct fast_reload_cow_entry_s{
 	uint32_t id; 

@@ -28,7 +28,7 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 #include "patcher.h"
 #include "debug.h"
 #include "redqueen_trace.h"
-#include "nyx/state.h"
+#include "nyx/state/state.h"
 #include <capstone/capstone.h>
 #include <capstone/x86.h>
 

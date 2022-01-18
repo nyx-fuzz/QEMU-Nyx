@@ -54,6 +54,6 @@ typedef struct nyx_fdl_s{
 }nyx_fdl_t;
 
 nyx_fdl_t* nyx_fdl_init(shadow_memory_t* self);
-void nyx_snapshot_nyx_fdl_restore(nyx_fdl_t* self, shadow_memory_t* shadow_memory_state, snapshot_page_blocklist_t* blocklist);
+uint32_t nyx_snapshot_nyx_fdl_restore(nyx_fdl_t* self, shadow_memory_t* shadow_memory_state, snapshot_page_blocklist_t* blocklist);
 
 void nyx_snapshot_nyx_fdl_save_root_pages(nyx_fdl_t* self, shadow_memory_t* shadow_memory_state, snapshot_page_blocklist_t* blocklist);

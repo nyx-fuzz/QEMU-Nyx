@@ -11,7 +11,7 @@
 #include "sysemu/kvm_int.h"
 #include "sysemu/kvm.h"
 #include "sysemu/runstate.h"
-#include "nyx/state.h"
+#include "nyx/state/state.h"
 #include "nyx/fast_vm_reload.h"
 #include "nyx/debug.h"
 #include "nyx/kvm_nested.h"
@@ -127,7 +127,7 @@ static inline void create_root_snapshot(void){
 			debug_printf("===> GET_GLOBAL_STATE()->fast_reload_mode: FALSE\n");
       /* store the current state as a snapshot folder */
       fast_reload_create_in_memory(get_fast_reload_snapshot());
-      fast_reload_serialize_to_file(get_fast_reload_snapshot(), GET_GLOBAL_STATE()->fast_reload_path);
+      fast_reload_serialize_to_file(get_fast_reload_snapshot(), GET_GLOBAL_STATE()->fast_reload_path, false);
     }
 	}
 	else{
@@ -149,7 +149,7 @@ static inline void perform_task_no_block_mode(fast_vm_reload_sync_t* self, FastR
       vm_stop(RUN_STATE_SAVE_VM);
       //fast_reload_create_to_file(get_fast_reload_snapshot(), GET_GLOBAL_STATE()->fast_reload_pre_path, true);
       fast_reload_create_in_memory(get_fast_reload_snapshot());
-      fast_reload_serialize_to_file(get_fast_reload_snapshot(), GET_GLOBAL_STATE()->fast_reload_pre_path);
+      fast_reload_serialize_to_file(get_fast_reload_snapshot(), GET_GLOBAL_STATE()->fast_reload_pre_path, true);
 
       qemu_system_shutdown_request(SHUTDOWN_CAUSE_GUEST_SHUTDOWN);
       qemu_mutex_unlock_iothread();
@@ -218,7 +218,7 @@ static inline void perform_task_block_mode(fast_vm_reload_sync_t* self, FastRelo
       vm_stop(RUN_STATE_SAVE_VM);
       //fast_reload_create_to_file(get_fast_reload_snapshot(), GET_GLOBAL_STATE()->fast_reload_pre_path, true);
       fast_reload_create_in_memory(get_fast_reload_snapshot());
-      fast_reload_serialize_to_file(get_fast_reload_snapshot(), GET_GLOBAL_STATE()->fast_reload_pre_path);
+      fast_reload_serialize_to_file(get_fast_reload_snapshot(), GET_GLOBAL_STATE()->fast_reload_pre_path, true);
       qemu_system_shutdown_request(SHUTDOWN_CAUSE_GUEST_SHUTDOWN);
       return; /* return here to skip the vm_start call */
     case REQUEST_SAVE_SNAPSHOT_ROOT_FIX_RIP:

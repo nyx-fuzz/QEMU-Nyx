@@ -35,7 +35,7 @@
 #include "qemu/error-report.h"
 #include "trace.h"
 #ifdef QEMU_NYX
-#include "nyx/state.h"
+#include "nyx/state/state.h"
 #endif
 
 //#define DEBUG_SERIAL

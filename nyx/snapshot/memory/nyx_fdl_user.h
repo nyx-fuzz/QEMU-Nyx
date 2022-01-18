@@ -21,5 +21,5 @@ nyx_fdl_user_t* nyx_fdl_user_init(shadow_memory_t* shadow_memory_state);
 void nyx_fdl_user_enable(nyx_fdl_user_t* self);
 void nyx_fdl_user_set(nyx_fdl_user_t* self, shadow_memory_t* shadow_memory_state, nyx_fdl_t* nyx_fdl_state, uint64_t addr, uint64_t length);
 
-void nyx_snapshot_user_fdl_restore(nyx_fdl_user_t* self, shadow_memory_t* shadow_memory_state, snapshot_page_blocklist_t* blocklist);
+uint32_t nyx_snapshot_user_fdl_restore(nyx_fdl_user_t* self, shadow_memory_t* shadow_memory_state, snapshot_page_blocklist_t* blocklist);
 void nyx_snapshot_nyx_fdl_user_save_root_pages(nyx_fdl_user_t* self, shadow_memory_t* shadow_memory_state, snapshot_page_blocklist_t* blocklist);

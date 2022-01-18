@@ -35,6 +35,7 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 #include "nyx/snapshot/block/nyx_block_snapshot.h"
 
 #include "nyx/snapshot/memory/backend/nyx_dirty_ring.h"
+#include "nyx/helpers.h"
 
 
 typedef enum FastReloadMemoryMode {
@@ -82,7 +83,7 @@ typedef struct fast_reload_s{
 	bool incremental_snapshot_enabled; 
 
 	/* copy of the fuzzing bitmap & ijon state buffer */
-	void* bitmap_copy;
+	nyx_coverage_bitmap_copy_t* bitmap_copy;
 
 
 
@@ -104,7 +105,7 @@ void fast_reload_create_from_file_pre_image(fast_reload_t* self, const char* fol
 void fast_reload_create_in_memory(fast_reload_t* self);
 
 
-void fast_reload_serialize_to_file(fast_reload_t* self, const char* folder);
+void fast_reload_serialize_to_file(fast_reload_t* self, const char* folder, bool is_pre_snapshot);
 
 
 void fast_reload_restore(fast_reload_t* self);

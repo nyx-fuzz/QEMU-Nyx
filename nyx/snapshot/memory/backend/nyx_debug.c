@@ -29,7 +29,9 @@ void nyx_snapshot_debug_enable(fast_reload_t* self){
 }
 
 /* restore operation */
-void nyx_snapshot_debug_restore(shadow_memory_t* shadow_memory_state, snapshot_page_blocklist_t* blocklist, bool verbose){
+uint32_t nyx_snapshot_debug_restore(shadow_memory_t* shadow_memory_state, snapshot_page_blocklist_t* blocklist, bool verbose){
+  uint32_t num_dirty_pages = 0;
+
   void* current_region = NULL;
   int counter = 0;
   for(uint8_t i = 0; i < shadow_memory_state->ram_regions_num; i++){
@@ -59,6 +61,7 @@ void nyx_snapshot_debug_restore(shadow_memory_t* shadow_memory_state, snapshot_p
           }
   
           memcpy(host_addr, snapshot_addr, TARGET_PAGE_SIZE);
+          num_dirty_pages++;
         }
       }
     }
@@ -67,6 +70,7 @@ void nyx_snapshot_debug_restore(shadow_memory_t* shadow_memory_state, snapshot_p
   if(verbose){
     printf("TOTAL: %d\n", counter);
   }
+  return num_dirty_pages;
 }
 
 void nyx_snapshot_debug_save_root_pages(shadow_memory_t* shadow_memory_state, snapshot_page_blocklist_t* blocklist, bool verbose){

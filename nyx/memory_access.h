@@ -67,7 +67,7 @@ void print_48_paging2(uint64_t cr3);
 
 bool dump_page_ht(uint64_t address, uint8_t* data, CPUState *cpu);
 
-void resize_coverage_bitmap(uint32_t new_size);
+void resize_shared_memory(uint32_t new_size, uint32_t* shm_size, void** shm_ptr, int fd);
 void resize_payload_buffer(uint32_t new_size);
 
 #endif

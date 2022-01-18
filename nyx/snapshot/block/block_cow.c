@@ -3,7 +3,7 @@
 #include <sys/mman.h>
 #include "nyx/snapshot/block/block_cow.h"
 #include "sysemu/block-backend.h"
-#include "nyx/state.h"
+#include "nyx/state/state.h"
 
 
 //#define COW_CACHE_DEBUG

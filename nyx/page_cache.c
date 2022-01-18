@@ -17,7 +17,7 @@
 #include "memory_access.h"
 #include "fast_vm_reload.h"
 #include "kvm_nested.h"
-#include "nyx/state.h"
+#include "nyx/state/state.h"
 #endif
 
 
@@ -106,7 +106,7 @@ static bool append_page(page_cache_t* self, uint64_t page, uint64_t cr3){
 		if(!dump_page_cr3_ht(page, self->page_data+(PAGE_SIZE*self->num_pages), self->cpu, GET_GLOBAL_STATE()->parent_cr3)){
 			if(!dump_page_cr3_snapshot(page, self->page_data+(PAGE_SIZE*self->num_pages), self->cpu, GET_GLOBAL_STATE()->parent_cr3)){
 
-				fprintf(stderr, "FAILED DUMP PROCESS of PAGE %lx\n", page);
+				//fprintf(stderr, "FAILED DUMP PROCESS of PAGE %lx\n", page);
 				//memset(self->page_data+(PAGE_SIZE*self->num_pages), 0xff, PAGE_SIZE);
 
 				munmap(self->page_data, (self->num_pages+1)*PAGE_SIZE);
@@ -255,7 +255,7 @@ static bool update_page_cache(page_cache_t* self, uint64_t page, khiter_t* k){
 				kh_value(self->lookup, *k) = (self->num_pages-1)*PAGE_SIZE;
 			}
 			else{
-				fprintf(stderr, "Fail!!!!\n");
+				//fprintf(stderr, "Fail!!!!\n");
 				page_cache_unlock(self);
 				return false;
 				/*
