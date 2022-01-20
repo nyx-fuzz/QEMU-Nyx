@@ -147,7 +147,7 @@ static int nyx_create_payload_buffer(nyx_interface_state *s, uint64_t buffer_siz
 	void * ptr;
 	int fd;
 	struct stat st;
-	
+
 	fd = open(file, O_CREAT|O_RDWR, S_IRWXU|S_IRWXG|S_IRWXO);
 	assert(ftruncate(fd, buffer_size) == 0);
 	stat(file, &st);
@@ -219,6 +219,7 @@ static bool verify_workdir_state(nyx_interface_state *s, Error **errp){
 	if (!folder_exits(tmp)){
 		mkdir(tmp, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
 	}
+	free(tmp);
 
 	assert(asprintf(&tmp, "%s/interface_%d", workdir, id) != -1);
 	if (!file_exits(tmp)){
