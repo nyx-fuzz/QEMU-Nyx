@@ -18,6 +18,11 @@ set -e
 # You should have received a copy of the GNU General Public License
 # along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 
+
+if [ -z "$BASH_VERSION" ]; then
+  exit 0
+fi
+
 error () {
   echo "$0: <option>"
   echo ""
@@ -95,7 +100,7 @@ then
 
   make clean
   compile_and_install_libraries
-  ./configure --target-list=x86_64-softmmu --disable-docs --enable-gtk --disable-werror --disable-capstone --disable-libssh --enable-nyx --disable-tools
+  ./configure --target-list=x86_64-softmmu --disable-gtk --disable-docs --enable-gtk --disable-werror --disable-capstone --disable-libssh --enable-nyx --disable-tools
   compile
   exit 0
 fi
@@ -105,7 +110,7 @@ then
 
   make clean
   compile_and_install_libraries
-  ./configure --target-list=x86_64-softmmu --disable-docs --enable-gtk --disable-werror --disable-capstone --disable-libssh --enable-nyx --enable-sanitizers --enable-debug --disable-tools
+  ./configure --target-list=x86_64-softmmu --disable-gtk --disable-docs --enable-gtk --disable-werror --disable-capstone --disable-libssh --enable-nyx --enable-sanitizers --enable-debug --disable-tools
   compile
   exit 0
 fi
@@ -115,7 +120,7 @@ then
 
   make clean
   compile_libraries
-  ./configure --target-list=x86_64-softmmu --disable-docs --enable-gtk --disable-werror --disable-capstone --disable-libssh --enable-nyx --enable-sanitizers --enable-debug --enable-nyx-static --disable-tools
+  ./configure --target-list=x86_64-softmmu --disable-gtk --disable-docs --enable-gtk --disable-werror --disable-capstone --disable-libssh --enable-nyx --enable-sanitizers --enable-debug --enable-nyx-static --disable-tools
   compile
   exit 0
 fi
@@ -125,7 +130,7 @@ then
 
   make clean
   compile_libraries
-  ./configure --target-list=x86_64-softmmu --disable-docs --enable-gtk --disable-werror --disable-capstone --disable-libssh --enable-nyx --enable-nyx-static --disable-tools
+  ./configure --target-list=x86_64-softmmu --disable-gtk --disable-docs --enable-gtk --disable-werror --disable-capstone --disable-libssh --enable-nyx --enable-nyx-static --disable-tools
   compile
   exit 0
 fi
@@ -135,7 +140,7 @@ then
 
   make clean
   compile_libraries
-  ./configure --target-list=x86_64-softmmu --disable-docs --enable-gtk --disable-werror --disable-capstone --disable-libssh --enable-nyx --enable-nyx-static --enable-nyx-flto --disable-tools
+  ./configure --target-list=x86_64-softmmu --disable-gtk --disable-docs --enable-gtk --disable-werror --disable-capstone --disable-libssh --enable-nyx --enable-nyx-static --enable-nyx-flto --disable-tools
   compile
   exit 0
 fi
