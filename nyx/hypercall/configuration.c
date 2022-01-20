@@ -7,6 +7,11 @@
 void handle_hypercall_kafl_get_host_config(struct kvm_run *run, CPUState *cpu, uint64_t hypercall_arg){
 	uint64_t vaddr = hypercall_arg;
 	host_config_t config;
+
+	if(is_called_in_fuzzing_mode("KVM_EXIT_KAFL_GET_HOST_CONFIG")){
+		return;
+	}
+
 	memset((void*)&config, 0, sizeof(host_config_t));
 
 	config.host_magic = NYX_HOST_MAGIC;
@@ -18,23 +23,13 @@ void handle_hypercall_kafl_get_host_config(struct kvm_run *run, CPUState *cpu, u
 	write_virtual_memory(vaddr, (uint8_t*)&config, sizeof(host_config_t), cpu);
 }
 
-static void resize_coverage_bitmap(uint32_t new_bitmap_size){
-	uint32_t new_bitmap_shm_size = new_bitmap_size;
-
-	if (new_bitmap_shm_size % 64 > 0) {
-    	new_bitmap_shm_size = ((new_bitmap_shm_size + 64) >> 6) << 6;
-    }
-
-	GET_GLOBAL_STATE()->shared_bitmap_real_size = new_bitmap_shm_size;
-	resize_shared_memory(new_bitmap_shm_size, &GET_GLOBAL_STATE()->shared_bitmap_size, &GET_GLOBAL_STATE()->shared_bitmap_ptr, GET_GLOBAL_STATE()->shared_bitmap_fd);
-
-	/* pass the actual bitmap buffer size to the front-end */
-	GET_GLOBAL_STATE()->auxilary_buffer->capabilites.agent_coverage_bitmap_size = new_bitmap_size;
-}
-
 void handle_hypercall_kafl_set_agent_config(struct kvm_run *run, CPUState *cpu, uint64_t hypercall_arg){
 	uint64_t vaddr = hypercall_arg;
 	agent_config_t config;
+
+	if(is_called_in_fuzzing_mode("KVM_EXIT_KAFL_SET_AGENT_CONFIG")){
+		return;
+	}
 
 	X86CPU *cpux86 = X86_CPU(cpu);
   	CPUX86State *env = &cpux86->env;
@@ -72,12 +67,12 @@ void handle_hypercall_kafl_set_agent_config(struct kvm_run *run, CPUState *cpu, 
 
 		GET_GLOBAL_STATE()->cap_cr3 = env->cr[3];
 
-        if (config.coverage_bitmap_size){
-			resize_coverage_bitmap(config.coverage_bitmap_size);
-		}
-		
+		GET_GLOBAL_STATE()->cap_coverage_bitmap_size = config.coverage_bitmap_size;
+
+		GET_GLOBAL_STATE()->input_buffer_size = GET_GLOBAL_STATE()->shared_payload_buffer_size;
+
 		if (config.input_buffer_size){
-			resize_payload_buffer(config.input_buffer_size);
+			abort();
 		}
 
 		if(apply_capabilities(cpu) == false){

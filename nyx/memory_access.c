@@ -272,7 +272,6 @@ void resize_shared_memory(uint32_t new_size, uint32_t* shm_size, void** shm_ptr,
         return;
     }
 
-    assert(!GET_GLOBAL_STATE()->pt_trace_mode);
     assert(!GET_GLOBAL_STATE()->in_fuzzing_mode);
     assert(ftruncate(fd, new_size) == 0);
 
@@ -281,26 +280,11 @@ void resize_shared_memory(uint32_t new_size, uint32_t* shm_size, void** shm_ptr,
 	    *shm_ptr = (void*)mmap(0, new_size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
         assert(*shm_ptr != MAP_FAILED);
     }
-    else{
-        fprintf(stderr, "=> shm_ptr is NULL\n");
-        abort();
-    }
+
     *shm_size = new_size;
 }
 
-
-
-void resize_payload_buffer(uint32_t new_size){
-    assert(GET_GLOBAL_STATE()->shared_payload_buffer_fd && GET_GLOBAL_STATE()->shared_payload_buffer_size);
-    assert(GET_GLOBAL_STATE()->shared_payload_buffer_size < new_size && !(new_size & 0xFFF));
-    assert(!GET_GLOBAL_STATE()->in_fuzzing_mode);
-    assert(ftruncate(GET_GLOBAL_STATE()->shared_payload_buffer_fd, new_size) == 0);
-
-    GET_GLOBAL_STATE()->shared_payload_buffer_size = new_size;
-    GET_GLOBAL_STATE()->auxilary_buffer->capabilites.agent_input_buffer_size = new_size;
-}
-
-bool remap_payload_buffer(uint64_t virt_guest_addr, CPUState *cpu){
+bool remap_payload_buffer(uint64_t virt_guest_addr, CPUState *cpu){    
     assert(GET_GLOBAL_STATE()->shared_payload_buffer_fd && GET_GLOBAL_STATE()->shared_payload_buffer_size);
     RAMBlock *block;
     refresh_kvm_non_dirty(cpu);

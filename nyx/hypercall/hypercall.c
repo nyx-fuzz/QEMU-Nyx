@@ -111,12 +111,6 @@ bool handle_hypercall_kafl_next_payload(struct kvm_run *run, CPUState *cpu, uint
 			if(!setup_snapshot_once){ 
 				//pt_reset_bitmap();
 
-				if (GET_GLOBAL_STATE()->pt_trace_mode){
-					printf("[QEMU-Nyx] coverage mode: Intel-PT (KVM-Nyx and libxdc)\n");
-				}
-				else{
-					printf("[QEMU-Nyx] coverage mode: compile-time instrumentation\n");
-				}
 
 				coverage_bitmap_reset();
 				request_fast_vm_reload(GET_GLOBAL_STATE()->reload_state, REQUEST_SAVE_SNAPSHOT_ROOT_FIX_RIP);
@@ -194,6 +188,11 @@ void handle_hypercall_kafl_acquire(struct kvm_run *run, CPUState *cpu, uint64_t 
 
 static void handle_hypercall_get_payload(struct kvm_run *run, CPUState *cpu, uint64_t hypercall_arg){
 	debug_printf("------------ %s\n", __func__);
+
+	if(is_called_in_fuzzing_mode("KVM_EXIT_KAFL_GET_PAYLOAD")){
+		return;
+	}
+
 	if(hypercall_enabled && !setup_snapshot_once){
 			QEMU_PT_PRINTF(CORE_PREFIX, "Payload Address:\t%lx", hypercall_arg);
 			kvm_arch_get_registers(cpu);	
@@ -222,16 +221,20 @@ static void set_return_value(CPUState *cpu, uint64_t return_value){
 static void handle_hypercall_kafl_req_stream_data(struct kvm_run *run, CPUState *cpu, uint64_t hypercall_arg){
 	static uint8_t req_stream_buffer[0x1000];
 
+	if(is_called_in_fuzzing_mode("HYPERCALL_KAFL_REQ_STREAM_DATA")){
+		return;
+	}
+
 	kvm_arch_get_registers(cpu);	
 	/* address has to be page aligned */
 	if((hypercall_arg&0xFFF) != 0){
 		debug_fprintf(stderr, "%s: ERROR -> address is not page aligned!\n", __func__);
-		set_return_value(cpu, 0xFFFFFFFFFFFFFFFFUL);
+		set_return_value(cpu, 0xFFFFFFFFFFFFFFFFULL);
 	}
 	else{
 		read_virtual_memory(hypercall_arg, (uint8_t*)req_stream_buffer, 0x100, cpu);
 		uint64_t bytes = sharedir_request_file(GET_GLOBAL_STATE()->sharedir, (const char *)req_stream_buffer, req_stream_buffer);
-		if(bytes != 0xFFFFFFFFFFFFFFFFUL){
+		if(bytes != 0xFFFFFFFFFFFFFFFFULL){
 			write_virtual_memory(hypercall_arg, (uint8_t*)req_stream_buffer, bytes, cpu);
 		}
 		set_return_value(cpu, bytes);
@@ -248,6 +251,10 @@ static void handle_hypercall_kafl_req_stream_data_bulk(struct kvm_run *run, CPUS
 	static uint8_t req_stream_buffer[0x1000];
 	//static uint64_t addresses[512];
 	req_data_bulk_t req_data_bulk_data;
+
+	if(is_called_in_fuzzing_mode("HYPERCALL_KAFL_REQ_STREAM_DATA_BULK")){
+		return;
+	}
 
 	kvm_arch_get_registers(cpu);	
 	/* address has to be page aligned */
@@ -284,6 +291,11 @@ static void handle_hypercall_kafl_req_stream_data_bulk(struct kvm_run *run, CPUS
 
 static void handle_hypercall_kafl_range_submit(struct kvm_run *run, CPUState *cpu, uint64_t hypercall_arg){
 	uint64_t buffer[3];
+
+	if(is_called_in_fuzzing_mode("KVM_EXIT_KAFL_RANGE_SUBMIT")){
+		return;
+	}
+
 	read_virtual_memory(hypercall_arg, (uint8_t*)&buffer, sizeof(buffer), cpu);
 
 	if(buffer[2] >= 2){
@@ -405,6 +417,11 @@ static void handle_hypercall_kafl_cr3(struct kvm_run *run, CPUState *cpu, uint64
 }
 
 static void handle_hypercall_kafl_submit_panic(struct kvm_run *run, CPUState *cpu, uint64_t hypercall_arg){
+
+	if(is_called_in_fuzzing_mode("KVM_EXIT_KAFL_SUBMIT_PANIC")){
+		return;
+	}
+
 	if(hypercall_enabled){
 		QEMU_PT_PRINTF(CORE_PREFIX, "Panic address:\t%lx", hypercall_arg);
 		write_virtual_memory(hypercall_arg, (uint8_t*)PANIC_PAYLOAD, PAYLOAD_BUFFER_SIZE, cpu);
@@ -524,6 +541,10 @@ static void handle_hypercall_kafl_panic_extended(struct kvm_run *run, CPUState *
 
 static void handle_hypercall_kafl_lock(struct kvm_run *run, CPUState *cpu, uint64_t hypercall_arg){
 
+	if(is_called_in_fuzzing_mode("KVM_EXIT_KAFL_LOCK")){
+		return;
+	}
+
 	if(!GET_GLOBAL_STATE()->fast_reload_pre_image){
 		QEMU_PT_PRINTF(CORE_PREFIX, "Skipping pre image creation (hint: set pre=on) ...");
 		return;
@@ -539,13 +560,17 @@ static void handle_hypercall_kafl_printf(struct kvm_run *run, CPUState *cpu, uin
 	read_virtual_memory(hypercall_arg, (uint8_t*)hprintf_buffer, HPRINTF_SIZE, cpu);
 #ifdef DEBUG_HPRINTF
 	fprintf(stderr, "%s %s\n", __func__, hprintf_buffer);
-#else
+#endif
 	set_hprintf_auxiliary_buffer(GET_GLOBAL_STATE()->auxilary_buffer, hprintf_buffer, strnlen(hprintf_buffer, HPRINTF_SIZE)+1);
 	synchronization_lock();
-#endif
 }
 
 static void handle_hypercall_kafl_user_range_advise(struct kvm_run *run, CPUState *cpu, uint64_t hypercall_arg){
+	
+	if(is_called_in_fuzzing_mode("KVM_EXIT_KAFL_USER_RANGE_ADVISE")){
+		return;
+	}
+
 	kAFL_ranges* buf = malloc(sizeof(kAFL_ranges));
 
 	for(int i = 0; i < INTEL_PT_MAX_RANGES; i++){
@@ -560,6 +585,11 @@ static void handle_hypercall_kafl_user_range_advise(struct kvm_run *run, CPUStat
 
 static void handle_hypercall_kafl_user_submit_mode(struct kvm_run *run, CPUState *cpu, uint64_t hypercall_arg){
 	//printf("%s\n", __func__);
+
+	if(is_called_in_fuzzing_mode("KVM_EXIT_KAFL_USER_SUBMIT_MODE")){
+		return;
+	}
+
 	switch(hypercall_arg){
 		case KAFL_MODE_64:
 			QEMU_PT_PRINTF(CORE_PREFIX, "target runs in KAFL_MODE_64 ...");
@@ -708,6 +738,11 @@ static void handle_hypercall_kafl_dump_file(struct kvm_run *run, CPUState *cpu, 
 }
 
 static void handle_hypercall_kafl_persist_page_past_snapshot(struct kvm_run *run, CPUState *cpu, uint64_t hypercall_arg){
+
+	if(is_called_in_fuzzing_mode("KVM_EXIT_KAFL_PERSIST_PAGE_PAST_SNAPSHOT")){
+		return;
+	}
+
 	CPUX86State *env = &(X86_CPU(cpu))->env;
 	kvm_arch_get_registers_fast(cpu);
 	hwaddr phys_addr = (hwaddr) get_paging_phys_addr(cpu, env->cr[3], hypercall_arg&(~0xFFF));

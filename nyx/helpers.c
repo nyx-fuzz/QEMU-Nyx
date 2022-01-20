@@ -20,6 +20,17 @@ void nyx_abort(char* msg){
 	synchronization_lock();
 }
 
+bool is_called_in_fuzzing_mode(const char* hypercall){
+	if(GET_GLOBAL_STATE()->in_fuzzing_mode){
+		char* tmp = NULL;
+		assert(asprintf(&tmp, "Hypercall <%s> called during fuzzing...", hypercall) != -1);
+		nyx_abort((char*)tmp);
+		free(tmp);
+		return true;
+	}
+	return false;
+}
+
 uint64_t get_rip(CPUState *cpu){
 	kvm_arch_get_registers(cpu);
 	X86CPU *x86_cpu = X86_CPU(cpu);
@@ -81,6 +92,20 @@ void coverage_bitmap_copy_from_buffer(nyx_coverage_bitmap_copy_t* buffer){
 	}
 }
 
+static void resize_coverage_bitmap(uint32_t new_bitmap_size){
+	uint32_t new_bitmap_shm_size = new_bitmap_size;
+
+	if (new_bitmap_shm_size % 64 > 0) {
+    	new_bitmap_shm_size = ((new_bitmap_shm_size + 64) >> 6) << 6;
+    }
+
+	GET_GLOBAL_STATE()->shared_bitmap_real_size = new_bitmap_shm_size;
+	resize_shared_memory(new_bitmap_shm_size, &GET_GLOBAL_STATE()->shared_bitmap_size, &GET_GLOBAL_STATE()->shared_bitmap_ptr, GET_GLOBAL_STATE()->shared_bitmap_fd);
+
+	/* pass the actual bitmap buffer size to the front-end */
+	GET_GLOBAL_STATE()->auxilary_buffer->capabilites.agent_coverage_bitmap_size = new_bitmap_size;
+}
+
 bool apply_capabilities(CPUState *cpu){
 	//X86CPU *cpux86 = X86_CPU(cpu);
   //CPUX86State *env = &cpux86->env;
@@ -107,6 +132,10 @@ bool apply_capabilities(CPUState *cpu){
 			return false;
 		}
 
+		if (GET_GLOBAL_STATE()->cap_coverage_bitmap_size){
+			resize_coverage_bitmap(GET_GLOBAL_STATE()->cap_coverage_bitmap_size);
+		}
+		
 		for(uint64_t i = 0; i < GET_GLOBAL_STATE()->shared_bitmap_size; i += 0x1000){
 			assert(remap_slot(GET_GLOBAL_STATE()->cap_compile_time_tracing_buffer_vaddr+ i, i/0x1000, cpu, GET_GLOBAL_STATE()->shared_bitmap_fd, GET_GLOBAL_STATE()->shared_bitmap_size, true, GET_GLOBAL_STATE()->cap_cr3));
 		}
@@ -127,6 +156,15 @@ bool apply_capabilities(CPUState *cpu){
 		}
 		set_cap_agent_ijon_trace_bitmap(GET_GLOBAL_STATE()->auxilary_buffer, true);
 	}
+
+	if (GET_GLOBAL_STATE()->input_buffer_size != GET_GLOBAL_STATE()->shared_payload_buffer_size){
+		resize_shared_memory(GET_GLOBAL_STATE()->input_buffer_size, &GET_GLOBAL_STATE()->shared_payload_buffer_size, NULL, GET_GLOBAL_STATE()->shared_payload_buffer_fd);
+		GET_GLOBAL_STATE()->shared_payload_buffer_size = GET_GLOBAL_STATE()->input_buffer_size;
+	}
+
+	/* pass the actual input buffer size to the front-end */
+	GET_GLOBAL_STATE()->auxilary_buffer->capabilites.agent_input_buffer_size = GET_GLOBAL_STATE()->shared_payload_buffer_size;
+
 	return true;
 }
 

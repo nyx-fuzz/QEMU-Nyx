@@ -17,71 +17,56 @@ void serialize_state(const char* filename_prefix, bool is_pre_snapshot){
 
 	FILE *fp = fopen(tmp, "wb");
 	if(fp == NULL) {                                                
-    	debug_fprintf(stderr, "[%s] Could not open file %s.\n", __func__, tmp);
+    	fprintf(stderr, "[%s] Could not open file %s.\n", __func__, tmp);
         assert(false);
-        //exit(EXIT_FAILURE);                                         
     }
 
-    qemu_nyx_state_t* nyx_global_state = GET_GLOBAL_STATE();
+    serialized_state_header_t header = {0};
 
-    debug_printf("DUMPING global_state.pt_ip_filter_configured: -\n");
-    fwrite(&nyx_global_state->pt_ip_filter_configured, sizeof(bool)*4, 1, fp);
+    header.magic = NYX_SERIALIZED_STATE_MAGIC;
+    header.version = NYX_SERIALIZED_STATE_VERSION;
 
-    debug_printf("DUMPING global_state.pt_ip_filter_a: -\n");
-    fwrite(&nyx_global_state->pt_ip_filter_a, sizeof(uint64_t)*4, 1, fp);
-
-    debug_printf("DUMPING global_state.pt_ip_filter_b: -\n");
-    fwrite(&nyx_global_state->pt_ip_filter_b, sizeof(uint64_t)*4, 1, fp);
-
-    debug_printf("DUMPING global_state.parent_cr3: %lx\n", global_state.parent_cr3);
-    fwrite(&nyx_global_state->parent_cr3, sizeof(uint64_t), 1, fp);
-    
-    debug_printf("DUMPING global_state.disassembler_word_width: %x\n", global_state.disassembler_word_width);
-    fwrite(&nyx_global_state->disassembler_word_width, sizeof(uint8_t), 1, fp);
-    debug_printf("DUMPING global_state.fast_reload_pre_image: %x\n", global_state.fast_reload_pre_image);
-    fwrite(&nyx_global_state->fast_reload_pre_image, sizeof(bool), 1, fp);
-
-    debug_printf("DUMPING global_state.mem_mode: %x\n", global_state.mem_mode);
-    fwrite(&nyx_global_state->mem_mode, sizeof(uint8_t), 1, fp);
-
-    debug_printf("DUMPING global_state.pt_trace_mode: %x\n", global_state.pt_trace_mode);
-    fwrite(&nyx_global_state->pt_trace_mode, sizeof(bool), 1, fp);
-
-    debug_printf("DUMPING global_state.nested: %x\n", global_state.nested);
-    fwrite(&nyx_global_state->nested, sizeof(bool), 1, fp);
-
-    if(!global_state.nested){
-        debug_printf("DUMPING global_state.payload_buffer: %lx\n", global_state.payload_buffer);
-        fwrite(&nyx_global_state->payload_buffer, sizeof(uint64_t), 1, fp);
-
-        fwrite(&nyx_global_state->cap_timeout_detection, sizeof(global_state.cap_timeout_detection), 1, fp);
-        fwrite(&nyx_global_state->cap_only_reload_mode, sizeof(global_state.cap_only_reload_mode), 1, fp);
-        fwrite(&nyx_global_state->cap_compile_time_tracing, sizeof(global_state.cap_compile_time_tracing), 1, fp);
-        fwrite(&nyx_global_state->cap_ijon_tracing, sizeof(global_state.cap_ijon_tracing), 1, fp);
-        fwrite(&nyx_global_state->cap_cr3, sizeof(global_state.cap_cr3), 1, fp);
-        fwrite(&nyx_global_state->cap_compile_time_tracing_buffer_vaddr, sizeof(global_state.cap_compile_time_tracing_buffer_vaddr), 1, fp);
-        fwrite(&nyx_global_state->cap_ijon_tracing_buffer_vaddr, sizeof(global_state.cap_ijon_tracing_buffer_vaddr), 1, fp);
-        fwrite(&nyx_global_state->protect_payload_buffer, sizeof(bool), 1, fp);
+    if (is_pre_snapshot){
+        header.type = NYX_SERIALIZED_TYPE_PRE_SNAPSHOT;
+        fwrite(&header, sizeof(serialized_state_header_t), 1, fp);
     }
     else{
-        assert(global_state.nested_payload_pages != NULL && global_state.nested_payload_pages_num != 0);
-        debug_printf("DUMPING global_state.nested_payload_pages_num: %x\n", global_state.nested_payload_pages_num);
-        fwrite(&nyx_global_state->nested_payload_pages_num, sizeof(uint32_t), 1, fp);
+        header.type = NYX_SERIALIZED_TYPE_ROOT_SNAPSHOT;
+        fwrite(&header, sizeof(serialized_state_header_t), 1, fp);
 
-        if(global_state.nested_payload_pages_num != 0){
-            debug_printf("DUMPING global_state.protect_payload_buffer: %x\n", global_state.protect_payload_buffer);
-            fwrite(&nyx_global_state->protect_payload_buffer, sizeof(bool), 1, fp);
-        }
+        qemu_nyx_state_t* nyx_global_state = GET_GLOBAL_STATE();
+        serialized_state_root_snapshot_t root_snapshot = {0};
 
-        for(uint32_t i = 0; i < global_state.nested_payload_pages_num; i++){
-            debug_printf("DUMPING global_state.nested_payload_pages[%d]: %lx\n", i, global_state.nested_payload_pages[i]);
-            fwrite(&nyx_global_state->nested_payload_pages[i], sizeof(uint64_t), 1, fp);
+        for (uint8_t i = 0; i < 4; i++){
+            root_snapshot.pt_ip_filter_configured[i] = nyx_global_state->pt_ip_filter_configured[i];
+            root_snapshot.pt_ip_filter_a[i] = nyx_global_state->pt_ip_filter_a[i];
+            root_snapshot.pt_ip_filter_b[i] = nyx_global_state->pt_ip_filter_b[i];
         }
+        root_snapshot.parent_cr3 = nyx_global_state->parent_cr3;
+        root_snapshot.disassembler_word_width = nyx_global_state->disassembler_word_width;
+        root_snapshot.fast_reload_pre_image = nyx_global_state->fast_reload_pre_image;
+        root_snapshot.mem_mode = nyx_global_state->mem_mode;
+        root_snapshot.pt_trace_mode =nyx_global_state->pt_trace_mode;
+
+        root_snapshot.input_buffer_vaddr = nyx_global_state->payload_buffer;
+        root_snapshot.protect_input_buffer = nyx_global_state->protect_payload_buffer;
+        
+        root_snapshot.input_buffer_size = nyx_global_state->input_buffer_size;
+
+        root_snapshot.cap_timeout_detection = nyx_global_state->cap_timeout_detection;
+        root_snapshot.cap_only_reload_mode = nyx_global_state->cap_only_reload_mode;
+        root_snapshot.cap_compile_time_tracing = nyx_global_state->cap_compile_time_tracing;
+        root_snapshot.cap_ijon_tracing = nyx_global_state->cap_ijon_tracing;
+        root_snapshot.cap_cr3 = nyx_global_state->cap_cr3;
+        root_snapshot.cap_compile_time_tracing_buffer_vaddr = nyx_global_state->cap_compile_time_tracing_buffer_vaddr;
+        root_snapshot.cap_ijon_tracing_buffer_vaddr = nyx_global_state->cap_ijon_tracing_buffer_vaddr;
+        root_snapshot.cap_coverage_bitmap_size = nyx_global_state->cap_coverage_bitmap_size;
+
+        fwrite(&root_snapshot, sizeof(serialized_state_root_snapshot_t), 1, fp);
+
     }
-
-
+        
     fclose(fp);
-
 	free(tmp);
 }
 
@@ -99,87 +84,56 @@ void deserialize_state(const char* filename_prefix){
         assert(false);
         //exit(EXIT_FAILURE);                                         
     }
-    
-    qemu_nyx_state_t* nyx_global_state = GET_GLOBAL_STATE();
 
-    assert(fread(&nyx_global_state->pt_ip_filter_configured, sizeof(bool)*4, 1, fp) == 1);
-    debug_printf("LOADING global_state.pt_ip_filter_configured: -\n");
 
-    assert(fread(&nyx_global_state->pt_ip_filter_a, sizeof(uint64_t)*4, 1, fp) == 1);
-    debug_printf("LOADING global_state.pt_ip_filter_a: -\n");
+    serialized_state_header_t header = {0};
+    assert(fread(&header, sizeof(serialized_state_header_t), 1, fp) == 1);
 
-    assert(fread(&nyx_global_state->pt_ip_filter_b, sizeof(uint64_t)*4, 1, fp) == 1);
-    debug_printf("LOADING global_state.pt_ip_filter_b: -\n");
+    assert(header.magic == NYX_SERIALIZED_STATE_MAGIC);
+    assert(header.version == NYX_SERIALIZED_STATE_VERSION);
 
-    assert(fread(&nyx_global_state->parent_cr3, sizeof(uint64_t), 1, fp) == 1);
-    debug_printf("LOADING global_state.parent_cr3: %lx\n", global_state.parent_cr3);
+    if(header.type == NYX_SERIALIZED_TYPE_PRE_SNAPSHOT){
+        /* we're done here */
+    }
+    else if (header.type == NYX_SERIALIZED_TYPE_ROOT_SNAPSHOT){
+        qemu_nyx_state_t* nyx_global_state = GET_GLOBAL_STATE();
+        serialized_state_root_snapshot_t root_snapshot = {0};
+        assert(fread(&root_snapshot, sizeof(serialized_state_root_snapshot_t), 1, fp) == 1);
 
-    assert(fread(&nyx_global_state->disassembler_word_width, sizeof(uint8_t), 1, fp) == 1);
-    debug_printf("LOADING global_state.disassembler_word_width: %x\n", global_state.disassembler_word_width);
-
-    assert(fread(&nyx_global_state->fast_reload_pre_image, sizeof(bool), 1, fp) == 1);
-    debug_printf("LOADING global_state.fast_reload_pre_image: %x\n", global_state.fast_reload_pre_image);
-
-    assert(fread(&nyx_global_state->mem_mode, sizeof(uint8_t), 1, fp) == 1);
-    debug_printf("LOADING global_state.mem_mode: %x\n", global_state.mem_mode);
-
-    assert(fread(&nyx_global_state->pt_trace_mode, sizeof(bool), 1, fp) == 1);
-    debug_printf("LOADING global_state.pt_trace_mode: %x\n", global_state.pt_trace_mode);
-
-    assert(fread(&nyx_global_state->nested, sizeof(bool), 1, fp) == 1);
-    debug_printf("LOADING global_state.nested: %x\n", global_state.nested);
-
-    if(!global_state.nested){
-        assert(fread(&nyx_global_state->payload_buffer, sizeof(uint64_t), 1, fp) == 1);
-        debug_printf("LOADING global_state.payload_buffer: %lx\n", global_state.payload_buffer);
-
-        assert(fread(&nyx_global_state->cap_timeout_detection, sizeof(global_state.cap_timeout_detection), 1, fp) == 1);
-        assert(fread(&nyx_global_state->cap_only_reload_mode, sizeof(global_state.cap_only_reload_mode), 1, fp) == 1);
-        assert(fread(&nyx_global_state->cap_compile_time_tracing, sizeof(global_state.cap_compile_time_tracing), 1, fp) == 1);
-        assert(fread(&nyx_global_state->cap_ijon_tracing, sizeof(global_state.cap_ijon_tracing), 1, fp) == 1);
-        assert(fread(&nyx_global_state->cap_cr3, sizeof(global_state.cap_cr3), 1, fp) == 1);
-        assert(fread(&nyx_global_state->cap_compile_time_tracing_buffer_vaddr, sizeof(global_state.cap_compile_time_tracing_buffer_vaddr), 1, fp) == 1);
-        assert(fread(&nyx_global_state->cap_ijon_tracing_buffer_vaddr, sizeof(global_state.cap_ijon_tracing_buffer_vaddr), 1, fp) == 1);
-
-        if(!global_state.fast_reload_pre_image){
-            assert(fread(&nyx_global_state->protect_payload_buffer, sizeof(bool), 1, fp) == 1);
-            if(global_state.payload_buffer != 0){
-                debug_printf("REMAP PAYLOAD BUFFER!\n");
-                remap_payload_buffer(global_state.payload_buffer, ((CPUState *)qemu_get_cpu(0)) );
-            }
-            else{
-                fprintf(stderr, "WARNING: address of payload buffer in snapshot file is zero!\n");
-            }
+        for (uint8_t i = 0; i < 4; i++){
+            nyx_global_state->pt_ip_filter_configured[i] = root_snapshot.pt_ip_filter_configured[i];
+            nyx_global_state->pt_ip_filter_a[i] = root_snapshot.pt_ip_filter_a[i];
+            nyx_global_state->pt_ip_filter_b[i] = root_snapshot.pt_ip_filter_b[i];
         }
+
+        nyx_global_state->parent_cr3 = root_snapshot.parent_cr3;
+        nyx_global_state->disassembler_word_width = root_snapshot.disassembler_word_width;
+        nyx_global_state->fast_reload_pre_image = root_snapshot.fast_reload_pre_image;
+        nyx_global_state->mem_mode = root_snapshot.mem_mode;
+        nyx_global_state->pt_trace_mode =root_snapshot.pt_trace_mode;
+
+        nyx_global_state->payload_buffer = root_snapshot.input_buffer_vaddr;
+        nyx_global_state->protect_payload_buffer = root_snapshot.protect_input_buffer;
+        
+        nyx_global_state->input_buffer_size = root_snapshot.input_buffer_size;
+
+        nyx_global_state->cap_timeout_detection = root_snapshot.cap_timeout_detection;
+        nyx_global_state->cap_only_reload_mode = root_snapshot.cap_only_reload_mode;
+        nyx_global_state->cap_compile_time_tracing = root_snapshot.cap_compile_time_tracing;
+        nyx_global_state->cap_ijon_tracing = root_snapshot.cap_ijon_tracing;
+        nyx_global_state->cap_cr3 = root_snapshot.cap_cr3;
+        nyx_global_state->cap_compile_time_tracing_buffer_vaddr = root_snapshot.cap_compile_time_tracing_buffer_vaddr;
+        nyx_global_state->cap_ijon_tracing_buffer_vaddr = root_snapshot.cap_ijon_tracing_buffer_vaddr;
+        nyx_global_state->cap_coverage_bitmap_size = root_snapshot.cap_coverage_bitmap_size;
 
         assert(apply_capabilities(qemu_get_cpu(0)));
+        remap_payload_buffer(nyx_global_state->payload_buffer, ((CPUState *)qemu_get_cpu(0)) );
     }
     else{
-        assert(fread(&nyx_global_state->nested_payload_pages_num, sizeof(uint32_t), 1, fp) == 1);
-        debug_printf("LOADING global_state.nested_payload_pages_num: %x\n", global_state.nested_payload_pages_num);
-
-        global_state.in_fuzzing_mode = true; /* haaaeeeeh ??? */
-        if(!global_state.fast_reload_pre_image){
-
-            assert(fread(&nyx_global_state->protect_payload_buffer, sizeof(bool), 1, fp) == 1);
-            debug_printf("LOADING global_state.protect_payload_buffer: %x\n", global_state.protect_payload_buffer);
-
-            global_state.nested_payload_pages = (uint64_t*)malloc(sizeof(uint64_t)*global_state.nested_payload_pages_num);
-            
-            for(uint32_t i = 0; i < global_state.nested_payload_pages_num; i++){
-                assert(fread(&nyx_global_state->nested_payload_pages[i], sizeof(uint64_t), 1, fp) == 1);
-                debug_printf("LOADED global_state.nested_payload_pages[%d]: %lx\n", i, global_state.nested_payload_pages[i]);
-                if(global_state.protect_payload_buffer){
-                    assert(remap_payload_slot_protected(GET_GLOBAL_STATE()->nested_payload_pages[i], i, ((CPUState *)qemu_get_cpu(0))) == true);
-		        }
-                else{
-                    remap_payload_slot(global_state.nested_payload_pages[i], i, ((CPUState *)qemu_get_cpu(0)));
-                }
-            }
-            
-        }
+        fprintf(stderr, "[QEMU-Nyx]: this feature is currently missing\n");
+        abort();
     }
-   
+
     fclose(fp);
 
 	free(tmp);

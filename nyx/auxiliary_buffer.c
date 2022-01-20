@@ -133,7 +133,9 @@ void check_auxiliary_config_buffer(auxilary_buffer_t* auxilary_buffer, auxilary_
 
     /* modify protect_payload_buffer */
     VOLATILE_READ_8(aux_byte, auxilary_buffer->configuration.protect_payload_buffer);
-    GET_GLOBAL_STATE()->protect_payload_buffer = aux_byte;
+    if (GET_GLOBAL_STATE()->protect_payload_buffer == 0 && aux_byte == 1){
+      GET_GLOBAL_STATE()->protect_payload_buffer = aux_byte;
+    }
 
     /* modify protect_payload_buffer */
     VOLATILE_READ_8(aux_byte, auxilary_buffer->configuration.discard_tmp_snapshot);

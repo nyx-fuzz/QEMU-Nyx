@@ -117,6 +117,7 @@ typedef struct qemu_nyx_state_s{
     bool protect_payload_buffer;
     bool discard_tmp_snapshot;
     uint8_t mem_mode; 
+    uint32_t input_buffer_size;
 
 
     /* NON MIGRATABLE OPTION */
@@ -146,6 +147,7 @@ typedef struct qemu_nyx_state_s{
     uint64_t cap_cr3; 
     uint64_t cap_compile_time_tracing_buffer_vaddr;
     uint64_t cap_ijon_tracing_buffer_vaddr;
+    uint64_t cap_coverage_bitmap_size;
 
     auxilary_buffer_t* auxilary_buffer;
     auxilary_buffer_config_t shadow_config;

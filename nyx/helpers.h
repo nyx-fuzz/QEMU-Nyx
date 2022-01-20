@@ -10,6 +10,7 @@ typedef struct nyx_coverage_bitmap_copy_s{
 }nyx_coverage_bitmap_copy_t;
 
 void nyx_abort(char* msg);
+bool is_called_in_fuzzing_mode(const char* hypercall);
 
 nyx_coverage_bitmap_copy_t* new_coverage_bitmaps(void);
 void coverage_bitmap_reset(void);
