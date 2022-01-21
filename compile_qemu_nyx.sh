@@ -82,7 +82,8 @@ compile () {
 }
 
 git submodule init
-git submodule update
+git submodule update libxdc
+git submodule update capstone_v4
 
 if [ "$#" == 0 ] ; then
   error
