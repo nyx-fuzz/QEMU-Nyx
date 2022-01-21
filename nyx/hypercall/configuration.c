@@ -12,6 +12,11 @@ void handle_hypercall_kafl_get_host_config(struct kvm_run *run, CPUState *cpu, u
 		return;
 	}
 
+	if (GET_GLOBAL_STATE()->get_host_config_done){
+		nyx_abort((char*)"KVM_EXIT_KAFL_GET_HOST_CONFIG called twice...");
+		return;
+	}
+
 	memset((void*)&config, 0, sizeof(host_config_t));
 
 	config.host_magic = NYX_HOST_MAGIC;
@@ -21,6 +26,7 @@ void handle_hypercall_kafl_get_host_config(struct kvm_run *run, CPUState *cpu, u
 	config.payload_buffer_size = GET_GLOBAL_STATE()->shared_payload_buffer_size;
 
 	write_virtual_memory(vaddr, (uint8_t*)&config, sizeof(host_config_t), cpu);
+	GET_GLOBAL_STATE()->get_host_config_done = true;
 }
 
 void handle_hypercall_kafl_set_agent_config(struct kvm_run *run, CPUState *cpu, uint64_t hypercall_arg){
@@ -28,6 +34,11 @@ void handle_hypercall_kafl_set_agent_config(struct kvm_run *run, CPUState *cpu, 
 	agent_config_t config;
 
 	if(is_called_in_fuzzing_mode("KVM_EXIT_KAFL_SET_AGENT_CONFIG")){
+		return;
+	}
+
+	if (GET_GLOBAL_STATE()->set_agent_config_done){
+		nyx_abort((char*)"KVM_EXIT_KAFL_SET_AGENT_CONFIG called twice...");
 		return;
 	}
 
@@ -89,4 +100,5 @@ void handle_hypercall_kafl_set_agent_config(struct kvm_run *run, CPUState *cpu, 
 		fprintf(stderr, "[QEMU-Nyx] Error: %s - failed (vaddr: 0x%lx)!\n", __func__, vaddr);
 		exit(1);
 	}
+	GET_GLOBAL_STATE()->set_agent_config_done = true;
 }

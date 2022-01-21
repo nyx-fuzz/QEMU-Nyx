@@ -108,6 +108,12 @@ bool handle_hypercall_kafl_next_payload(struct kvm_run *run, CPUState *cpu, uint
 			synchronization_lock();
 
 		} else {
+
+			if (GET_GLOBAL_STATE()->set_agent_config_done == false){
+				nyx_abort((char*)"KVM_EXIT_KAFL_SET_AGENT_CONFIG was not called...");
+				return false;
+			}
+
 			if(!setup_snapshot_once){ 
 				//pt_reset_bitmap();
 
@@ -190,6 +196,11 @@ static void handle_hypercall_get_payload(struct kvm_run *run, CPUState *cpu, uin
 	debug_printf("------------ %s\n", __func__);
 
 	if(is_called_in_fuzzing_mode("KVM_EXIT_KAFL_GET_PAYLOAD")){
+		return;
+	}
+
+	if (GET_GLOBAL_STATE()->get_host_config_done == false){
+		nyx_abort((char*)"KVM_EXIT_KAFL_GET_HOST_CONFIG was not called...");
 		return;
 	}
 
