@@ -104,6 +104,10 @@ static void resize_coverage_bitmap(uint32_t new_bitmap_size){
 
 	/* pass the actual bitmap buffer size to the front-end */
 	GET_GLOBAL_STATE()->auxilary_buffer->capabilites.agent_coverage_bitmap_size = new_bitmap_size;
+
+	if(new_bitmap_size & (PAGE_SIZE-1)){
+        GET_GLOBAL_STATE()->shared_bitmap_size = (new_bitmap_size & ~(PAGE_SIZE-1)) + PAGE_SIZE;
+    }
 }
 
 bool apply_capabilities(CPUState *cpu){
@@ -126,6 +130,11 @@ bool apply_capabilities(CPUState *cpu){
 		debug_printf("GET_GLOBAL_STATE()->shared_bitmap_size: %lx\n", GET_GLOBAL_STATE()->shared_bitmap_size);
 		debug_printf("GET_GLOBAL_STATE()->cap_cr3: %lx\n", GET_GLOBAL_STATE()->cap_cr3);
 		debug_printf("--------------------------\n");
+
+		if (GET_GLOBAL_STATE()->input_buffer_size != GET_GLOBAL_STATE()->shared_payload_buffer_size){
+			resize_shared_memory(GET_GLOBAL_STATE()->input_buffer_size, &GET_GLOBAL_STATE()->shared_payload_buffer_size, NULL, GET_GLOBAL_STATE()->shared_payload_buffer_fd);
+			GET_GLOBAL_STATE()->shared_payload_buffer_size = GET_GLOBAL_STATE()->input_buffer_size;
+		}
 
 		if(GET_GLOBAL_STATE()->cap_compile_time_tracing_buffer_vaddr&0xfff){
 			fprintf(stderr, "[QEMU-Nyx] Error: guest's trace bitmap v_addr (0x%lx) is not page aligned!\n", GET_GLOBAL_STATE()->cap_compile_time_tracing_buffer_vaddr);
@@ -157,10 +166,6 @@ bool apply_capabilities(CPUState *cpu){
 		set_cap_agent_ijon_trace_bitmap(GET_GLOBAL_STATE()->auxilary_buffer, true);
 	}
 
-	if (GET_GLOBAL_STATE()->input_buffer_size != GET_GLOBAL_STATE()->shared_payload_buffer_size){
-		resize_shared_memory(GET_GLOBAL_STATE()->input_buffer_size, &GET_GLOBAL_STATE()->shared_payload_buffer_size, NULL, GET_GLOBAL_STATE()->shared_payload_buffer_fd);
-		GET_GLOBAL_STATE()->shared_payload_buffer_size = GET_GLOBAL_STATE()->input_buffer_size;
-	}
 
 	/* pass the actual input buffer size to the front-end */
 	GET_GLOBAL_STATE()->auxilary_buffer->capabilites.agent_input_buffer_size = GET_GLOBAL_STATE()->shared_payload_buffer_size;
