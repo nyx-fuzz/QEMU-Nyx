@@ -18,6 +18,7 @@
 void nyx_abort(char* msg){
 	set_abort_reason_auxiliary_buffer(GET_GLOBAL_STATE()->auxilary_buffer, msg, strlen(msg));
 	synchronization_lock();
+	exit(1);
 }
 
 bool is_called_in_fuzzing_mode(const char* hypercall){
