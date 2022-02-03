@@ -533,3 +533,20 @@ static void pc_q35_2_4_machine_options(MachineClass *m)
 
 DEFINE_Q35_MACHINE(v2_4, "pc-q35-2.4", NULL,
                    pc_q35_2_4_machine_options);
+
+#ifdef QEMU_NYX
+static void pc_kAFL64_vmx_v1_0_machine_options(MachineClass *m)
+{
+    pc_q35_4_2_machine_options(m);
+    m->alias = "kAFL64";
+    //m->is_default = 1;
+    m->desc = "kAFL64 PC (Q35 + ICH9, 2009)";
+}
+
+static void kAFL64_init(MachineState *machine)
+{
+    pc_q35_init(machine);
+}
+
+DEFINE_PC_MACHINE(v1, "kAFL64-Q35", kAFL64_init, pc_kAFL64_vmx_v1_0_machine_options);
+#endif
