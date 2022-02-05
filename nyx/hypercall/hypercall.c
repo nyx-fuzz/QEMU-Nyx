@@ -615,7 +615,7 @@ static void handle_hypercall_kafl_printf(struct kvm_run *run, CPUState *cpu, uin
 #ifdef DEBUG_HPRINTF
 	fprintf(stderr, "%s %s\n", __func__, hprintf_buffer);
 #endif
-	set_hprintf_auxiliary_buffer(GET_GLOBAL_STATE()->auxilary_buffer, hprintf_buffer, strnlen(hprintf_buffer, HPRINTF_SIZE)+1);
+	set_hprintf_auxiliary_buffer(GET_GLOBAL_STATE()->auxilary_buffer, hprintf_buffer, strnlen(hprintf_buffer, HPRINTF_SIZE));
 	synchronization_lock();
 }
 
