@@ -335,6 +335,25 @@ void synchronization_lock_crash_found(void){
 	in_fuzzing_loop = false;
 }
 
+void synchronization_lock_asan_found(void){
+	if(!in_fuzzing_loop){
+		fprintf(stderr, "<%d-%ld>\t%s [NOT IN FUZZING LOOP]\n", getpid(), run_counter, __func__);
+		set_success_auxiliary_result_buffer(GET_GLOBAL_STATE()->auxilary_buffer, 0);
+	}
+
+	pt_disable(qemu_get_cpu(0), false);
+
+	handle_tmp_snapshot_state();
+
+	set_asan_auxiliary_result_buffer(GET_GLOBAL_STATE()->auxilary_buffer);
+	
+	perform_reload();
+
+	//synchronization_lock();
+
+	in_fuzzing_loop = false;
+}
+
 void synchronization_lock_timeout_found(void){		
 	
 	//fprintf(stderr, "<%d>\t%s\n", getpid(), __func__);

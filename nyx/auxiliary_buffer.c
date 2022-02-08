@@ -166,6 +166,10 @@ void set_crash_auxiliary_result_buffer(auxilary_buffer_t* auxilary_buffer){
   VOLATILE_WRITE_8(auxilary_buffer->result.exec_result_code, rc_crash);
 }
 
+void set_asan_auxiliary_result_buffer(auxilary_buffer_t* auxilary_buffer){
+  VOLATILE_WRITE_8(auxilary_buffer->result.exec_result_code, rc_sanitizer);
+}
+
 void set_timeout_auxiliary_result_buffer(auxilary_buffer_t* auxilary_buffer){
   VOLATILE_WRITE_8(auxilary_buffer->result.exec_result_code, rc_timeout);
 }

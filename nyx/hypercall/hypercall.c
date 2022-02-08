@@ -439,6 +439,13 @@ static void handle_hypercall_kafl_submit_panic(struct kvm_run *run, CPUState *cp
 	}
 }
 
+static void handle_hypercall_kafl_submit_kasan(struct kvm_run *run, CPUState *cpu, uint64_t hypercall_arg){
+	if(hypercall_enabled){
+		QEMU_PT_PRINTF(CORE_PREFIX, "kASAN address:\t%lx", hypercall_arg);
+		write_virtual_memory(hypercall_arg, (uint8_t*)KASAN_PAYLOAD, PAYLOAD_BUFFER_SIZE, cpu);
+	}
+}
+
 //#define PANIC_DEBUG
 
 static void handle_hypercall_kafl_panic(struct kvm_run *run, CPUState *cpu, uint64_t hypercall_arg){
@@ -548,6 +555,27 @@ static void handle_hypercall_kafl_panic_extended(struct kvm_run *run, CPUState *
 			assert(asprintf(&report, "Agent has crashed before initializing the fuzzing loop: %s", hprintf_buffer) != -1);
 			nyx_abort(report);
 		}
+}
+
+static void handle_hypercall_kafl_kasan(struct kvm_run *run, CPUState *cpu, uint64_t hypercall_arg){
+	if(hypercall_enabled){
+#ifdef PANIC_DEBUG
+		if(hypercall_arg){
+			QEMU_PT_PRINTF(CORE_PREFIX, "ASan notification in user mode!");
+		} else{
+			QEMU_PT_PRINTF(CORE_PREFIX, "ASan notification in kernel mode!");
+		}
+#endif
+		if(fast_reload_snapshot_exists(get_fast_reload_snapshot())){
+			synchronization_lock_asan_found();
+			//synchronization_stop_vm_kasan(cpu);
+		} else{
+			QEMU_PT_PRINTF(CORE_PREFIX, "KASAN detected during initialization of stage 1 or stage 2 loader");
+			//hypercall_snd_char(KAFL_PROTO_KASAN);
+			QEMU_PT_PRINTF_DEBUG("Protocol - SEND: KAFL_PROTO_KASAN");
+
+		}
+	}
 }
 
 static void handle_hypercall_kafl_lock(struct kvm_run *run, CPUState *cpu, uint64_t hypercall_arg){
@@ -804,7 +832,9 @@ int handle_kafl_hypercall(struct kvm_run *run, CPUState *cpu, uint64_t hypercall
 			ret = 0;
 			break;
 		case KVM_EXIT_KAFL_SUBMIT_KASAN:
-			nyx_abort((char*)"Deprecated hypercall called (HYPERCALL_SUBMIT_KASAN)...");
+			//timeout_reload_pending = false;
+			//fprintf(stderr, "KVM_EXIT_KAFL_SUBMIT_KASAN\n");
+			handle_hypercall_kafl_submit_kasan(run, cpu, arg);
 			ret = 0;
 			break;
 		case KVM_EXIT_KAFL_PANIC:
@@ -814,7 +844,9 @@ int handle_kafl_hypercall(struct kvm_run *run, CPUState *cpu, uint64_t hypercall
 			ret = 0;
 			break;
 		case KVM_EXIT_KAFL_KASAN:
-			nyx_abort((char*)"Deprecated hypercall called (HYPERCALL_KAFL_KASAN)...");
+			//timeout_reload_pending = false;
+			//fprintf(stderr, "KVM_EXIT_KAFL_KASAN\n");
+			handle_hypercall_kafl_kasan(run, cpu, arg);
 			ret = 0;
 			break;
 		case KVM_EXIT_KAFL_LOCK:
