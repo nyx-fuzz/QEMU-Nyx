@@ -107,6 +107,9 @@ void state_init_global(void){
     global_state.pt_trace_mode_force = false;
 
     global_state.num_dirty_pages = 0;
+    
+    global_state.get_host_config_done = false;
+    global_state.set_agent_config_done = false;
 
     global_state.sharedir = sharedir_new();
 

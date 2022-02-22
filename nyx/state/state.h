@@ -139,6 +139,9 @@ typedef struct qemu_nyx_state_s{
 
     uint32_t num_dirty_pages;
 
+    bool get_host_config_done;
+    bool set_agent_config_done;
+
     /* capabilites */
     uint8_t cap_timeout_detection;
     uint8_t cap_only_reload_mode;

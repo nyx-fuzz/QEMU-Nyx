@@ -1,6 +1,6 @@
 # QEMU-NYX
 
-This repository contains Nyx's fork of Qemu. To enable Hypervisor based snapshots, Intel-PT based tracing, and Redqueen style magic byte resolution, we made various extensions to QEMU. This includes the ability to quickly reset memory and devices, ontain precise disassembly of the code running (even when code is partially swapped out / unavailable) & intel-PT decoding, instrument code running in the VM with breakpoint based hooks as well as communicating with a fuzzing frontend (e.g. based on libnyx).
+This repository contains Nyx's fork of QEMU. To enable Hypervisor based snapshots, Intel-PT based tracing, and REDQUEEN style magic byte resolution, we made various extensions to QEMU. This includes the ability to quickly reset memory and devices, obtain precise disassembly of the code running (even when code is partially swapped out / unavailable) & Intel-PT decoding, instrument code running in the VM with breakpoint-based hooks as well as communicating with a fuzzing frontend (e.g. based on [libnyx](https://github.com/nyx-fuzz/libnyx)).
 
 You can find more detailed information in our main repository.
 
@@ -20,7 +20,7 @@ If you found and fixed a bug on your own: We are very open to patches, please cr
 
 ### License
 
-This tool is provided under **AGPL license**. 
+This tool is provided under **GPLv2 license**. 
 
 **Free Software Hell Yeah!** 
 

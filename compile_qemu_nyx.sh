@@ -81,15 +81,9 @@ compile () {
   echo "[!] QEMU-Nyx is ready!"
 }
 
-cd libxdc
 git submodule init
-git submodule update
-cd ..
-
-cd capstone_v4
-git submodule init
-git submodule update
-cd ..
+git submodule update libxdc
+git submodule update capstone_v4
 
 if [ "$#" == 0 ] ; then
   error

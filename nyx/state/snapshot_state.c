@@ -128,6 +128,10 @@ void deserialize_state(const char* filename_prefix){
 
         assert(apply_capabilities(qemu_get_cpu(0)));
         remap_payload_buffer(nyx_global_state->payload_buffer, ((CPUState *)qemu_get_cpu(0)) );
+
+        /* makes sure that we are allowed to enter the fuzzing loop */
+        nyx_global_state->get_host_config_done = true;
+        nyx_global_state->set_agent_config_done = true;
     }
     else{
         fprintf(stderr, "[QEMU-Nyx]: this feature is currently missing\n");
