@@ -25,6 +25,7 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdbool.h>
 #include "nyx/state/state.h"
 #include "nyx/debug.h"
+#include "nyx/trace_dump.h"
 
 /* experimental feature (currently broken)
  * enabled via trace mode
@@ -103,7 +104,9 @@ void check_auxiliary_config_buffer(auxilary_buffer_t* auxilary_buffer, auxilary_
 #ifdef SUPPORT_COMPILE_TIME_REDQUEEN
         GET_GLOBAL_STATE()->pt_trace_mode_force = true;		  
 #endif
-        redqueen_set_trace_mode(GET_GLOBAL_STATE()->redqueen_state);
+		GET_GLOBAL_STATE()->trace_mode = true;
+        redqueen_set_trace_mode();
+        pt_trace_dump_enable(true);
       }
     }
     else {
@@ -112,7 +115,9 @@ void check_auxiliary_config_buffer(auxilary_buffer_t* auxilary_buffer, auxilary_
 #ifdef SUPPORT_COMPILE_TIME_REDQUEEN
         GET_GLOBAL_STATE()->pt_trace_mode_force = false;
 #endif
-		    redqueen_unset_trace_mode(GET_GLOBAL_STATE()->redqueen_state);
+		GET_GLOBAL_STATE()->trace_mode = false;
+        redqueen_unset_trace_mode();
+        pt_trace_dump_enable(false);
       }
     }
 
@@ -164,6 +169,10 @@ void check_auxiliary_config_buffer(auxilary_buffer_t* auxilary_buffer, auxilary_
 
 void set_crash_auxiliary_result_buffer(auxilary_buffer_t* auxilary_buffer){
   VOLATILE_WRITE_8(auxilary_buffer->result.exec_result_code, rc_crash);
+}
+
+void set_asan_auxiliary_result_buffer(auxilary_buffer_t* auxilary_buffer){
+  VOLATILE_WRITE_8(auxilary_buffer->result.exec_result_code, rc_sanitizer);
 }
 
 void set_timeout_auxiliary_result_buffer(auxilary_buffer_t* auxilary_buffer){
@@ -225,7 +234,12 @@ void reset_page_not_found_result_buffer(auxilary_buffer_t* auxilary_buffer){
 }
 
 void set_success_auxiliary_result_buffer(auxilary_buffer_t* auxilary_buffer, uint8_t success){
-  VOLATILE_WRITE_8(auxilary_buffer->result.exec_result_code, rc_success);
+  //should refactor to let caller directly set the result codes
+  if (success == 2) {
+	  VOLATILE_WRITE_8(auxilary_buffer->result.exec_result_code, rc_starved);
+  } else {
+	  VOLATILE_WRITE_8(auxilary_buffer->result.exec_result_code, rc_success);
+  }
 }
 
 void set_payload_buffer_write_reason_auxiliary_buffer(auxilary_buffer_t* auxilary_buffer, char* msg, uint32_t len){

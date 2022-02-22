@@ -349,6 +349,13 @@ void handle_hypercall_kafl_release(struct kvm_run *run, CPUState *cpu, uint64_t 
 		if (init_state){
 			init_state = false;	
 		} else {
+			//printf(CORE_PREFIX, "Got STARVED notification (num=%llu)\n", run->hypercall.args[0]);
+			if (run->hypercall.args[0] > 0) {
+				GET_GLOBAL_STATE()->starved = 1;
+			} else {
+				GET_GLOBAL_STATE()->starved = 0;
+			}
+
 			synchronization_disable_pt(cpu);
 			release_print_once(cpu);
 		}
@@ -435,13 +442,28 @@ static void handle_hypercall_kafl_submit_panic(struct kvm_run *run, CPUState *cp
 
 	if(hypercall_enabled){
 		QEMU_PT_PRINTF(CORE_PREFIX, "Panic address:\t%lx", hypercall_arg);
-		write_virtual_memory(hypercall_arg, (uint8_t*)PANIC_PAYLOAD, PAYLOAD_BUFFER_SIZE, cpu);
+		if (run->hypercall.longmode) {
+			write_virtual_memory(hypercall_arg, (uint8_t*)PANIC_PAYLOAD_64, PAYLOAD_BUFFER_SIZE, cpu);
+		} else {
+			write_virtual_memory(hypercall_arg, (uint8_t*)PANIC_PAYLOAD_32, PAYLOAD_BUFFER_SIZE, cpu);
+		}
+	}
+}
+
+static void handle_hypercall_kafl_submit_kasan(struct kvm_run *run, CPUState *cpu, uint64_t hypercall_arg){
+	if(hypercall_enabled){
+		QEMU_PT_PRINTF(CORE_PREFIX, "kASAN address:\t%lx", hypercall_arg);
+		if (run->hypercall.longmode){
+			write_virtual_memory(hypercall_arg, (uint8_t*)KASAN_PAYLOAD_64, PAYLOAD_BUFFER_SIZE, cpu);
+		} else {
+			write_virtual_memory(hypercall_arg, (uint8_t*)KASAN_PAYLOAD_32, PAYLOAD_BUFFER_SIZE, cpu);
+		}
 	}
 }
 
 //#define PANIC_DEBUG
 
-static void handle_hypercall_kafl_panic(struct kvm_run *run, CPUState *cpu, uint64_t hypercall_arg){
+void handle_hypercall_kafl_panic(struct kvm_run *run, CPUState *cpu, uint64_t hypercall_arg){
 	static char reason[1024];
 	if(hypercall_enabled){
 #ifdef PANIC_DEBUG
@@ -550,6 +572,27 @@ static void handle_hypercall_kafl_panic_extended(struct kvm_run *run, CPUState *
 		}
 }
 
+static void handle_hypercall_kafl_kasan(struct kvm_run *run, CPUState *cpu, uint64_t hypercall_arg){
+	if(hypercall_enabled){
+#ifdef PANIC_DEBUG
+		if(hypercall_arg){
+			QEMU_PT_PRINTF(CORE_PREFIX, "ASan notification in user mode!");
+		} else{
+			QEMU_PT_PRINTF(CORE_PREFIX, "ASan notification in kernel mode!");
+		}
+#endif
+		if(fast_reload_snapshot_exists(get_fast_reload_snapshot())){
+			synchronization_lock_asan_found();
+			//synchronization_stop_vm_kasan(cpu);
+		} else{
+			QEMU_PT_PRINTF(CORE_PREFIX, "KASAN detected during initialization of stage 1 or stage 2 loader");
+			//hypercall_snd_char(KAFL_PROTO_KASAN);
+			QEMU_PT_PRINTF_DEBUG("Protocol - SEND: KAFL_PROTO_KASAN");
+
+		}
+	}
+}
+
 static void handle_hypercall_kafl_lock(struct kvm_run *run, CPUState *cpu, uint64_t hypercall_arg){
 
 	if(is_called_in_fuzzing_mode("KVM_EXIT_KAFL_LOCK")){
@@ -572,7 +615,7 @@ static void handle_hypercall_kafl_printf(struct kvm_run *run, CPUState *cpu, uin
 #ifdef DEBUG_HPRINTF
 	fprintf(stderr, "%s %s\n", __func__, hprintf_buffer);
 #endif
-	set_hprintf_auxiliary_buffer(GET_GLOBAL_STATE()->auxilary_buffer, hprintf_buffer, strnlen(hprintf_buffer, HPRINTF_SIZE)+1);
+	set_hprintf_auxiliary_buffer(GET_GLOBAL_STATE()->auxilary_buffer, hprintf_buffer, strnlen(hprintf_buffer, HPRINTF_SIZE));
 	synchronization_lock();
 }
 
@@ -671,81 +714,97 @@ void pt_set_disable_patches_pending(CPUState *cpu){
 	GET_GLOBAL_STATE()->patches_disable_pending = true;
 }
 
-void pt_enable_rqi_trace(CPUState *cpu){
-	if (GET_GLOBAL_STATE()->redqueen_state){
-		redqueen_set_trace_mode(GET_GLOBAL_STATE()->redqueen_state);
-	}
-}
-
-void pt_disable_rqi_trace(CPUState *cpu){
-	if (GET_GLOBAL_STATE()->redqueen_state){
-		redqueen_unset_trace_mode(GET_GLOBAL_STATE()->redqueen_state);
-		return;
-	}
-}
-
-static void handle_hypercall_kafl_dump_file(struct kvm_run *run, CPUState *cpu, uint64_t hypercall_arg){
-
-	/* TODO: check via aux buffer if we should allow this hypercall during fuzzing */
-	/*
-	if(GET_GLOBAL_STATE()->in_fuzzing_mode){
-		return;
-	}
-	*/
-
+static void handle_hypercall_kafl_dump_file(struct kvm_run *run, CPUState *cpu, uint64_t hypercall_arg)
+{
+	kafl_dump_file_t file_obj;
 	char filename[256] = {0};
+	char* host_path = NULL;
+	FILE* f = NULL;
 
 	uint64_t vaddr = hypercall_arg;
-	kafl_dump_file_t file_obj;
 	memset((void*)&file_obj, 0, sizeof(kafl_dump_file_t));
 
-
-	if(read_virtual_memory(vaddr, (uint8_t*)&file_obj, sizeof(kafl_dump_file_t), cpu)){
-
-		void* page = malloc(0x1000);
-	
-		read_virtual_memory(file_obj.file_name_str_ptr, (uint8_t*)&filename, sizeof(char)*256, cpu);
-		filename[255] = 0;
-
-    char* base_name = basename(filename);		
-		char* host_path = NULL;
-
-		assert(asprintf(&host_path, "%s/dump/%s", GET_GLOBAL_STATE()->workdir_path , base_name) != -1);
-		//fprintf(stderr, "dumping file %s -> %s (bytes %ld) in append_mode=%d\n", base_name, host_path, file_obj.bytes, file_obj.append);
-
-    FILE* f = NULL;
-
-		if(file_obj.append){
-	  	f = fopen(host_path, "a+");
-		}
-		else{
-    	f = fopen(host_path, "w+");
-		}
-
-		int32_t bytes = file_obj.bytes;
-		uint32_t pos = 0;
-
-		while(bytes > 0){
-
-			if(bytes >= 0x1000){
-				read_virtual_memory(file_obj.data_ptr+pos, (uint8_t*)page, 0x1000, cpu);
-				fwrite(page, 1, 0x1000, f);
-			}
-			else{
-				read_virtual_memory(file_obj.data_ptr+pos, (uint8_t*)page, bytes, cpu);
-				fwrite(page, 1, bytes, f);
-			}
-
-			bytes -= 0x1000;
-			pos += 0x1000;
-		}
-
-
-		fclose(f);
-		free(host_path);
-		free(page);
-		
+	if (!read_virtual_memory(vaddr, (uint8_t*)&file_obj, sizeof(kafl_dump_file_t), cpu)){
+		fprintf(stderr, "Failed to read file_obj in %s. Skipping..\n", __func__);
+		goto err_out1;
 	}
+
+	if (file_obj.file_name_str_ptr != 0) {
+		if (!read_virtual_memory(file_obj.file_name_str_ptr, (uint8_t*)filename, sizeof(filename)-1, cpu)) {
+			fprintf(stderr, "Failed to read file_name_str_ptr in %s. Skipping..\n", __func__);
+			goto err_out1;
+		}
+		filename[sizeof(filename)-1] = 0;
+	}
+	
+	//fprintf(stderr, "%s: dump %lu fbytes from %s (append=%u)\n",
+	//	   	__func__, file_obj.bytes, filename, file_obj.append);
+
+	// use a tempfile if file_name_ptr == NULL or points to empty string
+	if (0 == strnlen(filename, sizeof(filename))) {
+		strncpy(filename, "tmp.XXXXXX", sizeof(filename)-1);
+	}
+
+	char *base_name = basename(filename); // clobbers the filename buffer!
+	assert(asprintf(&host_path, "%s/dump/%s", GET_GLOBAL_STATE()->workdir_path , base_name) != -1);
+
+	// check if base_name is mkstemp() pattern, otherwise write/append to exact name
+	char *pattern = strstr(base_name, "XXXXXX");
+	if (pattern) {
+		unsigned suffix = strlen(pattern) - strlen("XXXXXX");
+		f = fdopen(mkstemps(host_path, suffix), "w+");
+		if (file_obj.append) {
+			fprintf(stderr, "Warning in %s: Writing unique generated file in append mode?\n", __func__);
+		}
+	} else {
+		if (file_obj.append){
+			f = fopen(host_path, "a+");
+		} else{
+			f = fopen(host_path, "w+");
+		}
+	}
+
+	if (!f) {
+		fprintf(stderr, "Error in %s(%s): %s\n", host_path, __func__, strerror(errno));
+		goto err_out1;
+	}
+
+	uint32_t pos = 0;
+	int32_t bytes = file_obj.bytes;
+	void* page = malloc(PAGE_SIZE);
+	uint32_t written = 0;
+
+	QEMU_PT_PRINTF(CORE_PREFIX, "%s: dump %d bytes to %s (append=%u)\n",
+			__func__, bytes, host_path, file_obj.append);
+
+	while (bytes > 0) {
+
+		if (bytes >= PAGE_SIZE) {
+			read_virtual_memory(file_obj.data_ptr+pos, (uint8_t*)page, PAGE_SIZE, cpu);
+			written = fwrite(page, 1, PAGE_SIZE, f);
+		}
+		else {
+			read_virtual_memory(file_obj.data_ptr+pos, (uint8_t*)page, bytes, cpu);
+			written = fwrite(page, 1, bytes, f);
+			break;
+		}
+
+		if (!written) {
+			fprintf(stderr, "Error in %s(%s): %s\n", host_path, __func__, strerror(errno));
+			goto err_out2;
+		}
+
+		bytes -= written;
+		pos += written;
+
+	}
+
+
+err_out2:
+	free(page);
+	fclose(f);
+err_out1:
+	free(host_path);
 }
 
 static void handle_hypercall_kafl_persist_page_past_snapshot(struct kvm_run *run, CPUState *cpu, uint64_t hypercall_arg){
@@ -804,7 +863,9 @@ int handle_kafl_hypercall(struct kvm_run *run, CPUState *cpu, uint64_t hypercall
 			ret = 0;
 			break;
 		case KVM_EXIT_KAFL_SUBMIT_KASAN:
-			nyx_abort((char*)"Deprecated hypercall called (HYPERCALL_SUBMIT_KASAN)...");
+			//timeout_reload_pending = false;
+			//fprintf(stderr, "KVM_EXIT_KAFL_SUBMIT_KASAN\n");
+			handle_hypercall_kafl_submit_kasan(run, cpu, arg);
 			ret = 0;
 			break;
 		case KVM_EXIT_KAFL_PANIC:
@@ -814,7 +875,9 @@ int handle_kafl_hypercall(struct kvm_run *run, CPUState *cpu, uint64_t hypercall
 			ret = 0;
 			break;
 		case KVM_EXIT_KAFL_KASAN:
-			nyx_abort((char*)"Deprecated hypercall called (HYPERCALL_KAFL_KASAN)...");
+			//timeout_reload_pending = false;
+			//fprintf(stderr, "KVM_EXIT_KAFL_KASAN\n");
+			handle_hypercall_kafl_kasan(run, cpu, arg);
 			ret = 0;
 			break;
 		case KVM_EXIT_KAFL_LOCK:

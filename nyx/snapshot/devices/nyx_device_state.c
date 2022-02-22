@@ -376,6 +376,12 @@ nyx_device_state_t* nyx_device_state_init_from_snapshot(const char* snapshot_fol
     return self;
 }
 
+/*
+ * This is where QemuFile is created for later fast_snapshot creation
+ * we use fast_qemu_savevm_state() to create a regular snapshot to QEMUFile
+ * backed by RAM. state_reallocation_new() then uses this file to build an
+ * optimized sequence of snapshot restore operations.
+ */
 nyx_device_state_t* nyx_device_state_init(void){
 
     nyx_device_state_t* self = malloc(sizeof(nyx_device_state_t));

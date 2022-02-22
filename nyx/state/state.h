@@ -49,6 +49,7 @@ typedef struct qemu_nyx_state_s{
     bool nyx_fdl;
 
     char* workdir_path;
+    uint32_t worker_id;
 
     /* FAST VM RELOAD */
     bool fast_reload_enabled;
@@ -131,6 +132,8 @@ typedef struct qemu_nyx_state_s{
 
     bool in_fuzzing_mode;
     bool in_reload_mode; 
+    bool starved;
+    bool trace_mode;
 
     bool shutdown_requested;
     bool cow_cache_full;

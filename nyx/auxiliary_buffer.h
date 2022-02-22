@@ -44,6 +44,8 @@ enum nyx_result_codes {
   rc_timeout = 3,
   rc_input_buffer_write = 4,
   rc_aborted = 5,
+  rc_sanitizer = 6, 
+  rc_starved = 7,
 };
 
 typedef struct auxilary_buffer_header_s{
@@ -72,7 +74,7 @@ typedef struct auxilary_buffer_config_s{
 
   /* trigger to enable / disable different QEMU-PT modes */
   uint8_t redqueen_mode; 
-  uint8_t trace_mode; 
+  uint8_t trace_mode;  /* dump decoded edge transitions to file */
   uint8_t reload_mode;
 
   uint8_t verbose_level;
@@ -149,6 +151,7 @@ void init_auxiliary_buffer(auxilary_buffer_t* auxilary_buffer);
 void check_auxiliary_config_buffer(auxilary_buffer_t* auxilary_buffer, auxilary_buffer_config_t* shadow_config);
 
 void set_crash_auxiliary_result_buffer(auxilary_buffer_t* auxilary_buffer);
+void set_asan_auxiliary_result_buffer(auxilary_buffer_t* auxilary_buffer);
 void set_timeout_auxiliary_result_buffer(auxilary_buffer_t* auxilary_buffer);
 void set_reload_auxiliary_result_buffer(auxilary_buffer_t* auxilary_buffer);
 void set_pt_overflow_auxiliary_result_buffer(auxilary_buffer_t* auxilary_buffer);

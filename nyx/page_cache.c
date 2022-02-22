@@ -25,6 +25,9 @@
 
 #define UNMAPPED_PAGE 0xFFFFFFFFFFFFFFFFULL
 
+static void page_cache_unlock(page_cache_t* self);
+static void page_cache_lock(page_cache_t* self);
+
 #ifndef STANDALONE_DECODER
 static bool reload_addresses(page_cache_t* self){
 #else
@@ -39,6 +42,8 @@ bool reload_addresses(page_cache_t* self){
 
 	if(self_offset != self->num_pages*PAGE_CACHE_ADDR_LINE_SIZE){
 		//fprintf(stderr, "Reloading files ...\n");
+
+		page_cache_lock(self); // don't read while someone else is writing?
 
 		lseek(self->fd_address_file, self->num_pages*PAGE_CACHE_ADDR_LINE_SIZE, SEEK_SET);
 		offset = self->num_pages;
@@ -79,6 +84,8 @@ bool reload_addresses(page_cache_t* self){
 		munmap(self->page_data, self->num_pages*PAGE_SIZE);
 		self->num_pages = self_offset/PAGE_CACHE_ADDR_LINE_SIZE;
 		self->page_data = mmap(NULL, (self->num_pages)*PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, self->fd_page_file, 0);
+				
+		page_cache_unlock(self);
 
 		return true;
 	}
@@ -359,12 +366,12 @@ page_cache_t* page_cache_new(const char* cache_file, uint8_t disassembler_word_w
 
 
 	self->lookup = kh_init(PC_CACHE);
-	self->fd_page_file = open(tmp1, O_CLOEXEC | O_RDWR, S_IRWXU);
-	self->fd_address_file = open(tmp2, O_CLOEXEC | O_RDWR, S_IRWXU);
+	self->fd_page_file = open(tmp1, O_CLOEXEC | O_CREAT | O_RDWR, 0644);
+	self->fd_address_file = open(tmp2, O_CLOEXEC | O_CREAT | O_RDWR, 0644);
 
 #ifndef STANDALONE_DECODER
 	self->cpu = cpu;
-	self->fd_lock = open(tmp3, O_CLOEXEC);
+	self->fd_lock = open(tmp3, O_CLOEXEC | O_CREAT, 0644);
 	assert(self->fd_lock > 0);
 #else
 	if(self->fd_page_file == -1 || self->fd_address_file == -1){
@@ -381,7 +388,11 @@ page_cache_t* page_cache_new(const char* cache_file, uint8_t disassembler_word_w
 	self->last_page = 0xFFFFFFFFFFFFFFFF;
 	self->last_addr = 0xFFFFFFFFFFFFFFFF;
 
+#ifndef STANDALONE_DECODER
 	QEMU_PT_PRINTF(PAGE_CACHE_PREFIX, "%s (%s - %s)", __func__, tmp1, tmp2);
+#else
+	QEMU_PT_PRINTF(PAGE_CACHE_PREFIX, "%s (%s - %s) WORD_WIDTH: %d", __func__, tmp1, tmp2, disassembler_word_width);
+#endif
 
 	free(tmp3);
 	free(tmp2);

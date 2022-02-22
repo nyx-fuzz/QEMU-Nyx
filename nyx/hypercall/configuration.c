@@ -24,6 +24,7 @@ void handle_hypercall_kafl_get_host_config(struct kvm_run *run, CPUState *cpu, u
 	config.bitmap_size = GET_GLOBAL_STATE()->shared_bitmap_size;
 	config.ijon_bitmap_size = GET_GLOBAL_STATE()->shared_ijon_bitmap_size;
 	config.payload_buffer_size = GET_GLOBAL_STATE()->shared_payload_buffer_size;
+	config.worker_id = GET_GLOBAL_STATE()->worker_id;
 
 	write_virtual_memory(vaddr, (uint8_t*)&config, sizeof(host_config_t), cpu);
 	GET_GLOBAL_STATE()->get_host_config_done = true;
