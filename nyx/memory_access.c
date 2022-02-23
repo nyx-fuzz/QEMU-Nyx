@@ -41,39 +41,38 @@ static uint64_t get_48_paging_phys_addr(uint64_t cr3, uint64_t addr, bool read_f
 #define x86_64_PAGE_SIZE        0x1000
 #define x86_64_PAGE_MASK        ~(x86_64_PAGE_SIZE - 1)
 
-static void set_mem_mode(CPUState *cpu){
+mem_mode_t get_current_mem_mode(CPUState *cpu){
 	kvm_arch_get_registers(cpu);
 
 	X86CPU *cpux86 = X86_CPU(cpu);
 	CPUX86State *env = &cpux86->env;
-    
-    if (!(env->cr[0] & CR0_PG_MASK)) {
-        GET_GLOBAL_STATE()->mem_mode = mm_32_protected;
-        return;
+
+	if (!(env->cr[0] & CR0_PG_MASK)) {
+        return mm_32_protected;
     }
     else{
     	if (env->cr[4] & CR4_PAE_MASK) {
 	        if (env->hflags & HF_LMA_MASK) {
 	            if (env->cr[4] & CR4_LA57_MASK) {
-	            	GET_GLOBAL_STATE()->mem_mode = mm_64_l5_paging;
-                    return;
+                    return mm_64_l5_paging;
 	            } else {
-                    GET_GLOBAL_STATE()->mem_mode = mm_64_l4_paging;
-                    return;
+                    return mm_64_l4_paging;
 	            }
 	        } 
 	        else{
-                GET_GLOBAL_STATE()->mem_mode = mm_32_pae;
-                return;
+                return mm_32_pae;
 	        }
 	    } 
 	    else {
-            GET_GLOBAL_STATE()->mem_mode = mm_32_paging;
-	    	return;
+	    	return mm_32_paging;
 	    }
     }
 
-    return;
+    return mm_unkown;
+}
+
+static void set_mem_mode(CPUState *cpu){
+    GET_GLOBAL_STATE()->mem_mode = get_current_mem_mode(cpu);
 }
 
 /*  Warning: This might break memory handling for hypervisor fuzzing => FIXME LATER */

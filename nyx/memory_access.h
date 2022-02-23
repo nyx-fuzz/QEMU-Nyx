@@ -26,6 +26,7 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 #include <linux/kvm.h>
 #include "qemu-common.h"
 #include "sysemu/kvm_int.h"
+#include "nyx/types.h"
 
 #define MEM_SPLIT_START 0x0C0000000
 #define MEM_SPLIT_END   0x100000000
@@ -33,6 +34,8 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 /* i386 pc_piix low_mem address translation */
 #define address_to_ram_offset(offset)  (offset >= MEM_SPLIT_END ? (offset - MEM_SPLIT_END) + MEM_SPLIT_START : offset)
 #define ram_offset_to_address(offset)  (offset >= MEM_SPLIT_START ? (offset - MEM_SPLIT_START) + MEM_SPLIT_END : offset)
+
+mem_mode_t get_current_mem_mode(CPUState *cpu);
 
 uint64_t get_paging_phys_addr(CPUState *cpu, uint64_t cr3, uint64_t addr);
 

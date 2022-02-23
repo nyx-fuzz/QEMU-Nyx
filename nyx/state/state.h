@@ -29,19 +29,11 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 #include "nyx/auxiliary_buffer.h"
 #include "nyx/sharedir.h"
 #include "nyx/fast_vm_reload_sync.h"
+#include "nyx/types.h"
 
 #include <libxdc.h>
 
 #define INTEL_PT_MAX_RANGES	4
-
-enum mem_mode { 
-    mm_unkown,
-	mm_32_protected,    /* 32 Bit / No MMU */
-	mm_32_paging,       /* 32 Bit / L3 Paging */
-	mm_32_pae,          /* 32 Bit / PAE Paging */
-	mm_64_l4_paging,    /* 64 Bit / L4 Paging */
-	mm_64_l5_paging,    /* 32 Bit / L5 Paging */
-};
 
 typedef struct qemu_nyx_state_s{
 
@@ -117,7 +109,7 @@ typedef struct qemu_nyx_state_s{
     uint64_t* nested_payload_pages; 
     bool protect_payload_buffer;
     bool discard_tmp_snapshot;
-    uint8_t mem_mode; 
+    mem_mode_t mem_mode; 
     uint32_t input_buffer_size;
 
 

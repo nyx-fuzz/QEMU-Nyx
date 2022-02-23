@@ -442,10 +442,20 @@ static void handle_hypercall_kafl_submit_panic(struct kvm_run *run, CPUState *cp
 
 	if(hypercall_enabled){
 		QEMU_PT_PRINTF(CORE_PREFIX, "Panic address:\t%lx", hypercall_arg);
-		if (run->hypercall.longmode) {
-			write_virtual_memory(hypercall_arg, (uint8_t*)PANIC_PAYLOAD_64, PAYLOAD_BUFFER_SIZE_64, cpu);
-		} else {
-			write_virtual_memory(hypercall_arg, (uint8_t*)PANIC_PAYLOAD_32, PAYLOAD_BUFFER_SIZE_32, cpu);
+
+		switch (get_current_mem_mode(cpu)){
+			case mm_32_protected:    
+			case mm_32_paging:
+			case mm_32_pae:
+				write_virtual_memory(hypercall_arg, (uint8_t*)PANIC_PAYLOAD_32, PAYLOAD_BUFFER_SIZE_32, cpu);
+				break;
+			case mm_64_l4_paging:
+			case mm_64_l5_paging:
+				write_virtual_memory(hypercall_arg, (uint8_t*)PANIC_PAYLOAD_64, PAYLOAD_BUFFER_SIZE_64, cpu);
+				break;
+			default:
+				abort();
+				break;
 		}
 	}
 }
@@ -453,10 +463,20 @@ static void handle_hypercall_kafl_submit_panic(struct kvm_run *run, CPUState *cp
 static void handle_hypercall_kafl_submit_kasan(struct kvm_run *run, CPUState *cpu, uint64_t hypercall_arg){
 	if(hypercall_enabled){
 		QEMU_PT_PRINTF(CORE_PREFIX, "kASAN address:\t%lx", hypercall_arg);
-		if (run->hypercall.longmode){
-			write_virtual_memory(hypercall_arg, (uint8_t*)KASAN_PAYLOAD_64, PAYLOAD_BUFFER_SIZE_64, cpu);
-		} else {
-			write_virtual_memory(hypercall_arg, (uint8_t*)KASAN_PAYLOAD_32, PAYLOAD_BUFFER_SIZE_32, cpu);
+
+		switch (get_current_mem_mode(cpu)){
+			case mm_32_protected:    
+			case mm_32_paging:
+			case mm_32_pae:
+				write_virtual_memory(hypercall_arg, (uint8_t*)KASAN_PAYLOAD_32, PAYLOAD_BUFFER_SIZE_32, cpu);
+				break;
+			case mm_64_l4_paging:
+			case mm_64_l5_paging:
+				write_virtual_memory(hypercall_arg, (uint8_t*)KASAN_PAYLOAD_64, PAYLOAD_BUFFER_SIZE_64, cpu);
+				break;
+			default:
+				abort();
+				break;
 		}
 	}
 }
