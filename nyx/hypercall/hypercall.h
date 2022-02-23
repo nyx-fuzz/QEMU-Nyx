@@ -21,7 +21,8 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 
 #pragma once 
 
-#define PAYLOAD_BUFFER_SIZE		26
+#define PAYLOAD_BUFFER_SIZE_64		26
+#define PAYLOAD_BUFFER_SIZE_32		20
 
 #define KAFL_MODE_64	0
 #define KAFL_MODE_32	1
