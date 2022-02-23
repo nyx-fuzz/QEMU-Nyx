@@ -521,11 +521,11 @@ static inline int get_handler(state_reallocation_t* self, QEMUFile* f, void* cur
         add_get(self, (void*) field->info->get, curr_elem, size, (void*) field, f, field->info->name);
     }
     else if(!strcmp(field->info->name, "pci config")){
-        fprintf(stderr, "type: %s (size: %lx)\n", field->info->name, size);
+        //fprintf(stderr, "type: %s (size: %lx)\n", field->info->name, size);
         add_get(self, (void*) field->info->get, curr_elem, size, (void*) field, f, field->info->name);
     }
     else if(!strcmp(field->info->name, "pci irq state")){
-        fprintf(stderr, "type: %s (size: %lx)\n", field->info->name, size);
+        //fprintf(stderr, "type: %s (size: %lx)\n", field->info->name, size);
         add_get(self, (void*) field->info->get, curr_elem, size, (void*) field, f, field->info->name);
     }
     else if(!strcmp(field->info->name, "virtio")){
