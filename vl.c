@@ -2928,6 +2928,7 @@ int main(int argc, char **argv, char **envp)
 #ifdef QEMU_NYX
     bool fast_vm_reload = false;
     state_init_global();
+    char *fast_vm_reload_opt_arg = NULL;
 #endif
 
     int i;
@@ -3083,9 +3084,11 @@ int main(int argc, char **argv, char **envp)
 #ifdef QEMU_NYX
             case QEMU_OPTION_fast_vm_reload:
                 opts = qemu_opts_parse_noisily(qemu_find_opts("fast_vm_reload-opts"),
-                                               optarg, true);                if (!opts) {
+                                               optarg, true);
+                if (!opts) {
                     exit(1);
                 }
+                fast_vm_reload_opt_arg = optarg;
                 fast_vm_reload = true;
                 break;
 #endif
@@ -4569,7 +4572,7 @@ int main(int argc, char **argv, char **envp)
             exit(1);
         }
 
-        QemuOpts *opts = qemu_opts_parse_noisily(qemu_find_opts("fast_vm_reload-opts"), optarg, true);
+        QemuOpts *opts = qemu_opts_parse_noisily(qemu_find_opts("fast_vm_reload-opts"), fast_vm_reload_opt_arg, true);
         const char* snapshot_path = qemu_opt_get(opts, "path");
         const char* pre_snapshot_path = qemu_opt_get(opts, "pre_path");
 
