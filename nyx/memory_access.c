@@ -592,12 +592,12 @@ static bool read_memory(uint64_t address, uint64_t* buffer, size_t size, bool re
     return true;
 }
 
-__attribute__((always_inline))
+__attribute__((always_inline)) inline
 static bool bit(uint64_t value, uint8_t lsb) {
   return (value >> lsb) & 1;
 }
 
-__attribute__((always_inline))
+__attribute__((always_inline)) inline
 static uint64_t bits(uint64_t value, uint8_t lsb, uint8_t msb) {
   return (value & ((0xffffffffffffffffull >> (64 - (msb - lsb + 1))) << lsb)) >> lsb;
 }
@@ -633,7 +633,7 @@ static uint64_t load_entry(uint64_t address, uint64_t index,
 }
 
 static void print_page(uint64_t address, uint64_t entry, size_t size, bool s, bool w, bool x) {
-    fprintf(stderr, " %c%c%c %016llx %zx",
+    fprintf(stderr, " %c%c%c %016lx %zx",
         s ? 's' : 'u', w ? 'w' : 'r', x ? 'x' : '-',
         (bits(entry, 12, 51) << 12) & ~(size - 1), size);
 }
@@ -651,7 +651,7 @@ static void print_48_pte(uint64_t address, uint64_t pde_entry, bool read_from_sn
         uint64_t entry = pte_table[i];
 
         if (entry) {
-            fprintf(stderr, "\n   1 %016llx", address | i << 12, entry);
+            fprintf(stderr, "\n   1 %016lx [%ld]", address | i << 12, entry);
         }
 
         if (!bit(entry, 0)) {
@@ -676,7 +676,7 @@ static void print_48_pde(uint64_t address, uint64_t pdpte_entry, bool read_from_
         uint64_t entry = pde_table[i];
 
         if (entry) {
-            fprintf(stderr, "\n  2 %016llx", address | i << 21, entry);
+            fprintf(stderr, "\n  2 %016lx [%ld]", address | i << 21, entry);
         }
 
         if (!bit(entry, 0)) {
@@ -704,7 +704,7 @@ static void print_48_pdpte(uint64_t address, uint64_t pml4_entry, bool read_from
         uint64_t entry = pdpte_table[i];
 
         if (entry) {
-            fprintf(stderr, "\n 3 %016llx", address | i << 30, entry);
+            fprintf(stderr, "\n 3 %016lx [%ld]", address | i << 30, entry);
         }
 
         if (!bit(entry, 0)) {
@@ -736,7 +736,7 @@ static void print_48_pagetables_(uint64_t cr3, bool read_from_snapshot) {
         }
 
         if (entry) {
-            fprintf(stderr, "\n4 %016llx", address, entry);
+            fprintf(stderr, "\n4 %016lx [%ld]", address, entry);
         }
 
         if (bit(entry, 0)) {
