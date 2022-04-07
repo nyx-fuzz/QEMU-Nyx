@@ -10,7 +10,7 @@ void handle_hypercall_kafl_set_agent_config(struct kvm_run *run, CPUState *cpu, 
 #define NYX_HOST_MAGIC  0x4878794e
 #define NYX_AGENT_MAGIC 0x4178794e
 
-#define NYX_HOST_VERSION 1 
+#define NYX_HOST_VERSION 2 
 #define NYX_AGENT_VERSION 1
 
 typedef struct host_config_s{
