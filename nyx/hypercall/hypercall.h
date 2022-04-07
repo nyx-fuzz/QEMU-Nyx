@@ -21,7 +21,8 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 
 #pragma once 
 
-#define PAYLOAD_BUFFER_SIZE		26
+#define PAYLOAD_BUFFER_SIZE_64		26
+#define PAYLOAD_BUFFER_SIZE_32		20
 
 #define KAFL_MODE_64	0
 #define KAFL_MODE_32	1
@@ -46,18 +47,40 @@ bool check_bitmap_byte(uint32_t value);
  * 0f 01 c1                vmcall
  * f4                      hlt
  */
-#define PANIC_PAYLOAD "\xFA\x48\xC7\xC0\x1F\x00\x00\x00\x48\xC7\xC3\x08\x00\x00\x00\x48\xC7\xC1\x00\x00\x00\x00\x0F\x01\xC1\xF4"
+#define PANIC_PAYLOAD_64 "\xFA\x48\xC7\xC0\x1F\x00\x00\x00\x48\xC7\xC3\x08\x00\x00\x00\x48\xC7\xC1\x00\x00\x00\x00\x0F\x01\xC1\xF4"
+
+/*
+ * Panic Notifier Payload (x86-32)
+ * fa                      cli
+ * b8 1f 00 00 00          mov    $0x1f,%eax
+ * bb 08 00 00 00          mov    $0x8,%ebx
+ * b9 00 00 00 00          mov    $0x0,%ecx
+ * 0f 01 c1                vmcall
+ * f4                      hlt
+ */
+#define PANIC_PAYLOAD_32 "\xFA\xB8\x1F\x00\x00\x00\xBB\x08\x00\x00\x00\xB9\x00\x00\x00\x00\x0F\x01\xC1\xF4"
 
 /*
  * KASAN Notifier Payload (x86-64)
  * fa                      cli
  * 48 c7 c0 1f 00 00 00    mov    rax,0x1f
- * 48 c7 c3 08 00 00 00    mov    rbx,0x9
+ * 48 c7 c3 09 00 00 00    mov    rbx,0x9
  * 48 c7 c1 00 00 00 00    mov    rcx,0x0
  * 0f 01 c1                vmcall
  * f4                      hlt
  */
-#define KASAN_PAYLOAD "\xFA\x48\xC7\xC0\x1F\x00\x00\x00\x48\xC7\xC3\x09\x00\x00\x00\x48\xC7\xC1\x00\x00\x00\x00\x0F\x01\xC1\xF4"
+#define KASAN_PAYLOAD_64 "\xFA\x48\xC7\xC0\x1F\x00\x00\x00\x48\xC7\xC3\x09\x00\x00\x00\x48\xC7\xC1\x00\x00\x00\x00\x0F\x01\xC1\xF4"
+
+/*
+ * KASAN Notifier Payload (x86-32)
+ * fa                      cli
+ * b8 1f 00 00 00          mov    $0x1f,%eax
+ * bb 09 00 00 00          mov    $0x9,%ebx
+ * b9 00 00 00 00          mov    $0x0,%ecx
+ * 0f 01 c1                vmcall
+ * f4                      hlt
+ */
+#define KASAN_PAYLOAD_32 "\xFA\xB8\x1F\x00\x00\x00\xBB\x09\x00\x00\x00\xB9\x00\x00\x00\x00\x0F\x01\xC1\xF4"
 
 /*
  * printk Notifier Payload (x86-64)
@@ -92,8 +115,7 @@ void hypercall_reload(void);
 
 void handle_hypercall_kafl_acquire(struct kvm_run *run, CPUState *cpu, uint64_t hypercall_arg);
 void handle_hypercall_kafl_release(struct kvm_run *run, CPUState *cpu, uint64_t hypercall_arg);
-
-
+void handle_hypercall_kafl_panic(struct kvm_run *run, CPUState *cpu, uint64_t hypercall_arg);
 
 void handle_hypercall_kafl_page_dump_bp(struct kvm_run *run, CPUState *cpu, uint64_t hypercall_arg, uint64_t page);
 
@@ -109,8 +131,6 @@ void pt_enable_rqo(CPUState *cpu);
 void pt_disable_rqo(CPUState *cpu);
 void pt_enable_rqi(CPUState *cpu);
 void pt_disable_rqi(CPUState *cpu);
-void pt_enable_rqi_trace(CPUState *cpu);
-void pt_disable_rqi_trace(CPUState *cpu);
 void pt_set_redqueen_instrumentation_mode(CPUState *cpu, int redqueen_instruction_mode);
 void pt_set_redqueen_update_blacklist(CPUState *cpu, bool newval);
 void pt_set_enable_patches_pending(CPUState *cpu);

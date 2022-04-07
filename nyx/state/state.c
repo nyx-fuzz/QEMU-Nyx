@@ -45,6 +45,7 @@ void state_init_global(void){
     global_state.nyx_fdl = false;
 
     global_state.workdir_path = NULL;
+    global_state.worker_id = 0xffff;
 
     global_state.fast_reload_enabled = false;
     global_state.fast_reload_mode = false;
@@ -89,6 +90,8 @@ void state_init_global(void){
 
     global_state.in_fuzzing_mode = false;
     global_state.in_reload_mode = true;
+    global_state.starved = false;
+    global_state.trace_mode = false;
     global_state.shutdown_requested = false;
     global_state.cow_cache_full = false;
 

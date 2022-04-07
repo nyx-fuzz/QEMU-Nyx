@@ -10,7 +10,7 @@ void handle_hypercall_kafl_set_agent_config(struct kvm_run *run, CPUState *cpu, 
 #define NYX_HOST_MAGIC  0x4878794e
 #define NYX_AGENT_MAGIC 0x4178794e
 
-#define NYX_HOST_VERSION 1 
+#define NYX_HOST_VERSION 2 
 #define NYX_AGENT_VERSION 1
 
 typedef struct host_config_s{
@@ -19,6 +19,7 @@ typedef struct host_config_s{
   uint32_t bitmap_size;
   uint32_t ijon_bitmap_size;
 	uint32_t payload_buffer_size;
+  uint32_t worker_id;
   /* more to come */
 } __attribute__((packed)) host_config_t;
 

@@ -49,7 +49,6 @@ redqueen_t* new_rq_state(CPUState *cpu,  page_cache_t* page_cache){
 
 	res->cpu = cpu;
 	res->intercept_mode = false;
-	res->trace_mode = false;
 	res->singlestep_enabled = false;
   	res->hooks_applied = 0;
   	res->page_cache = page_cache;
@@ -223,44 +222,6 @@ void redqueen_callback(void* opaque, disassembler_mode_t mode, uint64_t start_ad
     }
     cs_free(insn, 1);
   }
-}
-
-
-
-static void redqueen_trace_enabled(redqueen_t* self){
-	int unused __attribute__((unused));
-	if(self->trace_mode){
-
-    //libxdc_enable_tracing(GET_GLOBAL_STATE()->decoder);
-    libxdc_enable_tracing(GET_GLOBAL_STATE()->decoder);
-	  libxdc_register_edge_callback(GET_GLOBAL_STATE()->decoder, (void (*)(void*, disassembler_mode_t, uint64_t, uint64_t))&redqueen_trace_register_transition, self->trace_state);
-		//redqueen_trace_register_transition(self->trace_state, INIT_TRACE_IP, ip);
-    //last_ip = ip;
-	} 
-}
-
-static void redqueen_trace_disabled(redqueen_t* self){
-  int unused __attribute__((unused));
-	if(self->trace_mode){
-    libxdc_disable_tracing(GET_GLOBAL_STATE()->decoder);
-
-		//redqueen_trace_register_transition(self->trace_state, last_ip, ip);
-		//edqueen_trace_register_transition(self->trace_state, ip, INIT_TRACE_IP);
-	}
-}
-
-void redqueen_set_trace_mode(redqueen_t* self){
-	delete_trace_files();
-	self->trace_mode = true;
-  redqueen_trace_enabled(self);
-}
-
-void redqueen_unset_trace_mode(redqueen_t* self){
-	//write_trace_result(self->trace_state);
-	//redqueen_trace_reset(self->trace_state);
-  redqueen_trace_disabled(self);
-
-	self->trace_mode = false;
 }
 
 void destroy_rq_state(redqueen_t* self){
