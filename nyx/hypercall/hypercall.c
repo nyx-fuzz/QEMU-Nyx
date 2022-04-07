@@ -210,7 +210,7 @@ static void handle_hypercall_get_payload(struct kvm_run *run, CPUState *cpu, uin
 			CPUX86State *env = &(X86_CPU(cpu))->env;
 			GET_GLOBAL_STATE()->parent_cr3 = env->cr[3] & 0xFFFFFFFFFFFFF000ULL;
 			QEMU_PT_PRINTF(CORE_PREFIX, "Payload CR3:\t%lx", (uint64_t)GET_GLOBAL_STATE()->parent_cr3 );
-			//print_48_paging2(GET_GLOBAL_STATE()->parent_cr3);
+			//print_48_pagetables(GET_GLOBAL_STATE()->parent_cr3);
 
 			if(hypercall_arg&0xFFF){
 				fprintf(stderr, "[QEMU-Nyx] Error: Payload buffer is not page-aligned! (0x%lx)\n", hypercall_arg);

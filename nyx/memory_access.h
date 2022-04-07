@@ -66,7 +66,7 @@ bool dump_page_cr3_snapshot(uint64_t address, uint8_t* data, CPUState *cpu, uint
 bool dump_page_cr3_ht(uint64_t address, uint8_t* data, CPUState *cpu, uint64_t cr3);
 bool is_addr_mapped_cr3_snapshot(uint64_t address, CPUState *cpu, uint64_t cr3);
 
-void print_48_paging2(uint64_t cr3);
+void print_48_pagetables(uint64_t cr3);
 
 bool dump_page_ht(uint64_t address, uint8_t* data, CPUState *cpu);
 
