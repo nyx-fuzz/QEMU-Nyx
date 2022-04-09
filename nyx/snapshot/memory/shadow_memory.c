@@ -394,21 +394,48 @@ void shadow_memory_serialize(shadow_memory_t* self, const char* snapshot_folder)
     fclose(file_mem_data);
 }
 
-bool shadow_memory_read_physical_memory(shadow_memory_t* self, uint64_t address, void* ptr, size_t size){
-    
-    assert(size == 0x1000 && (address & 0xFFFULL) == 0); /* remove this limitation later */
+static bool shadow_memory_read_page_frame(shadow_memory_t* self, uint64_t address, void* ptr, uint16_t offset, uint16_t size){
+    assert((offset + size) <= 0x1000);
 
-    if(address < self->memory_size){
-
-        assert(size <= 0x1000); /* remove this limitation later */
-
-        for(uint8_t i = 0; i < self->ram_regions_num; i++){
-            if(address >= self->ram_regions[i].base && address < (self->ram_regions[i].base + self->ram_regions[i].size)){
-                void* snapshot_ptr = self->ram_regions[i].snapshot_region_ptr + (address-self->ram_regions[i].base);
-                memcpy(ptr, snapshot_ptr, size);
-                return true;
-            }
+    for(uint8_t i = 0; i < self->ram_regions_num; i++){
+        if(address >= self->ram_regions[i].base && address < (self->ram_regions[i].base + self->ram_regions[i].size)){
+            void* snapshot_ptr = self->ram_regions[i].snapshot_region_ptr + (address-self->ram_regions[i].base);
+            memcpy(ptr+offset, snapshot_ptr+offset, size);
+            return true;
         }
     }
     return false;
+}
+
+bool shadow_memory_read_physical_memory(shadow_memory_t* self, uint64_t address, void* ptr, size_t size){
+
+    size_t bytes_left = size;
+    size_t copy_bytes = 0;
+    uint64_t current_address = address;
+    uint64_t offset = 0;
+    
+    while (bytes_left != 0) {
+
+        /* full page */
+        if ((current_address & 0xFFF) == 0){
+            copy_bytes = 0x1000;
+        }
+        /* partial page (starting at an offset) */
+        else {
+            copy_bytes = 0x1000 - (current_address & 0xFFF);
+        }
+        
+        /* partial page */
+        if (bytes_left < copy_bytes){
+            copy_bytes = bytes_left;
+        }
+
+        if (shadow_memory_read_page_frame(self, current_address & ~0xFFFULL, ptr + offset, current_address & 0xFFFULL, copy_bytes) == false){
+            return false;
+        }
+        current_address += copy_bytes;
+        offset += copy_bytes;
+        bytes_left = bytes_left - copy_bytes;
+    }
+    return true;
 }
