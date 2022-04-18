@@ -186,7 +186,7 @@ shadow_memory_t* shadow_memory_init_from_snapshot(const char* snapshot_folder, b
     fseek(file_mem_dump, 0L, SEEK_END);
     uint64_t file_mem_dump_size = ftell(file_mem_dump);
 
-    debug_fprintf(stderr, "guest_ram_size == ftell(f) => 0x%lx vs 0x%lx (%s)\n", self->memory_size, file_mem_dump_size, dump_file);
+    debug_fprintf(stderr, "guest_ram_size == ftell(f) => 0x%lx vs 0x%lx (%s)\n", self->memory_size, file_mem_dump_size, path_dump);
 
     #define VGA_SIZE (16<<20)
 
@@ -400,7 +400,7 @@ static bool shadow_memory_read_page_frame(shadow_memory_t* self, uint64_t addres
     for(uint8_t i = 0; i < self->ram_regions_num; i++){
         if(address >= self->ram_regions[i].base && address < (self->ram_regions[i].base + self->ram_regions[i].size)){
             void* snapshot_ptr = self->ram_regions[i].snapshot_region_ptr + (address-self->ram_regions[i].base);
-            memcpy(ptr+offset, snapshot_ptr+offset, size);
+            memcpy(ptr, snapshot_ptr+offset, size);
             return true;
         }
     }
@@ -413,7 +413,7 @@ bool shadow_memory_read_physical_memory(shadow_memory_t* self, uint64_t address,
     size_t copy_bytes = 0;
     uint64_t current_address = address;
     uint64_t offset = 0;
-    
+
     while (bytes_left != 0) {
 
         /* full page */
