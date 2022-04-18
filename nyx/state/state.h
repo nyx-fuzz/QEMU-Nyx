@@ -30,6 +30,7 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 #include "nyx/sharedir.h"
 #include "nyx/fast_vm_reload_sync.h"
 #include "nyx/types.h"
+#include "nyx/hypercall/configuration.h"
 
 #include <libxdc.h>
 
@@ -69,6 +70,7 @@ typedef struct qemu_nyx_state_s{
 
     /* Intel PT Options (not migratable) */
     uint64_t pt_c3_filter;
+    bool pt_c3_filter_configured;
     volatile bool pt_ip_filter_enabled[4];
     bool pt_trace_mode; // enabled by default; disabled if compile-time tracing is implemented by agent
 

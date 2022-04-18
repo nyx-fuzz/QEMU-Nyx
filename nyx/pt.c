@@ -115,6 +115,11 @@ void pt_dump(CPUState *cpu, int bytes){
 	if(!(GET_GLOBAL_STATE()->redqueen_state && GET_GLOBAL_STATE()->redqueen_state->intercept_mode)){
 		if (GET_GLOBAL_STATE()->in_fuzzing_mode && GET_GLOBAL_STATE()->decoder_page_fault == false && GET_GLOBAL_STATE()->decoder && !GET_GLOBAL_STATE()->dump_page){
 			GET_GLOBAL_STATE()->pt_trace_size += bytes;
+
+			if (GET_GLOBAL_STATE()->pt_c3_filter_configured == false){
+				nyx_abort((char*)"No processor trace CR3 filter configured...");
+			}
+
 			//dump_pt_trace(cpu->pt_mmap, bytes);
 			pt_write_pt_dump_file(cpu->pt_mmap, bytes);
 			decoder_result_t result = libxdc_decode(GET_GLOBAL_STATE()->decoder, cpu->pt_mmap, bytes);
@@ -163,6 +168,7 @@ int pt_set_cr3(CPUState *cpu, uint64_t val, bool hmp_mode){
 	if (val == GET_GLOBAL_STATE()->pt_c3_filter){
 		return 0; // nothing changed  
 	}
+	GET_GLOBAL_STATE()->pt_c3_filter_configured = true;
 	//fprintf(stderr, "=========== %s %lx ============\n", __func__, val);
 	int r = 0;
 	

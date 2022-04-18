@@ -75,7 +75,8 @@ void state_init_global(void){
 		global_state.pt_ip_filter_b[i] = 0x0;
     }
     global_state.pt_c3_filter = 0;
-    
+    global_state.pt_c3_filter_configured = false;
+
     global_state.parent_cr3 = 0;
     global_state.disassembler_word_width = 64;
     global_state.nested = false;
