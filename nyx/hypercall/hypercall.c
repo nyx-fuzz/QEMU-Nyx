@@ -1026,8 +1026,8 @@ int handle_kafl_hypercall(struct kvm_run *run, CPUState *cpu, uint64_t hypercall
 			handle_hypercall_kafl_create_tmp_snapshot(run, cpu, arg);
 			ret = 0;
 			break;
-		case KVM_EXIT_KAFL_DEBUG_TMP_SNAPSHOT:
-			handle_hypercall_kafl_debug_tmp_snapshot(run, cpu, arg);
+		case KVM_EXIT_KAFL_DEBUG:
+			handle_hypercall_kafl_debug(run, cpu, arg);
 			ret = 0;
 			break;
 		case KVM_EXIT_KAFL_GET_HOST_CONFIG:

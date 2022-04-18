@@ -292,7 +292,7 @@ struct kvm_hyperv_exit {
 #define KVM_EXIT_KAFL_PANIC_EXTENDED 132
 #define KVM_EXIT_KAFL_CREATE_TMP_SNAPSHOT 133
 
-#define KVM_EXIT_KAFL_DEBUG_TMP_SNAPSHOT 134 /* hypercall for debugging / development purposes */
+#define KVM_EXIT_KAFL_DEBUG 134 /* hypercall for debugging / development purposes */
 
 #define KVM_EXIT_KAFL_GET_HOST_CONFIG 135
 #define KVM_EXIT_KAFL_SET_AGENT_CONFIG 136
