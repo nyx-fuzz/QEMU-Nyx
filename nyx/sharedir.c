@@ -6,6 +6,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include "nyx/debug.h"
 
 //#define SHAREDIR_DEBUG
 
@@ -167,7 +168,7 @@ uint64_t sharedir_request_file(sharedir_t* self, const char* file, uint8_t* page
     }
   }
   else{
-	  fprintf(stderr, "WARNING: No such file in sharedir: %s\n", file);
+	  debug_fprintf(stderr, "WARNING: No such file in sharedir: %s\n", file);
     return 0xFFFFFFFFFFFFFFFFUL;
   }
 }

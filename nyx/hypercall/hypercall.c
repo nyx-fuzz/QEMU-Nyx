@@ -322,7 +322,7 @@ static void handle_hypercall_kafl_range_submit(struct kvm_run *run, CPUState *cp
 	}
 
 	if(GET_GLOBAL_STATE()->pt_ip_filter_configured[buffer[2]]){
-			QEMU_PT_PRINTF(CORE_PREFIX, "Ignoring agent-provided address ranges (abort reason: 1) - %d", buffer[2]);
+			QEMU_PT_PRINTF(CORE_PREFIX, "Ignoring agent-provided address ranges (abort reason: 1) - %ld", buffer[2]);
 		return;
 	}
 
@@ -331,7 +331,7 @@ static void handle_hypercall_kafl_range_submit(struct kvm_run *run, CPUState *cp
 		GET_GLOBAL_STATE()->pt_ip_filter_b[buffer[2]] = buffer[1];
 		GET_GLOBAL_STATE()->pt_ip_filter_configured[buffer[2]] = true;
 		QEMU_PT_PRINTF(CORE_PREFIX, "Configuring agent-provided address ranges:");
-		QEMU_PT_PRINTF(CORE_PREFIX, "\tIP%d: %lx-%lx [ENABLED]", buffer[2], GET_GLOBAL_STATE()->pt_ip_filter_a[buffer[2]], GET_GLOBAL_STATE()->pt_ip_filter_b[buffer[2]]);
+		QEMU_PT_PRINTF(CORE_PREFIX, "\tIP%ld: %lx-%lx [ENABLED]", buffer[2], GET_GLOBAL_STATE()->pt_ip_filter_a[buffer[2]], GET_GLOBAL_STATE()->pt_ip_filter_b[buffer[2]]);
 	}
 	else{
 		QEMU_PT_PRINTF(CORE_PREFIX, "Ignoring agent-provided address ranges (abort reason: 2)");	
@@ -633,7 +633,7 @@ static void handle_hypercall_kafl_lock(struct kvm_run *run, CPUState *cpu, uint6
 
 	QEMU_PT_PRINTF(CORE_PREFIX, "Creating pre image snapshot <%s> ...", GET_GLOBAL_STATE()->fast_reload_pre_path);
 
-	printf("Creating pre image snapshot");
+	debug_printf("Creating pre image snapshot");
 	request_fast_vm_reload(GET_GLOBAL_STATE()->reload_state, REQUEST_SAVE_SNAPSHOT_PRE);
 }
 
@@ -801,7 +801,7 @@ static void handle_hypercall_kafl_dump_file(struct kvm_run *run, CPUState *cpu, 
 	void* page = malloc(PAGE_SIZE);
 	uint32_t written = 0;
 
-	QEMU_PT_PRINTF(CORE_PREFIX, "%s: dump %d bytes to %s (append=%u)\n",
+	QEMU_PT_PRINTF(CORE_PREFIX, "%s: dump %d bytes to %s (append=%u)",
 			__func__, bytes, host_path, file_obj.append);
 
 	while (bytes > 0) {

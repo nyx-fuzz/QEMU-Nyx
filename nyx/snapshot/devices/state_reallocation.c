@@ -878,7 +878,7 @@ static int fdl_enumerate_section(state_reallocation_t* self, QEMUFile *f, Migrat
         ret = fdl_vmstate_load(self, f, se, version_id);
     }
     else{
-        debug_fprintf(stderr, "---------------------------------\nVMSD2: %x\n", se->vmsd);
+        debug_fprintf(stderr, "---------------------------------\nVMSD2: %p\n", (void*)se->vmsd);
         //abort();
         //fprintf(stderr, "---------------------------------\nVMSD2: %s\n", (VMStateDescription *)(se->vmsd)->name);
         ret = vmstate_load(f, se);
