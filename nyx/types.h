@@ -51,5 +51,5 @@ typedef struct agent_config_s{
 enum nyx_cr3_mode { 
     cr3_current,			/* current cr3 value */
 	cr3_current_offset,		/* current cr3 + offset taken from agent_config */
-	cr3_absolute,			/* absolute cr3 value ür from agent_config */
+	cr3_absolute,			/* absolute cr3 value taken from agent_config */
 };
