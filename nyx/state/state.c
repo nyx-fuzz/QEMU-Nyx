@@ -76,7 +76,7 @@ void state_init_global(void){
     }
     global_state.pt_c3_filter = 0;
     global_state.pt_c3_filter_configured = false;
-
+    
     global_state.parent_cr3 = 0;
     global_state.disassembler_word_width = 64;
     global_state.nested = false;
@@ -133,13 +133,8 @@ void state_init_global(void){
     global_state.pt_trace_size = 0;
     global_state.bb_coverage = 0;
 
-    global_state.cap_timeout_detection = 0;
-    global_state.cap_only_reload_mode = 0;
-    global_state.cap_compile_time_tracing = 0;
-    global_state.cap_ijon_tracing = 0;
-    global_state.cap_cr3 = 0;
-    global_state.cap_compile_time_tracing_buffer_vaddr = 0;
-    global_state.cap_ijon_tracing_buffer_vaddr = 0;
+    memset(&global_state.agent_config, 0, sizeof(agent_config_t));
+    global_state.config_cr3 = 0;
 
     QTAILQ_INIT(&global_state.redqueen_breakpoints);
 }

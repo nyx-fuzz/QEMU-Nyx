@@ -139,15 +139,8 @@ typedef struct qemu_nyx_state_s{
     bool get_host_config_done;
     bool set_agent_config_done;
 
-    /* capabilites */
-    uint8_t cap_timeout_detection;
-    uint8_t cap_only_reload_mode;
-    uint8_t cap_compile_time_tracing;
-    uint8_t cap_ijon_tracing;
-    uint64_t cap_cr3; 
-    uint64_t cap_compile_time_tracing_buffer_vaddr;
-    uint64_t cap_ijon_tracing_buffer_vaddr;
-    uint64_t cap_coverage_bitmap_size;
+    agent_config_t agent_config;
+    uint64_t config_cr3; 
 
     auxilary_buffer_t* auxilary_buffer;
     auxilary_buffer_config_t shadow_config;

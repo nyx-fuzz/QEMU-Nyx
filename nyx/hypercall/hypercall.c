@@ -433,10 +433,27 @@ static inline void set_page_dump_bp(CPUState *cpu, uint64_t cr3, uint64_t addr){
 
 static void handle_hypercall_kafl_cr3(struct kvm_run *run, CPUState *cpu, uint64_t hypercall_arg){
 	if(hypercall_enabled){
-		//QEMU_PT_PRINTF(CORE_PREFIX, "CR3 address:\t\t%lx", hypercall_arg);
-		pt_set_cr3(cpu, hypercall_arg & 0xFFFFFFFFFFFFF000ULL, false);
+		uint64_t cr3_value = 0;
+
+		switch(GET_GLOBAL_STATE()->agent_config.pt_cr3_mode){
+			case cr3_current: 
+				cr3_value = hypercall_arg;
+				break;
+			case cr3_current_offset: 
+				cr3_value = hypercall_arg + (int64_t)GET_GLOBAL_STATE()->agent_config.pt_cr3_mode_value;
+				break;
+			case cr3_absolute:
+				cr3_value = GET_GLOBAL_STATE()->agent_config.pt_cr3_mode_value;
+				break;
+			default:
+				abort();
+		}
+
+		cr3_value &= 0xFFFFFFFFFFFFF000ULL;
+		QEMU_PT_PRINTF(CORE_PREFIX, "CR3 address:\t\t%lx", cr3_value);
+		pt_set_cr3(cpu, cr3_value, false);
 		if(GET_GLOBAL_STATE()->dump_page){
-			set_page_dump_bp(cpu, hypercall_arg & 0xFFFFFFFFFFFFF000ULL, GET_GLOBAL_STATE()->dump_page_addr);
+			set_page_dump_bp(cpu, cr3_value, GET_GLOBAL_STATE()->dump_page_addr);
 		}
 	}
 }
