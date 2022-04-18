@@ -303,8 +303,8 @@ struct kvm_hyperv_exit {
 #define KVM_EXIT_KAFL_PERSIST_PAGE_PAST_SNAPSHOT 139
 
 
-#define KVM_CAP_NYX_PT 512
-#define KVM_CAP_NYX_FDL 513
+#define KVM_NYX_VERSION 1 
+#define KVM_CAP_NYX_VERSION 512
 
 #endif
 

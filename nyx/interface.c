@@ -335,7 +335,7 @@ static void check_available_ipt_ranges(nyx_interface_state* s){
 		exit(1);
 	}
 
-	if (ioctl(kvm_fd, KVM_CHECK_EXTENSION, KVM_CAP_NYX_PT) == 1 && ioctl(kvm_fd, KVM_CHECK_EXTENSION, KVM_CAP_NYX_FDL) == 1) {
+	if (ioctl(kvm_fd, KVM_CHECK_EXTENSION, KVM_CAP_NYX_VERSION) == KVM_NYX_VERSION) {
 		for(uint8_t i = 0; i < INTEL_PT_MAX_RANGES; i++){
 			if(s->ip_filter[i][0] && s->ip_filter[i][1]){
 				if(i >= 1){
