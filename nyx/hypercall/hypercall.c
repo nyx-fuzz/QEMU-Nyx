@@ -122,14 +122,21 @@ bool handle_hypercall_kafl_next_payload(struct kvm_run *run, CPUState *cpu, uint
 				request_fast_vm_reload(GET_GLOBAL_STATE()->reload_state, REQUEST_SAVE_SNAPSHOT_ROOT_FIX_RIP);
 				setup_snapshot_once = true;
 
-				for(int i = 0; i < INTEL_PT_MAX_RANGES; i++){
-					//printf("=> %d\n", i);
-					//if(filter_enabled[i]){
-					if(GET_GLOBAL_STATE()->pt_ip_filter_configured[i]){
-						pt_enable_ip_filtering(cpu, i, true, false);
+				if(GET_GLOBAL_STATE()->pt_trace_mode){
+					bool pt_ip_filters_set = false;
+					for(int i = 0; i < INTEL_PT_MAX_RANGES; i++){
+						if(GET_GLOBAL_STATE()->pt_ip_filter_configured[i]){
+							pt_enable_ip_filtering(cpu, i, true, false);
+							pt_ip_filters_set = true;
+						}
 					}
+
+					if (pt_ip_filters_set == false){
+						nyx_abort((char*)"No processor trace IP range filters configured...");
+					}
+
+					pt_init_decoder(cpu);
 				}
-				pt_init_decoder(cpu);
 
 				request_fast_vm_reload(GET_GLOBAL_STATE()->reload_state, REQUEST_LOAD_SNAPSHOT_ROOT);
 
