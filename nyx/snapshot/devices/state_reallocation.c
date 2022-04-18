@@ -283,13 +283,45 @@ static void add_post_fptr(state_reallocation_t* self, void* fptr, uint32_t versi
 extern void fast_get_pci_config_device(void* data, size_t size, void* opaque);
 void fast_get_pci_irq_state(void* data, size_t size, void* opaque);
 
+//void fast_virtio_device_get(void* data, size_t size, void* opaque);
+int virtio_device_get(QEMUFile *f, void *opaque, size_t size, const VMStateField *field);
+
+static int fast_loadvm_fclose(void *opaque){
+    return 0;
+}
+
+static ssize_t fast_loadvm_get_buffer(void *opaque, uint8_t *buf, int64_t pos, size_t size){
+	assert(pos < ((struct fast_savevm_opaque_t*)(opaque))->buflen);
+    memcpy(buf, (void*)(((struct fast_savevm_opaque_t*)(opaque))->buf + pos), size);
+    return size;
+}
+
+static const QEMUFileOps fast_loadvm_ops = {
+    .get_buffer     = (QEMUFileGetBufferFunc*)fast_loadvm_get_buffer,
+    .close          = (QEMUFileCloseFunc*)fast_loadvm_fclose
+};
+
+/* use opaque data to bootstrap virtio restore from QEMUFile */
+static void fast_virtio_device_get(void* data, size_t size, void* opaque)
+{
+    struct fast_savevm_opaque_t fast_loadvm_opaque = {
+		.buf = data,
+		.buflen = size,
+		.f = NULL,
+		.pos = 0,
+	};
+    QEMUFile* f = qemu_fopen_ops(&fast_loadvm_opaque, &fast_loadvm_ops);
+
+	virtio_device_get(f, opaque, size, NULL);
+}
+
 static void add_get(state_reallocation_t* self, void* fptr, void* opaque, size_t size, void* field, QEMUFile* f, const char* name){
     if(!self){
         return;
     }
 
     void (*handler)(void* , size_t, void*) = NULL;
-    void* data = NULL; 
+    uint8_t* data = NULL;
 
     if(!strcmp(name, "timer")){
         debug_fprintf(stderr, "SKPPING: %ld\n", size*-1);
@@ -315,13 +347,21 @@ static void add_get(state_reallocation_t* self, void* fptr, void* opaque, size_t
         data = malloc(sizeof(uint8_t)*size);
         qemu_get_buffer(f, (uint8_t*)data, size);
     }
-    
+    else if(!strcmp(name, "virtio")){
+        fprintf(stderr, "WARNING: ATTEMPTING FAST GET for %s\n", name);
+        qemu_file_skip(f, size * -1);
+        handler = fast_virtio_device_get;
+        data = malloc(sizeof(uint8_t)*size);
+        qemu_get_buffer(f, (uint8_t*)data, size);
+	}
     else{
         fprintf(stderr, "WARNING: NOT IMPLEMENTED FAST GET ROUTINE for %s\n", name);
         abort();
         return;
     }
 
+	// will be called by pre-/post-save or pre-post-load?
+	// will be processed by fdl_fast_reload()
     self->get_fptr[self->fast_state_get_fptr_pos] = handler;
     self->get_opaque[self->fast_state_get_fptr_pos] = opaque;
     self->get_size[self->fast_state_get_fptr_pos] = size;
@@ -481,19 +521,21 @@ static inline int get_handler(state_reallocation_t* self, QEMUFile* f, void* cur
         add_get(self, (void*) field->info->get, curr_elem, size, (void*) field, f, field->info->name);
     }
     else if(!strcmp(field->info->name, "pci config")){
-        //fprintf(stderr, "type: %s (size: %x)\n", field->info->name, size);
+        //fprintf(stderr, "type: %s (size: %lx)\n", field->info->name, size);
         add_get(self, (void*) field->info->get, curr_elem, size, (void*) field, f, field->info->name);
     }
     else if(!strcmp(field->info->name, "pci irq state")){
-        //fprintf(stderr, "type: %s (size: %x)\n", field->info->name, size);
+        //fprintf(stderr, "type: %s (size: %lx)\n", field->info->name, size);
         add_get(self, (void*) field->info->get, curr_elem, size, (void*) field, f, field->info->name);
     }
     else if(!strcmp(field->info->name, "virtio")){
-        fprintf(stderr, "type: %s (size: %lx)\n", field->info->name, size);
-        abort(); /* not yet implemented */ 
+        add_get(self, (void*) field->info->get, curr_elem, size, (void*) field, f, field->info->name);
+		//fprintf(stderr, "[QEMU-PT] %s: WARNING no handler for %s, type %s, size %lx!\n",
+		//	   	__func__, vmsd_name, field->info->name, size);
     }
     else{
-        fprintf(stderr, "FAIL field->info->name: %s\n", field->info->name);
+		fprintf(stderr, "[QEMU-PT] %s: WARNING no handler for %s, type %s, size %lx!\n",
+			   	__func__, vmsd_name, field->info->name, size);
         assert(0);
     }
 
@@ -836,7 +878,7 @@ static int fdl_enumerate_section(state_reallocation_t* self, QEMUFile *f, Migrat
         ret = fdl_vmstate_load(self, f, se, version_id);
     }
     else{
-        debug_fprintf(stderr, "---------------------------------\nVMSD2: %x\n", se->vmsd);
+        debug_fprintf(stderr, "---------------------------------\nVMSD2: %p\n", (void*)se->vmsd);
         //abort();
         //fprintf(stderr, "---------------------------------\nVMSD2: %s\n", (VMStateDescription *)(se->vmsd)->name);
         ret = vmstate_load(f, se);
@@ -918,6 +960,7 @@ state_reallocation_t* state_reallocation_new(QEMUFile *f){
     self->tmp_snapshot.enabled = false;
     self->tmp_snapshot.fast_state_size = 0;
 
+    // actually enumerate the devices here
     fdl_enumerate_global_states(self, f);
 
     self->tmp_snapshot.copy = malloc(sizeof(void*) * self->fast_state_pos);

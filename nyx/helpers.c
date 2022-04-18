@@ -112,24 +112,22 @@ static void resize_coverage_bitmap(uint32_t new_bitmap_size){
 }
 
 bool apply_capabilities(CPUState *cpu){
-	//X86CPU *cpux86 = X86_CPU(cpu);
-  //CPUX86State *env = &cpux86->env;
 
-	debug_fprintf(stderr, "%s: agent supports timeout detection: %d\n", __func__, GET_GLOBAL_STATE()->cap_timeout_detection);
-	debug_fprintf(stderr, "%s: agent supports only-reload mode: %d\n", __func__, GET_GLOBAL_STATE()->cap_only_reload_mode);
-	debug_fprintf(stderr, "%s: agent supports compile-time tracing: %d\n", __func__, GET_GLOBAL_STATE()->cap_compile_time_tracing );
+	debug_fprintf(stderr, "%s: agent supports timeout detection: %d\n", __func__, GET_GLOBAL_STATE()->agent_config.agent_timeout_detection);
+	debug_fprintf(stderr, "%s: agent supports only-reload mode: %d\n", __func__, !!!GET_GLOBAL_STATE()->agent_config.agent_non_reload_mode);
+	debug_fprintf(stderr, "%s: agent supports compile-time tracing: %d\n", __func__, GET_GLOBAL_STATE()->agent_non_reload_mode.agent_tracing );
 
-	if(GET_GLOBAL_STATE()->cap_compile_time_tracing){
+	if(GET_GLOBAL_STATE()->agent_config.agent_tracing){
 		GET_GLOBAL_STATE()->pt_trace_mode = false;
 
-		debug_fprintf(stderr, "%s: agent trace buffer at vaddr: %lx\n", __func__, GET_GLOBAL_STATE()->cap_compile_time_tracing_buffer_vaddr);
+		debug_fprintf(stderr, "%s: agent trace buffer at vaddr: %lx\n", __func__, GET_GLOBAL_STATE()->agent_config.trace_buffer_vaddr);
 		kvm_arch_get_registers_fast(cpu);
 
 		debug_printf("--------------------------\n");
-		debug_printf("GET_GLOBAL_STATE()->cap_compile_time_tracing_buffer_vaddr: %lx\n", GET_GLOBAL_STATE()->cap_compile_time_tracing_buffer_vaddr);
-		debug_printf("GET_GLOBAL_STATE()->shared_bitmap_fd: %lx\n", GET_GLOBAL_STATE()->shared_bitmap_fd);
-		debug_printf("GET_GLOBAL_STATE()->shared_bitmap_size: %lx\n", GET_GLOBAL_STATE()->shared_bitmap_size);
-		debug_printf("GET_GLOBAL_STATE()->cap_cr3: %lx\n", GET_GLOBAL_STATE()->cap_cr3);
+		debug_printf("GET_GLOBAL_STATE()->cap_compile_time_tracing_buffer_vaddr: %lx\n", GET_GLOBAL_STATE()->agent_config.trace_buffer_vaddr);
+		debug_printf("GET_GLOBAL_STATE()->shared_bitmap_fd: %x\n", GET_GLOBAL_STATE()->shared_bitmap_fd);
+		debug_printf("GET_GLOBAL_STATE()->shared_bitmap_size: %x\n", GET_GLOBAL_STATE()->shared_bitmap_size);
+		debug_printf("GET_GLOBAL_STATE()->config_cr3: %lx\n", GET_GLOBAL_STATE()->config_cr3);
 		debug_printf("--------------------------\n");
 
 		if (GET_GLOBAL_STATE()->input_buffer_size != GET_GLOBAL_STATE()->shared_payload_buffer_size){
@@ -137,32 +135,32 @@ bool apply_capabilities(CPUState *cpu){
 			GET_GLOBAL_STATE()->shared_payload_buffer_size = GET_GLOBAL_STATE()->input_buffer_size;
 		}
 
-		if(GET_GLOBAL_STATE()->cap_compile_time_tracing_buffer_vaddr&0xfff){
-			fprintf(stderr, "[QEMU-Nyx] Error: guest's trace bitmap v_addr (0x%lx) is not page aligned!\n", GET_GLOBAL_STATE()->cap_compile_time_tracing_buffer_vaddr);
+		if(GET_GLOBAL_STATE()->agent_config.trace_buffer_vaddr&0xfff){
+			fprintf(stderr, "[QEMU-Nyx] Error: guest's trace bitmap v_addr (0x%lx) is not page aligned!\n", GET_GLOBAL_STATE()->agent_config.trace_buffer_vaddr);
 			return false;
 		}
 
-		if (GET_GLOBAL_STATE()->cap_coverage_bitmap_size){
-			resize_coverage_bitmap(GET_GLOBAL_STATE()->cap_coverage_bitmap_size);
+		if (GET_GLOBAL_STATE()->agent_config.coverage_bitmap_size){
+			resize_coverage_bitmap(GET_GLOBAL_STATE()->agent_config.coverage_bitmap_size);
 		}
 		
 		for(uint64_t i = 0; i < GET_GLOBAL_STATE()->shared_bitmap_size; i += 0x1000){
-			assert(remap_slot(GET_GLOBAL_STATE()->cap_compile_time_tracing_buffer_vaddr+ i, i/0x1000, cpu, GET_GLOBAL_STATE()->shared_bitmap_fd, GET_GLOBAL_STATE()->shared_bitmap_size, true, GET_GLOBAL_STATE()->cap_cr3));
+			assert(remap_slot(GET_GLOBAL_STATE()->agent_config.trace_buffer_vaddr+ i, i/0x1000, cpu, GET_GLOBAL_STATE()->shared_bitmap_fd, GET_GLOBAL_STATE()->shared_bitmap_size, true, GET_GLOBAL_STATE()->config_cr3));
 		}
 		set_cap_agent_trace_bitmap(GET_GLOBAL_STATE()->auxilary_buffer, true);
 	}
 	
-	if(GET_GLOBAL_STATE()->cap_ijon_tracing){
-		debug_printf(stderr, "%s: agent trace buffer at vaddr: %lx\n", __func__, GET_GLOBAL_STATE()->cap_ijon_tracing_buffer_vaddr);
+	if(GET_GLOBAL_STATE()->agent_config.agent_ijon_tracing){
+		debug_fprintf(stderr, "%s: agent trace buffer at vaddr: 0x%lx\n", __func__, GET_GLOBAL_STATE()->agent_config.ijon_trace_buffer_vaddr);
 
-		if(GET_GLOBAL_STATE()->cap_ijon_tracing_buffer_vaddr&0xfff){
-			fprintf(stderr, "[QEMU-Nyx] Error: guest's ijon buffer v_addr (0x%lx) is not page aligned!\n", GET_GLOBAL_STATE()->cap_ijon_tracing_buffer_vaddr);
+		if(GET_GLOBAL_STATE()->agent_config.ijon_trace_buffer_vaddr&0xfff){
+			fprintf(stderr, "[QEMU-Nyx] Error: guest's ijon buffer v_addr (0x%lx) is not page aligned!\n", GET_GLOBAL_STATE()->agent_config.ijon_trace_buffer_vaddr);
 			return false;
 		}
 
 		kvm_arch_get_registers_fast(cpu);
 		for(uint64_t i = 0; i < GET_GLOBAL_STATE()->shared_ijon_bitmap_size; i += 0x1000){
-			assert(remap_slot(GET_GLOBAL_STATE()->cap_ijon_tracing_buffer_vaddr + i, i/0x1000, cpu, GET_GLOBAL_STATE()->shared_ijon_bitmap_fd, GET_GLOBAL_STATE()->shared_ijon_bitmap_size+GET_GLOBAL_STATE()->shared_ijon_bitmap_size, true, GET_GLOBAL_STATE()->cap_cr3));
+			assert(remap_slot(GET_GLOBAL_STATE()->agent_config.ijon_trace_buffer_vaddr + i, i/0x1000, cpu, GET_GLOBAL_STATE()->shared_ijon_bitmap_fd, GET_GLOBAL_STATE()->shared_ijon_bitmap_size+GET_GLOBAL_STATE()->shared_ijon_bitmap_size, true, GET_GLOBAL_STATE()->config_cr3));
 		}
 		set_cap_agent_ijon_trace_bitmap(GET_GLOBAL_STATE()->auxilary_buffer, true);
 	}

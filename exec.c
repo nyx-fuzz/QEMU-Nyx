@@ -1368,7 +1368,6 @@ bool cpu_physical_memory_test_dirty(ram_addr_t start,
     unsigned long end, page;
     bool dirty = false;
     RAMBlock *ramblock;
-    uint64_t mr_offset, mr_size;
 
     if (length == 0) {
         return false;

@@ -2807,7 +2807,9 @@ static int virtio_device_put(QEMUFile *f, void *opaque, size_t size,
 }
 
 /* A wrapper for use as a VMState .get function */
-static int virtio_device_get(QEMUFile *f, void *opaque, size_t size,
+int virtio_device_get(QEMUFile *f, void *opaque, size_t size,
+                             const VMStateField *field);
+int virtio_device_get(QEMUFile *f, void *opaque, size_t size,
                              const VMStateField *field)
 {
     VirtIODevice *vdev = VIRTIO_DEVICE(opaque);

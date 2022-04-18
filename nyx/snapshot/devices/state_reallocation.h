@@ -50,6 +50,7 @@ struct QEMUFile_tmp {
 struct fast_savevm_opaque_t{
     FILE* f;
     uint8_t* buf;
+    size_t buflen;
     uint64_t pos;
     void* output_buffer;
     uint32_t* output_buffer_size;

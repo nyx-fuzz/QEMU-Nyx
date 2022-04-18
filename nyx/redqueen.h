@@ -70,7 +70,6 @@ KHASH_MAP_INIT_INT64(RQ, uint32_t)
 typedef struct redqueen_s{
 	khash_t(RQ) *lookup;
 	bool intercept_mode;
-	bool trace_mode;
 	bool singlestep_enabled;
 	int hooks_applied;
 	CPUState *cpu;
@@ -108,10 +107,6 @@ void handel_se_hook(redqueen_t* self);
 void enable_rq_intercept_mode(redqueen_t* self);
 void disable_rq_intercept_mode(redqueen_t* self);
 
-
-void redqueen_register_transition(redqueen_t* self, uint64_t ip, uint64_t transition_val);
-void redqueen_set_trace_mode(redqueen_t* self);
-void redqueen_unset_trace_mode(redqueen_t* self);
 
 void set_se_instruction(redqueen_t* self, uint64_t addr);
 

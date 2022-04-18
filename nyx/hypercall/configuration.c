@@ -24,6 +24,7 @@ void handle_hypercall_kafl_get_host_config(struct kvm_run *run, CPUState *cpu, u
 	config.bitmap_size = GET_GLOBAL_STATE()->shared_bitmap_size;
 	config.ijon_bitmap_size = GET_GLOBAL_STATE()->shared_ijon_bitmap_size;
 	config.payload_buffer_size = GET_GLOBAL_STATE()->shared_payload_buffer_size;
+	config.worker_id = GET_GLOBAL_STATE()->worker_id;
 
 	write_virtual_memory(vaddr, (uint8_t*)&config, sizeof(host_config_t), cpu);
 	GET_GLOBAL_STATE()->get_host_config_done = true;
@@ -57,31 +58,19 @@ void handle_hypercall_kafl_set_agent_config(struct kvm_run *run, CPUState *cpu, 
 			exit(1);
 		}
 
-		GET_GLOBAL_STATE()->cap_timeout_detection = config.agent_timeout_detection;
-		GET_GLOBAL_STATE()->cap_only_reload_mode = !!!config.agent_non_reload_mode; /* fix this */
-		GET_GLOBAL_STATE()->cap_compile_time_tracing = config.agent_tracing;
+		memcpy(&GET_GLOBAL_STATE()->agent_config, &config, sizeof(agent_config_t));
+		GET_GLOBAL_STATE()->config_cr3 = env->cr[3];
 
-		if(!GET_GLOBAL_STATE()->cap_compile_time_tracing && !GET_GLOBAL_STATE()->nyx_fdl){
+		if(!GET_GLOBAL_STATE()->agent_config.agent_tracing && !GET_GLOBAL_STATE()->nyx_fdl){
 			fprintf(stderr, "[QEMU-Nyx] Error: Attempt to fuzz target without compile-time instrumentation - Intel PT is not supported on this KVM build!\n");
 			exit(1);
 		}
 
-		GET_GLOBAL_STATE()->cap_ijon_tracing = config.agent_ijon_tracing;
-
-		if(config.agent_tracing){
-			GET_GLOBAL_STATE()->cap_compile_time_tracing_buffer_vaddr = config.trace_buffer_vaddr;
+		if(GET_GLOBAL_STATE()->agent_config.agent_tracing){
             GET_GLOBAL_STATE()->pt_trace_mode = false;
 		}
-		if(config.agent_ijon_tracing){
-			GET_GLOBAL_STATE()->cap_ijon_tracing_buffer_vaddr = config.ijon_trace_buffer_vaddr;
-		}
-
-		GET_GLOBAL_STATE()->cap_cr3 = env->cr[3];
-
-		GET_GLOBAL_STATE()->cap_coverage_bitmap_size = config.coverage_bitmap_size;
 
 		GET_GLOBAL_STATE()->input_buffer_size = GET_GLOBAL_STATE()->shared_payload_buffer_size;
-
 		if (config.input_buffer_size){
 			abort();
 		}

@@ -1916,7 +1916,8 @@ static int kvm_init(MachineState *ms)
         goto err;
     }
 #ifdef QEMU_NYX
-    if (ioctl(s->fd, KVM_CHECK_EXTENSION, KVM_CAP_NYX_PT) != 1 && ioctl(s->fd, KVM_CHECK_EXTENSION, KVM_CAP_NYX_FDL) != 1) {
+    int kvm_nyx_version = ioctl(s->fd, KVM_CHECK_EXTENSION, KVM_CAP_NYX_VERSION);
+    if (kvm_nyx_version == -1) {
 
         /* fallback -> use vanilla KVM module instead (no Intel-PT tracing or nested hypercalls at this point) */
         fprintf(stderr, "[QEMU-Nyx] Could not access KVM-PT kernel module!\n[QEMU-Nyx] Trying vanilla KVM...\n");
@@ -1965,10 +1966,15 @@ static int kvm_init(MachineState *ms)
         GET_GLOBAL_STATE()->pt_trace_mode = false; // Intel PT is not available in this mode 
         fast_reload_set_mode(get_fast_reload_snapshot(), RELOAD_MEMORY_MODE_DIRTY_RING);
     }
-    else{
+    else if (kvm_nyx_version == KVM_NYX_VERSION){
         s->nyx_no_pt_mode = false;
         GET_GLOBAL_STATE()->nyx_fdl = true;
         fast_reload_set_mode(get_fast_reload_snapshot(), RELOAD_MEMORY_MODE_FDL);
+    }
+    else{
+        fprintf(stderr, "[QEMU-Nyx] Error: You are probably using an outdated version of KVM-Nyx.\n\tAPI-Version: QEMU-Nyx=%d / KVM-Nyx=%d\n\tPlease upgrade KVM-Nyx (https://github.com/nyx-fuzz/KVM-Nyx) !\n", KVM_NYX_VERSION, kvm_nyx_version);
+        ret = -1;
+        goto err;
     }
 #endif
     ret = kvm_ioctl(s, KVM_GET_API_VERSION, 0);
@@ -2562,18 +2568,23 @@ int kvm_cpu_exec(CPUState *cpu)
             ret = EXCP_INTERRUPT;
             break;
         case KVM_EXIT_SHUTDOWN:
-            DPRINTF("shutdown\n");
 #ifndef QEMU_NYX
             qemu_system_reset_request(SHUTDOWN_CAUSE_GUEST_RESET);
             ret = EXCP_INTERRUPT;
 #else
-            fprintf(stderr, "ATTEMPT TO SHUTDOWN MACHINE (KVM_EXIT_SHUTDOWN)!\n");
             if(GET_GLOBAL_STATE()->in_fuzzing_mode){
+#define CONFIG_KVM_EXIT_SHUTODWN_IS_PANIC // consider triple-fault etc as crash?
+#ifndef CONFIG_KVM_EXIT_SHUTODWN_IS_PANIC
                 /* Fuzzing is enabled at this point -> don't exit */
+				fprintf(stderr, "Got KVM_EXIT_SHUTDOWN while in fuzzing mode => reload\n",);
                 handle_hypercall_kafl_release(run, cpu, (uint64_t)run->hypercall.args[0]);
-                ret = 0;
-            }
-            else{
+				ret = 0;
+#else
+				debug_fprintf(stderr, "Got KVM_EXIT_SHUTDOWN while in fuzzing mode => panic\n");
+				handle_hypercall_kafl_panic(run, cpu, (uint64_t)run->hypercall.args[0]);
+				ret = 0;
+#endif
+            } else{
                 qemu_system_reset_request(SHUTDOWN_CAUSE_GUEST_RESET);
                 ret = EXCP_INTERRUPT;
             }
@@ -2684,8 +2695,17 @@ int kvm_cpu_exec(CPUState *cpu)
 #ifndef QEMU_NYX
             DPRINTF("kvm_arch_handle_exit\n");
 #else
-            printf("kvm_arch_handle_exit => %d\n", run->exit_reason);
-            assert(false);
+#define CONFIG_UNKNOWN_ERROR_IS_PANIC
+#ifndef CONFIG_UNKNOWN_ERROR_IS_PANIC
+			fprintf(stderr, "Unknown exit code (%d) => ABORT\n", run->exit_reason);
+			ret = kvm_arch_handle_exit(cpu, run);
+            assert(ret == 0);
+#else
+            debug_fprintf(stderr, "kvm_arch_handle_exit(%d) => panic\n", run->exit_reason);
+			ret = kvm_arch_handle_exit(cpu, run);
+			if (ret != 0)
+				handle_hypercall_kafl_panic(run, cpu, (uint64_t)run->hypercall.args[0]);
+#endif
 #endif
             ret = kvm_arch_handle_exit(cpu, run);
             break;

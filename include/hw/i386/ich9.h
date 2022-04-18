@@ -177,7 +177,12 @@ typedef struct ICH9LPCState {
 
 #define ICH9_LPC_RCBA                           0xf0
 #define ICH9_LPC_RCBA_BA_MASK                   Q35_MASK(32, 31, 14)
+#ifdef QEMU_NYX
+// Nyx snapshot restore fails on this
+#define ICH9_LPC_RCBA_EN                        0x0
+#else
 #define ICH9_LPC_RCBA_EN                        0x1
+#endif
 #define ICH9_LPC_RCBA_DEFAULT                   0x0
 
 #define ICH9_LPC_PIC_NUM_PINS                   16

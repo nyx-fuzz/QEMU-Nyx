@@ -29,19 +29,12 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 #include "nyx/auxiliary_buffer.h"
 #include "nyx/sharedir.h"
 #include "nyx/fast_vm_reload_sync.h"
+#include "nyx/types.h"
+#include "nyx/hypercall/configuration.h"
 
 #include <libxdc.h>
 
 #define INTEL_PT_MAX_RANGES	4
-
-enum mem_mode { 
-    mm_unkown,
-	mm_32_protected,    /* 32 Bit / No MMU */
-	mm_32_paging,       /* 32 Bit / L3 Paging */
-	mm_32_pae,          /* 32 Bit / PAE Paging */
-	mm_64_l4_paging,    /* 64 Bit / L4 Paging */
-	mm_64_l5_paging,    /* 32 Bit / L5 Paging */
-};
 
 typedef struct qemu_nyx_state_s{
 
@@ -49,6 +42,7 @@ typedef struct qemu_nyx_state_s{
     bool nyx_fdl;
 
     char* workdir_path;
+    uint32_t worker_id;
 
     /* FAST VM RELOAD */
     bool fast_reload_enabled;
@@ -76,6 +70,7 @@ typedef struct qemu_nyx_state_s{
 
     /* Intel PT Options (not migratable) */
     uint64_t pt_c3_filter;
+    bool pt_c3_filter_configured;
     volatile bool pt_ip_filter_enabled[4];
     bool pt_trace_mode; // enabled by default; disabled if compile-time tracing is implemented by agent
 
@@ -116,7 +111,7 @@ typedef struct qemu_nyx_state_s{
     uint64_t* nested_payload_pages; 
     bool protect_payload_buffer;
     bool discard_tmp_snapshot;
-    uint8_t mem_mode; 
+    mem_mode_t mem_mode; 
     uint32_t input_buffer_size;
 
 
@@ -131,6 +126,8 @@ typedef struct qemu_nyx_state_s{
 
     bool in_fuzzing_mode;
     bool in_reload_mode; 
+    bool starved;
+    bool trace_mode;
 
     bool shutdown_requested;
     bool cow_cache_full;
@@ -142,15 +139,8 @@ typedef struct qemu_nyx_state_s{
     bool get_host_config_done;
     bool set_agent_config_done;
 
-    /* capabilites */
-    uint8_t cap_timeout_detection;
-    uint8_t cap_only_reload_mode;
-    uint8_t cap_compile_time_tracing;
-    uint8_t cap_ijon_tracing;
-    uint64_t cap_cr3; 
-    uint64_t cap_compile_time_tracing_buffer_vaddr;
-    uint64_t cap_ijon_tracing_buffer_vaddr;
-    uint64_t cap_coverage_bitmap_size;
+    agent_config_t agent_config;
+    uint64_t config_cr3; 
 
     auxilary_buffer_t* auxilary_buffer;
     auxilary_buffer_config_t shadow_config;

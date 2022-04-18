@@ -2,9 +2,10 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include "nyx/types.h"
 
 #define NYX_SERIALIZED_STATE_MAGIC      0x58594E
-#define NYX_SERIALIZED_STATE_VERSION    1
+#define NYX_SERIALIZED_STATE_VERSION    1 || (NYX_AGENT_VERSION << 16)
 
 #define NYX_SERIALIZED_TYPE_PRE_SNAPSHOT        0
 #define NYX_SERIALIZED_TYPE_ROOT_SNAPSHOT       1
@@ -30,14 +31,8 @@ typedef struct serialized_state_root_snapshot_s {
     bool protect_input_buffer;
     uint32_t input_buffer_size;
 
-    uint8_t cap_timeout_detection;
-    uint8_t cap_only_reload_mode;
-    uint8_t cap_compile_time_tracing;
-    uint8_t cap_ijon_tracing;
-    uint64_t cap_cr3; 
-    uint64_t cap_compile_time_tracing_buffer_vaddr;
-    uint64_t cap_ijon_tracing_buffer_vaddr;
-    uint64_t cap_coverage_bitmap_size;
+    agent_config_t agent_config;
+    uint64_t config_cr3; 
 
 } serialized_state_root_snapshot_t;
 

@@ -51,6 +51,7 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 #include "nyx/state/state.h"
 #include "nyx/sharedir.h"
 #include "nyx/helpers.h"
+#include "nyx/trace_dump.h"
 
 #include <time.h>
 
@@ -89,6 +90,7 @@ typedef struct nyx_interface_state {
 	uint32_t input_buffer_size;
 
 	bool dump_pt_trace;
+	bool edge_cb_trace;
 
 	bool redqueen;
 	
@@ -260,30 +262,6 @@ static bool verify_workdir_state(nyx_interface_state *s, Error **errp){
 	}
 	free(tmp);
 
-	assert(asprintf(&tmp, "%s/page_cache.lock", workdir) != -1);
-	if (!file_exits(tmp)){
-		fprintf(stderr, "%s does not exist...", tmp);
-		free(tmp);
-		return false;
-	}
-	free(tmp);
-
-	assert(asprintf(&tmp, "%s/page_cache.addr", workdir) != -1);
-	if (!file_exits(tmp)){
-		fprintf(stderr, "%s does not exist...\n", tmp);
-		free(tmp);
-		return false;
-	}
-	free(tmp);
-
-	assert(asprintf(&tmp, "%s/page_cache.dump", workdir) != -1);
-	if (!file_exits(tmp)){
-		fprintf(stderr,  "%s does not exist...\n", tmp);
-		free(tmp);
-		return false;
-	}
-	free(tmp);
-
 	assert(asprintf(&tmp, "%s/page_cache", workdir) != -1);
 	init_page_cache(tmp);
 
@@ -301,9 +279,13 @@ static bool verify_workdir_state(nyx_interface_state *s, Error **errp){
 	init_redqueen_state();
 
   if(s->dump_pt_trace){
-	  assert(asprintf(&tmp, "%s/pt_trace_dump_%d", workdir, id) != -1);
-    	pt_open_pt_trace_file(tmp);
-    	free(tmp);
+	assert(asprintf(&tmp, "%s/pt_trace_dump_%d", workdir, id) != -1);
+	pt_trace_dump_init(tmp);
+	free(tmp);
+  }
+
+  if(s->edge_cb_trace){
+	redqueen_trace_init();
   }
 
 
@@ -353,7 +335,7 @@ static void check_available_ipt_ranges(nyx_interface_state* s){
 		exit(1);
 	}
 
-	if (ioctl(kvm_fd, KVM_CHECK_EXTENSION, KVM_CAP_NYX_PT) == 1 && ioctl(kvm_fd, KVM_CHECK_EXTENSION, KVM_CAP_NYX_FDL) == 1) {
+	if (ioctl(kvm_fd, KVM_CHECK_EXTENSION, KVM_CAP_NYX_VERSION) == KVM_NYX_VERSION) {
 		for(uint8_t i = 0; i < INTEL_PT_MAX_RANGES; i++){
 			if(s->ip_filter[i][0] && s->ip_filter[i][1]){
 				if(i >= 1){
@@ -398,6 +380,7 @@ static void nyx_realize(DeviceState *dev, Error **errp){
 	if(s->cow_primary_size){
 		set_global_cow_cache_primary_size(s->cow_primary_size);
 	}
+	GET_GLOBAL_STATE()->worker_id = s->worker_id;
 
 	if (!s->workdir || !verify_workdir_state(s, errp)){
 		fprintf(stderr, "[QEMU-Nyx] Error:  work dir...\n");
@@ -449,6 +432,7 @@ static Property nyx_interface_properties[] = {
 	DEFINE_PROP_UINT32("bitmap_size", nyx_interface_state, bitmap_size, DEFAULT_NYX_BITMAP_SIZE),
 	DEFINE_PROP_UINT32("input_buffer_size", nyx_interface_state, input_buffer_size, DEFAULT_NYX_BITMAP_SIZE),
 	DEFINE_PROP_BOOL("dump_pt_trace", nyx_interface_state, dump_pt_trace, false),
+	DEFINE_PROP_BOOL("edge_cb_trace", nyx_interface_state, edge_cb_trace, false),
 
 
 	DEFINE_PROP_END_OF_LIST(),

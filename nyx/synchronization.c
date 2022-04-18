@@ -277,12 +277,12 @@ void synchronization_lock(void){
 
 	//last_timeout = false;
 
-	if(unlikely(GET_GLOBAL_STATE()->in_redqueen_reload_mode || GET_GLOBAL_STATE()->redqueen_state->trace_mode)){
-		if(GET_GLOBAL_STATE()->redqueen_state->trace_mode){
-			write_trace_result(GET_GLOBAL_STATE()->redqueen_state->trace_state);
-			redqueen_trace_reset(GET_GLOBAL_STATE()->redqueen_state->trace_state);
-		}
-		fsync_all_traces();		
+	if(unlikely(GET_GLOBAL_STATE()->in_redqueen_reload_mode)) {
+			fsync_redqueen_files();		
+	}
+
+	if (unlikely(GET_GLOBAL_STATE()->trace_mode)) {
+		redqueen_trace_flush();
 	}
 
 	interface_send_char(NYX_INTERFACE_PING);
@@ -291,7 +291,12 @@ void synchronization_lock(void){
 	pthread_mutex_unlock(&synchronization_lock_mutex);
 
 	check_auxiliary_config_buffer(GET_GLOBAL_STATE()->auxilary_buffer, &GET_GLOBAL_STATE()->shadow_config);
-	set_success_auxiliary_result_buffer(GET_GLOBAL_STATE()->auxilary_buffer, 1);
+
+	//set_success_auxiliary_result_buffer(GET_GLOBAL_STATE()->auxilary_buffer, 1);
+	if (GET_GLOBAL_STATE()->starved == true)
+		set_success_auxiliary_result_buffer(GET_GLOBAL_STATE()->auxilary_buffer, 2);
+	else
+		set_success_auxiliary_result_buffer(GET_GLOBAL_STATE()->auxilary_buffer, 1);
 
 	GET_GLOBAL_STATE()->pt_trace_size = 0;
 	/*
@@ -327,6 +332,25 @@ void synchronization_lock_crash_found(void){
 	handle_tmp_snapshot_state();
 
 	set_crash_auxiliary_result_buffer(GET_GLOBAL_STATE()->auxilary_buffer);
+	
+	perform_reload();
+
+	//synchronization_lock();
+
+	in_fuzzing_loop = false;
+}
+
+void synchronization_lock_asan_found(void){
+	if(!in_fuzzing_loop){
+		fprintf(stderr, "<%d-%ld>\t%s [NOT IN FUZZING LOOP]\n", getpid(), run_counter, __func__);
+		set_success_auxiliary_result_buffer(GET_GLOBAL_STATE()->auxilary_buffer, 0);
+	}
+
+	pt_disable(qemu_get_cpu(0), false);
+
+	handle_tmp_snapshot_state();
+
+	set_asan_auxiliary_result_buffer(GET_GLOBAL_STATE()->auxilary_buffer);
 	
 	perform_reload();
 

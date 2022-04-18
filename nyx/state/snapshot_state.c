@@ -53,14 +53,8 @@ void serialize_state(const char* filename_prefix, bool is_pre_snapshot){
         
         root_snapshot.input_buffer_size = nyx_global_state->input_buffer_size;
 
-        root_snapshot.cap_timeout_detection = nyx_global_state->cap_timeout_detection;
-        root_snapshot.cap_only_reload_mode = nyx_global_state->cap_only_reload_mode;
-        root_snapshot.cap_compile_time_tracing = nyx_global_state->cap_compile_time_tracing;
-        root_snapshot.cap_ijon_tracing = nyx_global_state->cap_ijon_tracing;
-        root_snapshot.cap_cr3 = nyx_global_state->cap_cr3;
-        root_snapshot.cap_compile_time_tracing_buffer_vaddr = nyx_global_state->cap_compile_time_tracing_buffer_vaddr;
-        root_snapshot.cap_ijon_tracing_buffer_vaddr = nyx_global_state->cap_ijon_tracing_buffer_vaddr;
-        root_snapshot.cap_coverage_bitmap_size = nyx_global_state->cap_coverage_bitmap_size;
+        memcpy(&root_snapshot.agent_config, &nyx_global_state->agent_config, sizeof(agent_config_t));
+        root_snapshot.config_cr3 = nyx_global_state->config_cr3;
 
         fwrite(&root_snapshot, sizeof(serialized_state_root_snapshot_t), 1, fp);
 
@@ -117,14 +111,8 @@ void deserialize_state(const char* filename_prefix){
         
         nyx_global_state->input_buffer_size = root_snapshot.input_buffer_size;
 
-        nyx_global_state->cap_timeout_detection = root_snapshot.cap_timeout_detection;
-        nyx_global_state->cap_only_reload_mode = root_snapshot.cap_only_reload_mode;
-        nyx_global_state->cap_compile_time_tracing = root_snapshot.cap_compile_time_tracing;
-        nyx_global_state->cap_ijon_tracing = root_snapshot.cap_ijon_tracing;
-        nyx_global_state->cap_cr3 = root_snapshot.cap_cr3;
-        nyx_global_state->cap_compile_time_tracing_buffer_vaddr = root_snapshot.cap_compile_time_tracing_buffer_vaddr;
-        nyx_global_state->cap_ijon_tracing_buffer_vaddr = root_snapshot.cap_ijon_tracing_buffer_vaddr;
-        nyx_global_state->cap_coverage_bitmap_size = root_snapshot.cap_coverage_bitmap_size;
+        memcpy(&nyx_global_state->agent_config, &root_snapshot.agent_config, sizeof(agent_config_t));
+        nyx_global_state->config_cr3 = root_snapshot.config_cr3;
 
         assert(apply_capabilities(qemu_get_cpu(0)));
         remap_payload_buffer(nyx_global_state->payload_buffer, ((CPUState *)qemu_get_cpu(0)) );

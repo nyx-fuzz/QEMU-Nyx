@@ -41,39 +41,38 @@ static uint64_t get_48_paging_phys_addr(uint64_t cr3, uint64_t addr, bool read_f
 #define x86_64_PAGE_SIZE        0x1000
 #define x86_64_PAGE_MASK        ~(x86_64_PAGE_SIZE - 1)
 
-static void set_mem_mode(CPUState *cpu){
+mem_mode_t get_current_mem_mode(CPUState *cpu){
 	kvm_arch_get_registers(cpu);
 
 	X86CPU *cpux86 = X86_CPU(cpu);
 	CPUX86State *env = &cpux86->env;
-    
-    if (!(env->cr[0] & CR0_PG_MASK)) {
-        GET_GLOBAL_STATE()->mem_mode = mm_32_protected;
-        return;
+
+	if (!(env->cr[0] & CR0_PG_MASK)) {
+        return mm_32_protected;
     }
     else{
     	if (env->cr[4] & CR4_PAE_MASK) {
 	        if (env->hflags & HF_LMA_MASK) {
 	            if (env->cr[4] & CR4_LA57_MASK) {
-	            	GET_GLOBAL_STATE()->mem_mode = mm_64_l5_paging;
-                    return;
+                    return mm_64_l5_paging;
 	            } else {
-                    GET_GLOBAL_STATE()->mem_mode = mm_64_l4_paging;
-                    return;
+                    return mm_64_l4_paging;
 	            }
 	        } 
 	        else{
-                GET_GLOBAL_STATE()->mem_mode = mm_32_pae;
-                return;
+                return mm_32_pae;
 	        }
 	    } 
 	    else {
-            GET_GLOBAL_STATE()->mem_mode = mm_32_paging;
-	    	return;
+	    	return mm_32_paging;
 	    }
     }
 
-    return;
+    return mm_unkown;
+}
+
+static void set_mem_mode(CPUState *cpu){
+    GET_GLOBAL_STATE()->mem_mode = get_current_mem_mode(cpu);
 }
 
 /*  Warning: This might break memory handling for hypervisor fuzzing => FIXME LATER */
@@ -215,8 +214,14 @@ bool remap_slot(uint64_t addr, uint32_t slot, CPUState *cpu, int fd, uint64_t sh
     QLIST_FOREACH_RCU(block, &ram_list.blocks, next) {
         if(!memcmp(block->idstr, "pc.ram", 6)){
             /* TODO: put assert calls here */ 
-            munmap((void*)(((uint64_t)block->host) + phys_addr_ram_offset), x86_64_PAGE_SIZE);
-            mmap((void*)(((uint64_t)block->host) + phys_addr_ram_offset), 0x1000, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, fd, (i*x86_64_PAGE_SIZE));
+      if (munmap((void*)(((uint64_t)block->host) + phys_addr_ram_offset), x86_64_PAGE_SIZE) == -1) {
+				fprintf(stderr, "%s: munmap failed!\n", __func__);
+				assert(false);
+			}
+            if (mmap((void*)(((uint64_t)block->host) + phys_addr_ram_offset), 0x1000, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, fd, (i*x86_64_PAGE_SIZE)) == MAP_FAILED) {
+				fprintf(stderr, "%s: mmap failed!\n", __func__);
+				assert(false);
+			}
 
             //printf("MMUNMAP: %d\n", munmap((void*)(((uint64_t)block->host) + phys_addr), x86_64_PAGE_SIZE));
             //printf("MMAP: %p\n", mmap((void*)(((uint64_t)block->host) + phys_addr), 0x1000, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, fd, (i*x86_64_PAGE_SIZE)));
@@ -285,6 +290,7 @@ void resize_shared_memory(uint32_t new_size, uint32_t* shm_size, void** shm_ptr,
 
 bool remap_payload_buffer(uint64_t virt_guest_addr, CPUState *cpu){    
     assert(GET_GLOBAL_STATE()->shared_payload_buffer_fd && GET_GLOBAL_STATE()->shared_payload_buffer_size);
+    assert(GET_GLOBAL_STATE()->shared_payload_buffer_size % x86_64_PAGE_SIZE == 0);
     RAMBlock *block;
     refresh_kvm_non_dirty(cpu);
 
@@ -563,221 +569,240 @@ void remove_all_breakpoints(CPUState *cpu){
 }
 
 
-
-
-
-
-
-
-
-
-
-
-
-#define PPAGE_SIZE 0x1000
 #define PENTRIES 0x200
-#define PLEVEL_4_SHIFT 12
-#define PLEVEL_3_SHIFT 21
-#define PLEVEL_2_SHIFT 30
-#define PLEVEL_1_SHIFT 39
-#define SIGN_EXTEND_TRESHOLD 0x100
-#define SIGN_EXTEND 0xFFFF000000000000ULL
-#define PAGETABLE_MASK 0x1FFFFFFFFF000ULL
-#define PML4_ENTRY_MASK 0x1FFFFFFFFF000ULL
-#define PML3_ENTRY_MASK 0x1FFFFC0000000ULL
-#define PML2_ENTRY_MASK 0x1FFFFFFE00000ULL
+#define PPAGE_SIZE 0x1000
 
-#define CHECK_BIT(var,pos) !!(((var) & (1ULL<<(pos))))
-
-
-static void write_address(uint64_t address, uint64_t size, uint64_t prot){
-    //fprintf(stderr, "%s %lx %lx %lx\n", __func__, address, size, prot);
-    static uint64_t next_address = PAGETABLE_MASK;
-    static uint64_t last_address = 0x0; 
-    static uint64_t last_prot = 0;
-
-    if((address != next_address || prot != last_prot)){
-        /* do not print guard pages or empty pages without any permissions */
-        if(last_address && prot && (last_address+size != next_address || prot != last_prot)){
-            fprintf(stderr, "%016lx - %016lx %c%c%c\n",
-                last_address, next_address,
-                CHECK_BIT(last_prot, 1) ? 'W' : '-', 
-                CHECK_BIT(last_prot, 2) ? 'U' : 'K', 
-                !CHECK_BIT(last_prot, 63)? 'X' : '-');
-        }
-        last_address = address;
+static bool read_memory(uint64_t address, uint64_t* buffer, size_t size, bool read_from_snapshot) {
+    if (unlikely(address == INVALID_ADDRESS)) {
+        return false;
     }
-    next_address = address+size;
-    last_prot = prot;
+
+    if (unlikely(read_from_snapshot)) {
+        return read_snapshot_memory(
+            get_fast_reload_snapshot(),
+            address, (uint8_t *)buffer, size);
+    } 
     
+    // NB: This API exposed by exec.h doesn't signal failure, although it can
+    // fail. Figure out how to expose the address space object instead and then
+    // we can actually check the return value here. Until then, will clear the
+    // buffer contents first.
+    memset(buffer, 0, size);
+    cpu_physical_memory_rw(address, (uint8_t*)buffer, size, false);
+    return true;
 }
 
-void print_48_paging2(uint64_t cr3){
-    uint64_t paging_entries_level_1[PENTRIES];
-    uint64_t paging_entries_level_2[PENTRIES];
-    uint64_t paging_entries_level_3[PENTRIES];
-    uint64_t paging_entries_level_4[PENTRIES];
-
-    uint64_t address_identifier_1, address_identifier_2, address_identifier_3, address_identifier_4;
-    uint32_t i1, i2, i3,i4;
-
-    cpu_physical_memory_rw((cr3&PAGETABLE_MASK), (uint8_t *) paging_entries_level_1, PPAGE_SIZE, false);
-    for(i1 = 0; i1 < 512; i1++){
-        if(paging_entries_level_1[i1]){
-            address_identifier_1 = ((uint64_t)i1) << PLEVEL_1_SHIFT;
-            if (i1 & SIGN_EXTEND_TRESHOLD){
-                address_identifier_1 |= SIGN_EXTEND;
-            }
-            if(CHECK_BIT(paging_entries_level_1[i1], 0)){ /* otherwise swapped out */ 
-                cpu_physical_memory_rw((paging_entries_level_1[i1]&PAGETABLE_MASK), (uint8_t *) paging_entries_level_2, PPAGE_SIZE, false);
-                for(i2 = 0; i2 < PENTRIES; i2++){
-                    if(paging_entries_level_2[i2]){
-                        address_identifier_2 = (((uint64_t)i2) << PLEVEL_2_SHIFT) + address_identifier_1;
-                        if (CHECK_BIT(paging_entries_level_2[i2], 0)){ /* otherwise swapped out */ 
-                            if((paging_entries_level_2[i2]&PAGETABLE_MASK) == (paging_entries_level_1[i1]&PAGETABLE_MASK)){
-                                /* loop */
-                                continue;
-                            }
-
-                            if (CHECK_BIT(paging_entries_level_2[i2], 7)){
-                                    write_address(address_identifier_2, 0x40000000, (uint64_t)paging_entries_level_2[i2] & ((1ULL<<63) | (1ULL<<2) | (1ULL<<1)));
-                            }
-                            else{
-                                /* otherwise this PDPE references a 1GB page */
-                                cpu_physical_memory_rw((paging_entries_level_2[i2]&PAGETABLE_MASK), (uint8_t *) paging_entries_level_3, PPAGE_SIZE, false);
-                                for(i3 = 0; i3 < PENTRIES; i3++){
-                                    if(paging_entries_level_3[i3]){
-                                        address_identifier_3 = (((uint64_t)i3) << PLEVEL_3_SHIFT) + address_identifier_2;
-                                        if (CHECK_BIT(paging_entries_level_3[i3], 0)){ /* otherwise swapped out */ 
-                                            if (CHECK_BIT(paging_entries_level_3[i3], 7)){
-                                                write_address(address_identifier_3, 0x200000, (uint64_t)paging_entries_level_3[i3] & ((1ULL<<63) | (1ULL<<2) | (1ULL<<1)));
-                                            }
-                                            else{
-                                                cpu_physical_memory_rw((paging_entries_level_3[i3]&PAGETABLE_MASK), (uint8_t *) paging_entries_level_4, PPAGE_SIZE, false);
-                                                for(i4 = 0; i4 < PENTRIES; i4++){
-                                                    if(paging_entries_level_4[i4]){
-                                                        address_identifier_4 = (((uint64_t)i4) << PLEVEL_4_SHIFT) + address_identifier_3;
-                                                        if (CHECK_BIT(paging_entries_level_4[i4], 0)){
-                                                            write_address(address_identifier_4, 0x1000, (uint64_t)paging_entries_level_4[i4] & ((1ULL<<63) | (1ULL<<2) | (1ULL<<1)));
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-    write_address(0, 0x1000, 0);
+__attribute__((always_inline)) inline
+static bool bit(uint64_t value, uint8_t lsb) {
+  return (value >> lsb) & 1;
 }
 
-
-static uint64_t* load_page_table(uint64_t page_table_address, uint64_t* paging_entries_buffer, uint8_t level, bool read_from_snapshot, bool *success){
-    if(page_table_address == INVALID_ADDRESS){
-        *success = false;
-    }
-
-    if (read_from_snapshot){
-        *success = read_snapshot_memory(get_fast_reload_snapshot(), page_table_address, (uint8_t *) paging_entries_buffer, PPAGE_SIZE);   
-    }
-    else{
-        cpu_physical_memory_rw(page_table_address, (uint8_t *) paging_entries_buffer, PPAGE_SIZE, false);
-        *success = true; /* fix this */
-    }
-    return paging_entries_buffer;
+__attribute__((always_inline)) inline
+static uint64_t bits(uint64_t value, uint8_t lsb, uint8_t msb) {
+  return (value & ((0xffffffffffffffffull >> (64 - (msb - lsb + 1))) << lsb)) >> lsb;
 }
 
-static uint64_t get_48_paging_phys_addr(uint64_t cr3, uint64_t addr, bool read_from_snapshot){
-    /* signedness broken af -> fix me! */
-    uint16_t pml_4_index = (addr & 0xFF8000000000ULL) >> 39;
-    uint16_t pml_3_index = (addr & 0x0007FC0000000UL) >> 30;
-    uint16_t pml_2_index = (addr & 0x000003FE00000UL) >> 21;
-    uint16_t pml_1_index = (addr & 0x00000001FF000UL) >> 12;
-
-    uint64_t address_identifier_4;
-    uint64_t paging_entries_buffer[PENTRIES];
-    uint64_t* paging_entries_buffer_ptr = NULL;
-    uint64_t page_table_address = 0;
-
-    bool success = false;
-
-    page_table_address = (cr3&PAGETABLE_MASK);
-    paging_entries_buffer_ptr = load_page_table(page_table_address, paging_entries_buffer, 0, read_from_snapshot, &success);
-
-    if (unlikely(success == false)){
-        goto fail;
+// Helper function to load an entire pagetable table. These are PENTRIES
+// 64-bit entries, so entries must point to a sufficiently large buffer.
+static bool load_table(uint64_t address, uint64_t* entries, bool read_from_snapshot) {
+    if (unlikely(!read_memory(address, entries, 512 * sizeof(*entries), read_from_snapshot))) {
+        return false;
     }
 
-    if(paging_entries_buffer_ptr[pml_4_index]){
-        address_identifier_4 = ((uint64_t)pml_4_index) << PLEVEL_1_SHIFT;
-        if (pml_4_index & SIGN_EXTEND_TRESHOLD){
-            address_identifier_4 |= SIGN_EXTEND;
-        }
-        if(CHECK_BIT(paging_entries_buffer_ptr[pml_4_index], 0)){ /* otherwise swapped out */ 
+    return true;
+}
 
-            page_table_address = (paging_entries_buffer_ptr[pml_4_index]&PAGETABLE_MASK);
-            paging_entries_buffer_ptr = load_page_table(page_table_address, paging_entries_buffer, 1, read_from_snapshot, &success);
-
-            if (unlikely(success == false)){
-                goto fail;
-            }
-
-            if(paging_entries_buffer_ptr[pml_3_index]){
-
-                if (CHECK_BIT(paging_entries_buffer_ptr[pml_3_index], 0)){ /* otherwise swapped out */ 
-
-                    if (CHECK_BIT(paging_entries_buffer_ptr[pml_3_index], 7)){
-                        /* 1GB PAGE */
-                        return (paging_entries_buffer_ptr[pml_3_index] & PML3_ENTRY_MASK) | (0x7FFFFFFF & addr); 
-                    }
-                    else{
-
-                        page_table_address = (paging_entries_buffer_ptr[pml_3_index]&PAGETABLE_MASK);
-                        paging_entries_buffer_ptr = load_page_table(page_table_address, paging_entries_buffer, 2, read_from_snapshot, &success);
-
-                        if (unlikely(success == false)){
-                            goto fail;
-                        }
-
-                        if(paging_entries_buffer_ptr[pml_2_index]){
-                            if (CHECK_BIT(paging_entries_buffer_ptr[pml_2_index], 0)){ /* otherwise swapped out */ 
-                                if (CHECK_BIT(paging_entries_buffer_ptr[pml_2_index], 7)){
-                                    /* 2MB PAGE */
-                                    return (paging_entries_buffer_ptr[pml_2_index] & PML2_ENTRY_MASK) | (0x3FFFFF & addr); 
-                                }
-                                else{
-
-                                    page_table_address = (paging_entries_buffer_ptr[pml_2_index]&PAGETABLE_MASK);
-                                    paging_entries_buffer_ptr = load_page_table(page_table_address, paging_entries_buffer, 3, read_from_snapshot, &success);
-
-                                    if (unlikely(success == false)){
-                                         goto fail;
-                                    }
-
-                                    if(paging_entries_buffer_ptr[pml_1_index]){
-                                        if (CHECK_BIT(paging_entries_buffer_ptr[pml_1_index], 0)){
-                                            /* 4 KB PAGE */
-                                            return (paging_entries_buffer_ptr[pml_1_index] & PML4_ENTRY_MASK) | (0xFFF & addr); 
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+// Helper function to load a single pagetable entry. We simplify things by
+// returning the same invalid value (0) for both non-present entries and
+// any other error conditions, since we don't need to handle these cases
+// differently.
+static uint64_t load_entry(uint64_t address, uint64_t index,
+                           bool read_from_snapshot) {
+    uint64_t entry = 0;
+    if (unlikely(!read_memory(address + (index * sizeof(entry)), &entry, sizeof(entry),
+            read_from_snapshot))) {
+        return 0;
     }
 
-    fail:
-    
-    return INVALID_ADDRESS;
+    // Check that the entry is present.
+    if (unlikely(!bit(entry, 0))) {
+        return 0;
+    }
+
+    return entry;
+}
+
+static void print_page(uint64_t address, uint64_t entry, size_t size, bool s, bool w, bool x) {
+    fprintf(stderr, " %c%c%c %016lx %zx",
+        s ? 's' : 'u', w ? 'w' : 'r', x ? 'x' : '-',
+        (bits(entry, 12, 51) << 12) & ~(size - 1), size);
+}
+
+static void print_48_pte(uint64_t address, uint64_t pde_entry, bool read_from_snapshot,
+        bool s, bool w, bool x) {
+    uint64_t pte_address = bits(pde_entry, 12, 51) << 12;
+    uint64_t pte_table[PENTRIES];
+
+    if (!load_table(pte_address, pte_table, read_from_snapshot)) {
+        return;
+    }
+
+    for (size_t i = 0; i < PENTRIES; ++i) {
+        uint64_t entry = pte_table[i];
+
+        if (entry) {
+            fprintf(stderr, "\n   1 %016lx [%ld]", address | i << 12, entry);
+        }
+
+        if (!bit(entry, 0)) {
+            // Not present.
+        } else {
+            print_page(address | i << 12, entry, 0x1000,
+                s & !bit(entry, 2), w & bit(entry, 1), x & !bit(entry, 63));
+        }
+    }
+}
+
+static void print_48_pde(uint64_t address, uint64_t pdpte_entry, bool read_from_snapshot,
+        bool s, bool w, bool x) {
+    uint64_t pde_address = bits(pdpte_entry, 12, 51) << 12;
+    uint64_t pde_table[PENTRIES];
+
+    if (!load_table(pde_address, pde_table, read_from_snapshot)) {
+        return;
+    }
+
+    for (size_t i = 0; i < PENTRIES; ++i) {
+        uint64_t entry = pde_table[i];
+
+        if (entry) {
+            fprintf(stderr, "\n  2 %016lx [%ld]", address | i << 21, entry);
+        }
+
+        if (!bit(entry, 0)) {
+            // Not present.
+        } else if (bit(entry, 7)) {
+            print_page(address | i << 21, entry, 0x200000,
+                s & !bit(entry, 2), w & bit(entry, 1), x & !bit(entry, 63));
+        } else {
+            print_48_pte(address | i << 21, entry, read_from_snapshot,
+                s & !bit(entry, 2), w & bit(entry, 1), x & !bit(entry, 63));
+        }
+    }
+}
+
+static void print_48_pdpte(uint64_t address, uint64_t pml4_entry, bool read_from_snapshot,
+        bool s, bool w, bool x) {
+    uint64_t pdpte_address = bits(pml4_entry, 12, 51) << 12;
+    uint64_t pdpte_table[PENTRIES];
+
+    if (!load_table(pdpte_address, pdpte_table, read_from_snapshot)) {
+        return;
+    }
+
+    for (size_t i = 0; i < PENTRIES; ++i) {
+        uint64_t entry = pdpte_table[i];
+
+        if (entry) {
+            fprintf(stderr, "\n 3 %016lx [%ld]", address | i << 30, entry);
+        }
+
+        if (!bit(entry, 0)) {
+            // Not present.
+        } else if (bit(entry, 7)) {
+            print_page(address | i << 30, entry, 0x40000000,
+                s & !bit(entry, 2), w & bit(entry, 1), x & !bit(entry, 63));
+        } else {
+            print_48_pde(address | i << 30, entry, read_from_snapshot,
+                s & !bit(entry, 2), w & bit(entry, 1), x & !bit(entry, 63));
+        }
+    }
+}
+
+static void print_48_pagetables_(uint64_t cr3, bool read_from_snapshot) {
+    uint64_t pml4_address = bits(cr3, 12, 51) << 12;
+    uint64_t pml4_table[PENTRIES];
+
+    if (!load_table(pml4_address, pml4_table, read_from_snapshot)) {
+        return;
+    }
+
+    for (size_t i = 0; i < PENTRIES; ++i) {
+        uint64_t entry = pml4_table[i];
+        uint64_t address = i << 39;
+        // Ensure canonical virtual address
+        if (bit(address, 47)) {
+            address |= 0xffff000000000000ul;
+        }
+
+        if (entry) {
+            fprintf(stderr, "\n4 %016lx [%ld]", address, entry);
+        }
+
+        if (bit(entry, 0)) {
+            print_48_pdpte(address, entry, read_from_snapshot,
+                !bit(entry, 2), bit(entry, 1), !bit(entry, 63));
+        }
+    }
+}
+
+void print_48_pagetables(uint64_t cr3) {
+    static bool printed = false;
+    if (!printed) {
+        fprintf(stderr, "pagetables for cr3 %lx", cr3);
+        print_48_pagetables_(cr3, false);
+        printed = true;
+        fprintf(stderr, "\n");
+    }
+}
+
+static uint64_t get_48_paging_phys_addr(uint64_t cr3, uint64_t addr, bool read_from_snapshot) {
+    uint64_t pml4_address = bits(cr3, 12, 51) << 12;
+    uint64_t pml4_offset = bits(addr, 39, 47);
+    uint64_t pml4_entry = load_entry(pml4_address, pml4_offset, read_from_snapshot);
+    if (unlikely(!pml4_entry)) {
+        return INVALID_ADDRESS;
+    }
+
+    uint64_t pdpte_address = bits(pml4_entry, 12, 51) << 12;
+    uint64_t pdpte_offset = bits(addr, 30, 38);
+    uint64_t pdpte_entry = load_entry(pdpte_address, pdpte_offset, read_from_snapshot);
+    if (unlikely(!pdpte_entry)) {
+        return INVALID_ADDRESS;
+    }
+
+    if (unlikely(bit(pdpte_entry, 7))) {
+        // 1GByte page translation.
+        uint64_t page_address = bits(pdpte_entry, 12, 51) << 12;
+        uint64_t page_offset = bits(addr, 0, 29);
+        return page_address + page_offset;
+    }
+
+    uint64_t pde_address = bits(pdpte_entry, 12, 51) << 12;
+    uint64_t pde_offset = bits(addr, 21, 29);
+    uint64_t pde_entry = load_entry(pde_address, pde_offset, read_from_snapshot);
+    if (unlikely(!pde_entry)) {
+        return INVALID_ADDRESS;
+    }
+
+    if (unlikely(bit(pde_entry, 7))) {
+        // 2MByte page translation.
+        uint64_t page_address = bits(pde_entry, 12, 51) << 12;
+        uint64_t page_offset = bits(addr, 0, 20);
+        return page_address + page_offset;
+    }
+
+    uint64_t pte_address = bits(pde_entry, 12, 51) << 12;
+    uint64_t pte_offset = bits(addr, 12, 20);
+    uint64_t pte_entry = load_entry(pte_address, pte_offset, read_from_snapshot);
+    if (unlikely(!pte_entry)) {
+       return INVALID_ADDRESS;
+    }
+
+    // 4Kbyte page translation.
+    uint64_t page_address = bits(pte_entry, 12, 51) << 12;
+    uint64_t page_offset = bits(addr, 0, 11);
+    return page_address + page_offset;
 }
 
 //#define DEBUG_48BIT_WALK

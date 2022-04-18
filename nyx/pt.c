@@ -34,35 +34,20 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 #include "nyx/memory_access.h"
 #include "nyx/interface.h"
 #include "nyx/debug.h"
+#include "nyx/file_helper.h"
+#ifdef CONFIG_REDQUEEN
 #include "nyx/redqueen.h"
 #include "nyx/redqueen_patch.h"
 #include "nyx/patcher.h"
+#endif
 #include "nyx/page_cache.h"
 #include "nyx/state/state.h"
 #include <libxdc.h>
 #include "nyx/helpers.h"
+#include "nyx/trace_dump.h"
+#include "nyx/redqueen_trace.h"
 
 #define PT_BUFFER_MMAP_ADDR 0x3ffff0000000
-
-uint32_t state_byte = 0;
-uint32_t last = 0;
-
-int pt_trace_dump_fd = 0;
-bool should_dump_pt_trace= false;
-
-void pt_open_pt_trace_file(char* filename){
-  printf("using pt trace at %s",filename);
-  pt_trace_dump_fd = open(filename, O_WRONLY);
-  should_dump_pt_trace = true;
-  assert(pt_trace_dump_fd >= 0);
-}
-
-void pt_trucate_pt_trace_file(void){
-  if(should_dump_pt_trace){
-    assert(lseek(pt_trace_dump_fd, 0, SEEK_SET) == 0);
-    assert(ftruncate(pt_trace_dump_fd, 0)==0);
-  }
-}
 
 static void pt_set(CPUState *cpu, run_on_cpu_data arg){
 	asm volatile("" ::: "memory");
@@ -98,12 +83,6 @@ static inline int pt_ioctl(int fd, unsigned long request, unsigned long arg){
 	return ioctl(fd, request, arg);
 }
 
-static inline uint64_t mix_bits(uint64_t v) {
-  v ^= (v >> 31);
-  v *= 0x7fb5d329728ea185;
-  return v;
-}
-
 #ifdef DUMP_AND_DEBUG_PT
 void dump_pt_trace(void* buffer, int bytes){
 	static FILE* f = NULL;
@@ -131,12 +110,18 @@ void dump_pt_trace(void* buffer, int bytes){
 #endif
 
 void pt_dump(CPUState *cpu, int bytes){
-  if(should_dump_pt_trace){
-    assert(bytes == write(pt_trace_dump_fd, cpu->pt_mmap, bytes));
-  }
+	//pt_write_pt_dump_file(cpu->pt_mmap, bytes);
+
 	if(!(GET_GLOBAL_STATE()->redqueen_state && GET_GLOBAL_STATE()->redqueen_state->intercept_mode)){
 		if (GET_GLOBAL_STATE()->in_fuzzing_mode && GET_GLOBAL_STATE()->decoder_page_fault == false && GET_GLOBAL_STATE()->decoder && !GET_GLOBAL_STATE()->dump_page){
 			GET_GLOBAL_STATE()->pt_trace_size += bytes;
+
+			if (GET_GLOBAL_STATE()->pt_c3_filter_configured == false){
+				nyx_abort((char*)"No processor trace CR3 filter configured...");
+			}
+
+			//dump_pt_trace(cpu->pt_mmap, bytes);
+			pt_write_pt_dump_file(cpu->pt_mmap, bytes);
 			decoder_result_t result = libxdc_decode(GET_GLOBAL_STATE()->decoder, cpu->pt_mmap, bytes);
 			switch(result){
 				case decoder_success:
@@ -150,7 +135,7 @@ void pt_dump(CPUState *cpu, int bytes){
 					GET_GLOBAL_STATE()->decoder_page_fault_addr = libxdc_get_page_fault_addr(GET_GLOBAL_STATE()->decoder);
 					break;
 				case decoder_unkown_packet:
-					fprintf(stderr, "WARNING: libxdc_decode returned decoder_error\n");
+					fprintf(stderr, "WARNING: libxdc_decode returned unknown_packet\n");
 					break;
 				case decoder_error:
 					fprintf(stderr, "WARNING: libxdc_decode returned decoder_error\n");
@@ -165,8 +150,11 @@ int pt_enable(CPUState *cpu, bool hmp_mode){
 	if(!fast_reload_set_bitmap(get_fast_reload_snapshot())){
 		coverage_bitmap_reset();
 	}
-	//pt_reset_bitmap();
-  pt_trucate_pt_trace_file();
+	if (GET_GLOBAL_STATE()->trace_mode) {
+		redqueen_trace_reset();
+		alt_bitmap_reset();
+	}
+	pt_truncate_pt_dump_file();
 	return pt_cmd(cpu, KVM_VMX_PT_ENABLE, hmp_mode);
 }
 	
@@ -180,6 +168,7 @@ int pt_set_cr3(CPUState *cpu, uint64_t val, bool hmp_mode){
 	if (val == GET_GLOBAL_STATE()->pt_c3_filter){
 		return 0; // nothing changed  
 	}
+	GET_GLOBAL_STATE()->pt_c3_filter_configured = true;
 	//fprintf(stderr, "=========== %s %lx ============\n", __func__, val);
 	int r = 0;
 	
@@ -248,6 +237,10 @@ void pt_init_decoder(CPUState *cpu){
 	GET_GLOBAL_STATE()->decoder = libxdc_init(filters, (void* (*)(void*, uint64_t, bool*))page_cache_fetch2, GET_GLOBAL_STATE()->page_cache, GET_GLOBAL_STATE()->shared_bitmap_ptr, GET_GLOBAL_STATE()->shared_bitmap_size);
 
 	libxdc_register_bb_callback(GET_GLOBAL_STATE()->decoder, (void (*)(void*, disassembler_mode_t, uint64_t, uint64_t))redqueen_callback, GET_GLOBAL_STATE()->redqueen_state);
+
+	alt_bitmap_init(
+			GET_GLOBAL_STATE()->shared_bitmap_ptr,
+			GET_GLOBAL_STATE()->shared_bitmap_size);
 }
 
 int pt_disable_ip_filtering(CPUState *cpu, uint8_t addrn, bool hmp_mode){
