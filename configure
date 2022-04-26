@@ -6105,8 +6105,7 @@ if test "$nyx" = "yes" ; then
   CFLAGS="-DNESTED_PATCH -Wno-error=maybe-uninitialized -DQEMU_NYX -g -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2 $QEMU_CFLAGS"
 
   if test "$nyx_static" = "yes" ; then
-    LIBS="-L$PWD/capstone_v4/ -l:libcapstone.a -L$PWD/libxdc/ -l:libxdc.a -I$PWD/capstone_v4/include/ -I$PWD/libxdc/ $LIBS"
-    QEMU_INCLUDES=" -I$PWD/capstone_v4/include/ -I$PWD/libxdc/ $QEMU_INCLUDES"
+    LIBS="-l:libcapstone.a -l:libxdc.a $LIBS"
   else
     LIBS="-lcapstone -lxdc $LIBS"
   fi

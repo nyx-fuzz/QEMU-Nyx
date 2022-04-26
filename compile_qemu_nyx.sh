@@ -60,6 +60,16 @@ configure_qemu()
   QEMU_CONFIGURE="./configure --target-list=x86_64-softmmu --disable-gtk --disable-docs --enable-gtk --disable-werror --disable-capstone --disable-libssh --disable-tools"
 
   case $1 in
+    "debug_static"|"static"|"lto")
+      export LIBS="-L$PWD/capstone_v4/ -L$PWD/libxdc/ $LIBS"
+      export QEMU_CFLAGS="-I$PWD/capstone_v4/include/ -I$PWD/libxdc/ $QEMU_CFLAGS"
+      ;;
+    *)
+      error
+      ;;
+  esac
+
+  case $1 in
     "dynamic")
       $QEMU_CONFIGURE --enable-nyx
       ;;
