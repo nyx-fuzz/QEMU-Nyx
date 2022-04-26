@@ -1,5 +1,4 @@
 #!/bin/bash
-set -e
 
 # Copyright (C) 2021 Sergej Schumilo
 # 
@@ -18,12 +17,14 @@ set -e
 # You should have received a copy of the GNU General Public License
 # along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 
+set -e
 
 if [ -z "$BASH_VERSION" ]; then
   exit 0
 fi
 
-error () {
+error()
+{
   echo "$0: <option>"
   echo ""
   echo "Available compile options: "
@@ -33,111 +34,69 @@ error () {
   echo " -  debug         enable several debug options"
   echo " -  debug_static  enable several debug options and statically link libxdc and capstone4"
   echo ""
-  exit 3
+  exit 1
 }
 
-compile_libraries (){
-  echo "[!] compiling capstone4..."
-  cd capstone_v4
-  make -j
-  cd ..
-  echo "[!] capstone4 is ready!"
+compile_libraries()
+{
+  echo "[!] Compiling capstone4..."
+  make -C capstone_v4 -j $(nproc)
 
-  echo "[!] compiling libxdc..."
-  cd libxdc
-  CFLAGS="-I../capstone_v4/include/" V=1 make libxdc.a
-  cd ..
-  echo "[!] libxdc is ready!"
+  echo "[!] Compiling libxdc..."
+  CFLAGS="-I$PWD/capstone_v4/include/" make -C libxdc -j $(nproc)
+
+  case $1 in
+    "dynamic"|"debug")
+      echo "[!] Installing capstone4..."
+      sudo make -C capstone_v4 install
+      echo "[!] Installing libxdc..."
+      sudo make -C libxdc install
+      ;;
+  esac
 }
 
-compile_and_install_libraries () {
-  if [ ! -f "/usr/lib/libcapstone.so" ] || [ ! -d "/usr/include/capstone/" ]; then
-    echo "[!] capstone not found! Installing..."
-    cd capstone_v4
-    make -j
-    echo "[ ] requesting permissions to install capstone4 ..."
-    sudo make install
-    echo "[!] done ..."
-    cd ..
-  fi
+configure_qemu()
+{
+  QEMU_CONFIGURE="./configure --target-list=x86_64-softmmu --disable-gtk --disable-docs --enable-gtk --disable-werror --disable-capstone --disable-libssh --disable-tools"
 
-  if [ ! -f "/usr/lib/libxdc.so" ] || [ ! -f "/usr/include/libxdc.h" ]; then
-    echo "[!] libxdc not found! Installing..."
-    cd libxdc
-    make -j
-    echo "[ ] requesting permissions to install libxdc ..."
-    sudo make install
-    echo "[!] done ..."
-    cd ..
-  fi
+  case $1 in
+    "dynamic")
+      $QEMU_CONFIGURE --enable-nyx
+      ;;
+    "debug")
+      $QEMU_CONFIGURE --enable-nyx --enable-sanitizers --enable-debug
+      ;;
+    "debug_static")
+      $QEMU_CONFIGURE --enable-nyx --enable-sanitizers --enable-debug --enable-nyx-static
+      ;;
+    "static")
+      $QEMU_CONFIGURE --enable-nyx --enable-nyx-static
+      ;;
+    "lto")
+      $QEMU_CONFIGURE --enable-nyx --enable-nyx-static --enable-nyx-flto
+      ;;
+    *)
+      error
+      ;;
+  esac
 }
 
-compile () {
-  if [ -f GNUmakefile ]; then
-    rm GNUmakefile 2> /dev/null
-  fi
-
-  make -j
-  echo "[!] QEMU-Nyx is ready!"
+compile_qemu()
+{
+  test -f GNUmakefile && rm GNUmakefile 2> /dev/null
+  make -j $(nproc)
 }
+
+
+if [ "$#" -ne 1 ] ; then
+  error
+fi
 
 git submodule init
 git submodule update libxdc
 git submodule update capstone_v4
 
-if [ "$#" == 0 ] ; then
-  error
-fi
-
-if [ "$1" == "dynamic" ]; 
-then 
-
-  make clean
-  compile_and_install_libraries
-  ./configure --target-list=x86_64-softmmu --disable-gtk --disable-docs --enable-gtk --disable-werror --disable-capstone --disable-libssh --enable-nyx --disable-tools
-  compile
-  exit 0
-fi
-
-if [ "$1" == "debug" ]; 
-then 
-
-  make clean
-  compile_and_install_libraries
-  ./configure --target-list=x86_64-softmmu --disable-gtk --disable-docs --enable-gtk --disable-werror --disable-capstone --disable-libssh --enable-nyx --enable-sanitizers --enable-debug --disable-tools
-  compile
-  exit 0
-fi
-
-if [ "$1" == "debug_static" ]; 
-then 
-
-  make clean
-  compile_libraries
-  ./configure --target-list=x86_64-softmmu --disable-gtk --disable-docs --enable-gtk --disable-werror --disable-capstone --disable-libssh --enable-nyx --enable-sanitizers --enable-debug --enable-nyx-static --disable-tools
-  compile
-  exit 0
-fi
-
-if [ "$1" == "static" ]; 
-then 
-
-  make clean
-  compile_libraries
-  ./configure --target-list=x86_64-softmmu --disable-gtk --disable-docs --enable-gtk --disable-werror --disable-capstone --disable-libssh --enable-nyx --enable-nyx-static --disable-tools
-  compile
-  exit 0
-fi
-
-if [ "$1" == "lto" ]; 
-then 
-
-  make clean
-  compile_libraries
-  ./configure --target-list=x86_64-softmmu --disable-gtk --disable-docs --enable-gtk --disable-werror --disable-capstone --disable-libssh --enable-nyx --enable-nyx-static --enable-nyx-flto --disable-tools
-  compile
-  exit 0
-fi
-
-error
-exit 1
+make clean
+compile_libraries $1
+configure_qemu $1
+compile_qemu
