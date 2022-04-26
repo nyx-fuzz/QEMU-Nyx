@@ -43,7 +43,7 @@ compile_libraries()
   make -C capstone_v4 -j $(nproc)
 
   echo "[!] Compiling libxdc..."
-  CFLAGS="-I$PWD/capstone_v4/include/" make -C libxdc -j $(nproc)
+  LDFLAGS="-L$PWD/capstone_v4 -L$PWD/libxdc" CFLAGS="-I$PWD/capstone_v4/include/" make -C libxdc -j $(nproc)
 
   case $1 in
     "dynamic"|"debug")
