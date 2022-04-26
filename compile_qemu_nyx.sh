@@ -40,17 +40,17 @@ error()
 compile_libraries()
 {
   echo "[!] Compiling capstone4..."
-  make -C capstone_v4 -j $(nproc)
+  make -C $CAPSTONE_ROOT -j $(nproc)
 
   echo "[!] Compiling libxdc..."
-  LDFLAGS="-L$PWD/capstone_v4 -L$PWD/libxdc" CFLAGS="-I$PWD/capstone_v4/include/" make -C libxdc -j $(nproc)
+  LDFLAGS="-L$CAPSTONE_ROOT -L$LIBXDC_ROOT" CFLAGS="-I$CAPSTONE_ROOT/include/" make -C $LIBXDC_ROOT -j $(nproc)
 
   case $1 in
     "dynamic"|"debug")
       echo "[!] Installing capstone4..."
-      sudo make -C capstone_v4 install
+      sudo make -C $CAPSTONE_ROOT install
       echo "[!] Installing libxdc..."
-      sudo make -C libxdc install
+      sudo make -C $LIBXDC_ROOT install
       ;;
   esac
 }
@@ -61,8 +61,8 @@ configure_qemu()
 
   case $1 in
     "debug_static"|"static"|"lto")
-      export LIBS="-L$PWD/capstone_v4/ -L$PWD/libxdc/ $LIBS"
-      export QEMU_CFLAGS="-I$PWD/capstone_v4/include/ -I$PWD/libxdc/ $QEMU_CFLAGS"
+      export LIBS="-L$CAPSTONE_ROOT -L$LIBXDC_ROOT/ $LIBS"
+      export QEMU_CFLAGS="-I$CAPSTONE_ROOT/include/ -I$LIBXDC_ROOT/ $QEMU_CFLAGS"
       ;;
     *)
       error
@@ -102,9 +102,14 @@ if [ "$#" -ne 1 ] ; then
   error
 fi
 
-git submodule init
-git submodule update libxdc
-git submodule update capstone_v4
+if [ -z "$LIBXDC_ROOT" -o -z "$CAPSTONE_ROOT" ]; then
+	git submodule init
+	git submodule update libxdc
+	git submodule update capstone_v4
+	
+	LIBXDC_ROOT="$PWD/libxdc"
+	CAPSTONE_ROOT="$PWD/capstone_v4"
+fi
 
 make clean
 compile_libraries $1
