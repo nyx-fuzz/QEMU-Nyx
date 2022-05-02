@@ -232,8 +232,6 @@ void synchronization_lock(void){
 	                                      runtime_sec, runtime_usec,
 	                                      GET_GLOBAL_STATE()->num_dirty_pages);
 
-	reset_timeout_detector(&(GET_GLOBAL_STATE()->timeout_detector));
-
 	if(synchronization_check_page_not_found()){
 		set_success_auxiliary_result_buffer(GET_GLOBAL_STATE()->auxilary_buffer, 0);
 	}
@@ -343,7 +341,6 @@ void synchronization_lock_timeout_found(void){
 	handle_tmp_snapshot_state();
 
 	set_timeout_auxiliary_result_buffer(GET_GLOBAL_STATE()->auxilary_buffer);
-	reset_timeout_detector(&(GET_GLOBAL_STATE()->timeout_detector));
 
 	perform_reload();
 
