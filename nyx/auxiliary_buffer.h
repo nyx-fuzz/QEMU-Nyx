@@ -155,7 +155,7 @@ void set_asan_auxiliary_result_buffer(auxilary_buffer_t* auxilary_buffer);
 void set_timeout_auxiliary_result_buffer(auxilary_buffer_t* auxilary_buffer);
 void set_reload_auxiliary_result_buffer(auxilary_buffer_t* auxilary_buffer);
 void set_pt_overflow_auxiliary_result_buffer(auxilary_buffer_t* auxilary_buffer);
-void set_exec_done_auxiliary_result_buffer(auxilary_buffer_t* auxilary_buffer, uint8_t sec, uint32_t usec, uint32_t num_dirty_pages);
+void set_exec_done_auxiliary_result_buffer(auxilary_buffer_t* auxilary_buffer, uint32_t sec, uint32_t usec, uint32_t num_dirty_pages);
 void set_state_auxiliary_result_buffer(auxilary_buffer_t* auxilary_buffer, uint8_t state);
 void set_hprintf_auxiliary_buffer(auxilary_buffer_t* auxilary_buffer, char* msg, uint32_t len);
 

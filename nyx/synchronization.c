@@ -245,15 +245,26 @@ void synchronization_lock_hprintf(void){
 }
 void synchronization_lock(void){
 
+	timeout_detector_t timer = GET_GLOBAL_STATE()->timeout_detector;
 	pthread_mutex_lock(&synchronization_lock_mutex);
 	run_counter++;
 
 	if(qemu_get_cpu(0)->intel_pt_run_trashed){
 		set_pt_overflow_auxiliary_result_buffer(GET_GLOBAL_STATE()->auxilary_buffer);
 	}
+
+	long runtime_sec = timer.config.tv_sec - timer.alarm.it_value.tv_sec;
+	long runtime_usec = timer.config.tv_usec - timer.alarm.it_value.tv_usec;
+
+	if (runtime_usec < 0) {
+		if (runtime_sec < 1) {
+			fprintf(stderr, "Error: negative payload runtime?!\n");
+		}
+		runtime_sec -= 1;
+		runtime_usec = timer.config.tv_usec - timer.alarm.it_value.tv_usec + 1000000;
+	}
 	set_exec_done_auxiliary_result_buffer(GET_GLOBAL_STATE()->auxilary_buffer,
-											GET_GLOBAL_STATE()->timeout_detector.timeout_sec - GET_GLOBAL_STATE()->timeout_detector.arm_timeout.it_value.tv_sec,
-											GET_GLOBAL_STATE()->timeout_detector.timeout_usec - (uint32_t)GET_GLOBAL_STATE()->timeout_detector.arm_timeout.it_value.tv_usec,
+                                            runtime_sec, runtime_usec,
 											GET_GLOBAL_STATE()->num_dirty_pages);
 	/*
 	if(last_timeout){
