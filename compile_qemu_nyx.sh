@@ -39,19 +39,14 @@ error()
 
 compile_libraries()
 {
-  echo "[!] Compiling capstone4..."
-  make -C $CAPSTONE_ROOT -j $(nproc)
-
-  echo "[!] Compiling libxdc..."
-  LDFLAGS="-L$CAPSTONE_ROOT -L$LIBXDC_ROOT" CFLAGS="-I$CAPSTONE_ROOT/include/" make -C $LIBXDC_ROOT -j $(nproc)
-
   case $1 in
-    "dynamic"|"debug")
-      echo "[!] Installing capstone4..."
-      sudo make -C $CAPSTONE_ROOT install
-      echo "[!] Installing libxdc..."
-      sudo make -C $LIBXDC_ROOT install
-      ;;
+    "debug_static"|"static"|"lto")
+      echo "[!] Compiling capstone4..."
+      make -C $CAPSTONE_ROOT -j $(nproc)
+
+      echo "[!] Compiling libxdc..."
+      LDFLAGS="-L$CAPSTONE_ROOT -L$LIBXDC_ROOT" CFLAGS="-I$CAPSTONE_ROOT/include/" make -C $LIBXDC_ROOT -j $(nproc)
+    ;;
   esac
 }
 
