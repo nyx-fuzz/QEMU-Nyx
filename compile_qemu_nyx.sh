@@ -60,7 +60,6 @@ configure_qemu()
       export QEMU_CFLAGS="-I$CAPSTONE_ROOT/include/ -I$LIBXDC_ROOT/ $QEMU_CFLAGS"
       ;;
     *)
-      error
       ;;
   esac
 
