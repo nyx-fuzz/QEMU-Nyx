@@ -1917,7 +1917,7 @@ static int kvm_init(MachineState *ms)
     }
 #ifdef QEMU_NYX
     int kvm_nyx_version = ioctl(s->fd, KVM_CHECK_EXTENSION, KVM_CAP_NYX_VERSION);
-    if (kvm_nyx_version == -1) {
+    if (kvm_nyx_version <= 0) {
 
         /* fallback -> use vanilla KVM module instead (no Intel-PT tracing or nested hypercalls at this point) */
         fprintf(stderr, "[QEMU-Nyx] Could not access KVM-PT kernel module!\n[QEMU-Nyx] Trying vanilla KVM...\n");
