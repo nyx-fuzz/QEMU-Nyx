@@ -2457,9 +2457,7 @@ int kvm_cpu_exec(CPUState *cpu)
         smp_rmb();
 
 #ifdef QEMU_NYX
-        if(arm_sigprof_timer(&GET_GLOBAL_STATE()->timeout_detector)){
-            assert(false);
-        }
+        arm_sigprof_timer(&GET_GLOBAL_STATE()->timeout_detector);
 #endif
 
         run_ret = kvm_vcpu_ioctl(cpu, KVM_RUN, 0);

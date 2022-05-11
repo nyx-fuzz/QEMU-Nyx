@@ -26,138 +26,103 @@ volatile bool synchronization_reload_pending = false;
 volatile bool synchronization_kvm_loop_waiting = false;
 
 
-/* new SIGALRM based timeout detection */
-
+/* SIGALRM based timeout detection */
 //#define DEBUG_TIMEOUT_DETECTOR
+void init_timeout_detector(timeout_detector_t* timer){
+	timer->kvm_tid = 0;
+	timer->detection_enabled = false;
 
-void init_timeout_detector(timeout_detector_t* timeout_detector){
-	timeout_detector->kvm_tid = 0;
-	timeout_detector->reload_pending = false;
-	timeout_detector->detection_enabled = false;
+	timer->config.tv_sec = 0;
+	timer->config.tv_usec = 0;
 
-	timeout_detector->timeout_sec = 0;
-	timeout_detector->timeout_usec = 0; /* default: disabled */
-
-	timeout_detector->arm_timeout.it_interval.tv_sec = 0;
-	timeout_detector->arm_timeout.it_interval.tv_usec = 0;
-	timeout_detector->arm_timeout.it_value.tv_sec = 0;
-	timeout_detector->arm_timeout.it_value.tv_usec = 0;
-
-	timeout_detector->disarm_timeout.it_interval.tv_sec = 0;
-	timeout_detector->disarm_timeout.it_interval.tv_usec = 0;
-	timeout_detector->arm_timeout.it_value.tv_sec = timeout_detector->timeout_sec;
-	timeout_detector->arm_timeout.it_value.tv_usec = timeout_detector->timeout_usec;
+	timer->alarm.it_interval.tv_sec = 0;
+	timer->alarm.it_interval.tv_usec = 0;
+	timer->alarm.it_value.tv_sec = 0;
+	timer->alarm.it_value.tv_usec = 0;
 
 }
 
 static void sigalarm_handler(int signum) {
-		/* ensure that SIGALARM is ALWAYS handled by kvm thread */
-    assert(GET_GLOBAL_STATE()->timeout_detector.kvm_tid == syscall(SYS_gettid));
-		//GET_GLOBAL_STATE()->timeout_detector.reload_pending = true;
+	/* ensure that SIGALARM is ALWAYS handled by kvm thread */
+	assert(GET_GLOBAL_STATE()->timeout_detector.kvm_tid == syscall(SYS_gettid));
 #ifdef DEBUG_TIMEOUT_DETECTOR
+	fprintf(stderr, "Handled! %d %ld\n", signum, syscall(SYS_gettid));
 #endif
-    //fprintf(stderr, "Handled! %d %ld\n", signum, syscall(SYS_gettid));
 }
 
-void install_timeout_detector(timeout_detector_t* timeout_detector){
-		timeout_detector->kvm_tid = syscall(SYS_gettid);
-    if(signal(SIGALRM, sigalarm_handler) == SIG_ERR) {
-      fprintf(stderr, "%s failed!\n", __func__);
-			assert(false);
-    }
-    //fprintf(stderr, "SIGALRM HANDLER INSTALLED! %ld\n", syscall(SYS_gettid));
-}
-
-void reset_timeout_detector(timeout_detector_t* timeout_detector){
+void install_timeout_detector(timeout_detector_t* timer){
+	timer->kvm_tid = syscall(SYS_gettid);
+	if (signal(SIGALRM, sigalarm_handler) == SIG_ERR) {
+		fprintf(stderr, "%s failed!\n", __func__);
+		assert(false);
+	}
 #ifdef DEBUG_TIMEOUT_DETECTOR
-    fprintf(stderr, "%s!\n", __func__);
+	fprintf(stderr, "SIGALRM HANDLER INSTALLED! tid=%ld\n", syscall(SYS_gettid));
 #endif
-	timeout_detector->reload_pending = false;
-	if(timeout_detector->timeout_sec || timeout_detector->timeout_usec){
-		timeout_detector->arm_timeout.it_value.tv_sec = timeout_detector->timeout_sec;
-		timeout_detector->arm_timeout.it_value.tv_usec = timeout_detector->timeout_usec;
-		timeout_detector->detection_enabled = true;
+}
+
+void reset_timeout_detector(timeout_detector_t* timer){
+#ifdef DEBUG_TIMEOUT_DETECTOR
+	fprintf(stderr, "%s!\n", __func__);
+#endif
+
+	if (timer->config.tv_sec || timer->config.tv_usec) {
+		timer->alarm.it_value.tv_sec = timer->config.tv_sec;
+		timer->alarm.it_value.tv_usec = timer->config.tv_usec;
+		timer->detection_enabled = true;
+	} else {
+		timer->detection_enabled = false;
 	}
-	else{
-			timeout_detector->detection_enabled = false;
-	}
 }
 
-void enable_timeout_detector(timeout_detector_t* timeout_detector){
-	timeout_detector->detection_enabled = true;
-}
-
-/*
-static void disable_timeout_detector(timeout_detector_t* timeout_detector){
-	timeout_detector->detection_enabled = false;
-
-	struct itimerval tmp;
-
-	timeout_detector->disarm_timeout.it_interval.tv_sec = 0;
-	timeout_detector->disarm_timeout.it_interval.tv_usec = 0;
-  assert(setitimer(ITIMER_REAL, &timeout_detector->disarm_timeout, &tmp) == 0);
-}
-*/
-
-
-void update_itimer(timeout_detector_t* timeout_detector, uint8_t sec, uint32_t usec){
+void update_itimer(timeout_detector_t* timer, uint8_t sec, uint32_t usec)
+{
+#ifdef DEBUG_TIMEOUT_DETECTOR
 	//fprintf(stderr, "%s: %x %x\n", __func__, sec, usec);
-	if(sec || usec){
-		timeout_detector->timeout_sec = (time_t) sec;
-		timeout_detector->timeout_usec = (suseconds_t) usec;
-		timeout_detector->detection_enabled = true;
-	}
-	else{
-		timeout_detector->detection_enabled = false;
+#endif
+
+	if (sec || usec) {
+		timer->config.tv_sec = (time_t)sec;
+		timer->config.tv_usec = (suseconds_t)usec;
+		timer->detection_enabled = true;
+	} else {
+		timer->detection_enabled = false;
 	}
 }
 
-bool arm_sigprof_timer(timeout_detector_t* timeout_detector){
-	//return false;
-    if(timeout_detector->detection_enabled){
-			if(timeout_detector->reload_pending || (!timeout_detector->arm_timeout.it_value.tv_sec && !timeout_detector->arm_timeout.it_value.tv_usec)){
-					//assert(false);
-					fprintf(stderr, "TIMER EXPIRED 1! %d %ld %ld\n", timeout_detector->reload_pending, timeout_detector->arm_timeout.it_value.tv_sec, timeout_detector->arm_timeout.it_value.tv_usec);
-					reset_timeout_detector(timeout_detector);
-					/* TODO: check if this function still works as expected even if we don't return at this point */
-					//return true;
-			}
+void arm_sigprof_timer(timeout_detector_t* timer){
 #ifdef DEBUG_TIMEOUT_DETECTOR
-				fprintf(stderr, "%s (%ld %ld)\n", __func__, timeout_detector->arm_timeout.it_value.tv_sec, timeout_detector->arm_timeout.it_value.tv_usec);
+	fprintf(stderr, "%s (%ld %ld)\n", __func__, timer->alarm.it_value.tv_sec, timer->alarm.it_value.tv_usec);
 #endif
-				timeout_detector->arm_timeout.it_interval.tv_sec = 0;
-				timeout_detector->arm_timeout.it_interval.tv_usec = 0;
 
-
-        assert(setitimer(ITIMER_REAL, &timeout_detector->arm_timeout, 0) == 0);
-    }
-		return false;
+	if (timer->detection_enabled) {
+		if (timer->alarm.it_value.tv_usec == 0 && timer->alarm.it_value.tv_sec == 0) {
+			fprintf(stderr, "Attempting to re-arm an expired timer! => reset(%ld.%ld)\n",
+					timer->config.tv_sec, timer->config.tv_usec);
+			reset_timeout_detector(timer);
+			//return true;
+		}
+		assert(setitimer(ITIMER_REAL, &timer->alarm, NULL) == 0);
+	}
 }
 
-bool disarm_sigprof_timer(timeout_detector_t* timeout_detector){
-	//return false;
-		struct itimerval tmp;
-
-    if(timeout_detector->detection_enabled){
-				timeout_detector->disarm_timeout.it_interval.tv_sec = 0;
-				timeout_detector->disarm_timeout.it_interval.tv_usec = 0;
-        assert(setitimer(ITIMER_REAL, &timeout_detector->disarm_timeout, &tmp) == 0);
-
-				timeout_detector->arm_timeout.it_value.tv_sec = tmp.it_value.tv_sec;
-				timeout_detector->arm_timeout.it_value.tv_usec = tmp.it_value.tv_usec;
+bool disarm_sigprof_timer(timeout_detector_t* timer){
 
 #ifdef DEBUG_TIMEOUT_DETECTOR
-				fprintf(stderr, "%s (%ld %ld)\n", __func__, timeout_detector->arm_timeout.it_value.tv_sec, timeout_detector->arm_timeout.it_value.tv_usec);
+	fprintf(stderr, "%s (%ld %ld)\n", __func__, timer->alarm.it_value.tv_sec, timer->alarm.it_value.tv_usec);
 #endif
-			if(timeout_detector->reload_pending || (!timeout_detector->arm_timeout.it_value.tv_sec && !timeout_detector->arm_timeout.it_value.tv_usec)){
-					//fprintf(stderr, "TIMER EXPIRED 2! %d %d %d\n", timeout_detector->reload_pending, timeout_detector->arm_timeout.it_value.tv_sec, timeout_detector->arm_timeout.it_value.tv_usec);
-	
-					reset_timeout_detector(timeout_detector);
-					//timeout_detector->detection_enabled = false;
-					return true;
-			}
-	  }
-    return false;
+
+	if (timer->detection_enabled) {
+		struct itimerval disable = {0};
+		assert(setitimer(ITIMER_REAL, &disable, &timer->alarm) == 0);
+		assert(timer->alarm.it_interval.tv_usec == 0);
+
+		if (timer->alarm.it_value.tv_usec == 0 && timer->alarm.it_value.tv_sec == 0) {
+			reset_timeout_detector(timer);
+			return true;
+		}
+	}
+	return false;
 }
 
 void block_signals(void){
@@ -245,24 +210,27 @@ void synchronization_lock_hprintf(void){
 }
 void synchronization_lock(void){
 
+	timeout_detector_t timer = GET_GLOBAL_STATE()->timeout_detector;
 	pthread_mutex_lock(&synchronization_lock_mutex);
 	run_counter++;
 
 	if(qemu_get_cpu(0)->intel_pt_run_trashed){
 		set_pt_overflow_auxiliary_result_buffer(GET_GLOBAL_STATE()->auxilary_buffer);
 	}
-	set_exec_done_auxiliary_result_buffer(GET_GLOBAL_STATE()->auxilary_buffer,
-											GET_GLOBAL_STATE()->timeout_detector.timeout_sec - GET_GLOBAL_STATE()->timeout_detector.arm_timeout.it_value.tv_sec,
-											GET_GLOBAL_STATE()->timeout_detector.timeout_usec - (uint32_t)GET_GLOBAL_STATE()->timeout_detector.arm_timeout.it_value.tv_usec,
-											GET_GLOBAL_STATE()->num_dirty_pages);
-	/*
-	if(last_timeout){
-		reset_timeout_detector_timeout(&(GET_GLOBAL_STATE()->timeout_detector));
+
+	long runtime_sec = timer.config.tv_sec - timer.alarm.it_value.tv_sec;
+	long runtime_usec = timer.config.tv_usec - timer.alarm.it_value.tv_usec;
+
+	if (runtime_usec < 0) {
+		if (runtime_sec < 1) {
+			fprintf(stderr, "Error: negative payload runtime?!\n");
+		}
+		runtime_sec -= 1;
+		runtime_usec = timer.config.tv_usec - timer.alarm.it_value.tv_usec + 1000000;
 	}
-	else{
-		*/
-	reset_timeout_detector(&(GET_GLOBAL_STATE()->timeout_detector));
-	//}
+	set_exec_done_auxiliary_result_buffer(GET_GLOBAL_STATE()->auxilary_buffer,
+	                                      runtime_sec, runtime_usec,
+	                                      GET_GLOBAL_STATE()->num_dirty_pages);
 
 	if(synchronization_check_page_not_found()){
 		set_success_auxiliary_result_buffer(GET_GLOBAL_STATE()->auxilary_buffer, 0);
@@ -373,7 +341,6 @@ void synchronization_lock_timeout_found(void){
 	handle_tmp_snapshot_state();
 
 	set_timeout_auxiliary_result_buffer(GET_GLOBAL_STATE()->auxilary_buffer);
-	reset_timeout_detector(&(GET_GLOBAL_STATE()->timeout_detector));
 
 	perform_reload();
 
@@ -469,6 +436,5 @@ void synchronization_enter_fuzzing_loop(CPUState *cpu){
 	in_fuzzing_loop = true;
 
 	reset_timeout_detector(&(GET_GLOBAL_STATE()->timeout_detector));
-	//enable_timeout_detector(&(GET_GLOBAL_STATE()->timeout_detector));
 }
 
