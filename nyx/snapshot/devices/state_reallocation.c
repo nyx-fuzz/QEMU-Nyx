@@ -348,7 +348,6 @@ static void add_get(state_reallocation_t* self, void* fptr, void* opaque, size_t
         qemu_get_buffer(f, (uint8_t*)data, size);
     }
     else if(!strcmp(name, "virtio")){
-        fprintf(stderr, "WARNING: ATTEMPTING FAST GET for %s\n", name);
         qemu_file_skip(f, size * -1);
         handler = fast_virtio_device_get;
         data = malloc(sizeof(uint8_t)*size);

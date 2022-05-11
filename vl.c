@@ -2928,7 +2928,7 @@ int main(int argc, char **argv, char **envp)
 #ifdef QEMU_NYX
     bool fast_vm_reload = false;
     state_init_global();
-    char *fast_vm_reload_opt_arg = NULL;
+    const char *fast_vm_reload_opt_arg = NULL;
 #endif
 
     int i;
