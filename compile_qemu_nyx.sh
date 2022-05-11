@@ -39,19 +39,14 @@ error()
 
 compile_libraries()
 {
-  echo "[!] Compiling capstone4..."
-  make -C $CAPSTONE_ROOT -j $(nproc)
-
-  echo "[!] Compiling libxdc..."
-  LDFLAGS="-L$CAPSTONE_ROOT -L$LIBXDC_ROOT" CFLAGS="-I$CAPSTONE_ROOT/include/" make -C $LIBXDC_ROOT -j $(nproc)
-
   case $1 in
-    "dynamic"|"debug")
-      echo "[!] Installing capstone4..."
-      sudo make -C $CAPSTONE_ROOT install
-      echo "[!] Installing libxdc..."
-      sudo make -C $LIBXDC_ROOT install
-      ;;
+    "debug_static"|"static"|"lto")
+      echo "[!] Compiling capstone4..."
+      make -C $CAPSTONE_ROOT -j $(nproc)
+
+      echo "[!] Compiling libxdc..."
+      LDFLAGS="-L$CAPSTONE_ROOT -L$LIBXDC_ROOT" CFLAGS="-I$CAPSTONE_ROOT/include/" make -C $LIBXDC_ROOT -j $(nproc)
+    ;;
   esac
 }
 
@@ -65,7 +60,6 @@ configure_qemu()
       export QEMU_CFLAGS="-I$CAPSTONE_ROOT/include/ -I$LIBXDC_ROOT/ $QEMU_CFLAGS"
       ;;
     *)
-      error
       ;;
   esac
 
@@ -101,6 +95,14 @@ compile_qemu()
 if [ "$#" -ne 1 ] ; then
   error
 fi
+
+case $1 in
+    "dynamic"|"debug"|"debug_static"|"static"|"lto")
+      ;;
+    *)
+      error
+      ;;
+  esac
 
 if [ -z "$LIBXDC_ROOT" -o -z "$CAPSTONE_ROOT" ]; then
 	git submodule init
