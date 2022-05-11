@@ -102,6 +102,14 @@ if [ "$#" -ne 1 ] ; then
   error
 fi
 
+case $1 in
+    "dynamic"|"debug"|"debug_static"|"static"|"lto")
+      ;;
+    *)
+      error
+      ;;
+  esac
+
 if [ -z "$LIBXDC_ROOT" -o -z "$CAPSTONE_ROOT" ]; then
 	git submodule init
 	git submodule update libxdc
