@@ -356,8 +356,8 @@ void handle_hypercall_kafl_release(struct kvm_run *run, CPUState *cpu, uint64_t 
 		if (init_state){
 			init_state = false;	
 		} else {
-			//printf(CORE_PREFIX, "Got STARVED notification (num=%llu)\n", run->hypercall.args[0]);
-			if (run->hypercall.args[0] > 0) {
+			//printf(CORE_PREFIX, "Got STARVED notification (num=%llu)\n", hypercall_arg);
+			if (hypercall_arg > 0) {
 				GET_GLOBAL_STATE()->starved = 1;
 			} else {
 				GET_GLOBAL_STATE()->starved = 0;
@@ -585,7 +585,7 @@ static void handle_hypercall_kafl_create_tmp_snapshot(struct kvm_run *run, CPUSt
 		//handle_hypercall_kafl_acquire(run, cpu);
 		//fprintf(stderr, "%s: CREATE DONE at %lx\n", __func__, get_rip(cpu));
 
-		handle_hypercall_kafl_release(run, cpu, (uint64_t)run->hypercall.args[0]);
+		handle_hypercall_kafl_release(run, cpu, hypercall_arg);
 	}
 	else{
 		//fprintf(stderr, "%s: LOAD Continue at %lx\n", __func__, get_rip(cpu));
