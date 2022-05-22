@@ -28,11 +28,11 @@ error()
   echo "$0: <option>"
   echo ""
   echo "Available compile options: "
-  echo " -  dynamic       dynamically link libxdc and capstone4"
-  echo " -  static        statically link libxdc and capstone4"
-  echo " -  lto           statically link libxdc and capstone4 and enable LTO (up to 10% better performance)"
-  echo " -  debug         enable several debug options"
-  echo " -  debug_static  enable several debug options and statically link libxdc and capstone4"
+  echo " -  dynamic        dynamically link libxdc and capstone4"
+  echo " -  static         statically link libxdc and capstone4"
+  echo " -  lto            enable static linking and LTO (up to 10% better performance)"
+  echo " -  debug          enable debug and ASAN options"
+  echo " -  debug_static   enable debug, ASAN and static linking"
   echo ""
   exit 1
 }
@@ -52,7 +52,7 @@ compile_libraries()
 
 configure_qemu()
 {
-  QEMU_CONFIGURE="./configure --target-list=x86_64-softmmu --disable-gtk --disable-docs --enable-gtk --disable-werror --disable-capstone --disable-libssh --disable-tools"
+  QEMU_CONFIGURE="./configure --target-list=x86_64-softmmu --disable-docs --disable-gtk --disable-werror --disable-capstone --disable-libssh --disable-tools"
 
   case $1 in
     "debug_static"|"static"|"lto")
@@ -68,10 +68,10 @@ configure_qemu()
       $QEMU_CONFIGURE --enable-nyx
       ;;
     "debug")
-      $QEMU_CONFIGURE --enable-nyx --enable-sanitizers --enable-debug
+      $QEMU_CONFIGURE --enable-nyx --enable-sanitizers --enable-debug --enable-nyx-debug
       ;;
     "debug_static")
-      $QEMU_CONFIGURE --enable-nyx --enable-sanitizers --enable-debug --enable-nyx-static
+      $QEMU_CONFIGURE --enable-nyx --enable-sanitizers --enable-debug --enable-nyx-debug --enable-nyx-static
       ;;
     "static")
       $QEMU_CONFIGURE --enable-nyx --enable-nyx-static
