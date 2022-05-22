@@ -67,7 +67,7 @@ shadow_memory_t* shadow_memory_init(void){
     self->snapshot_ptr = mmap(NULL, self->memory_size, PROT_READ | PROT_WRITE , MAP_SHARED , self->snapshot_ptr_fd, 0);
     madvise(self->snapshot_ptr, self->memory_size, MADV_RANDOM | MADV_MERGEABLE);
 
-    QEMU_PT_PRINTF(RELOAD_PREFIX, "Allocating Memory (%p) Size: %lx", self->snapshot_ptr, self->memory_size);
+    nyx_debug_p(RELOAD_PREFIX, "Allocating Memory (%p) Size: %lx", self->snapshot_ptr, self->memory_size);
 
 
 
@@ -75,7 +75,7 @@ shadow_memory_t* shadow_memory_init(void){
     uint8_t i = 0;
     uint8_t regions_num = 0;
     QLIST_FOREACH_RCU(block, &ram_list.blocks, next) {
-        QEMU_PT_PRINTF(RELOAD_PREFIX, "%lx %lx %lx\t%s\t%p", block->offset, block->used_length, block->max_length, block->idstr, block->host);
+        nyx_debug_p(RELOAD_PREFIX, "%lx %lx %lx\t%s\t%p", block->offset, block->used_length, block->max_length, block->idstr, block->host);
         //printf("%lx %lx %lx\t%s\t%p\n", block->offset, block->used_length, block->max_length, block->idstr, block->host);
 
         block_array[i] = block;
@@ -175,7 +175,7 @@ shadow_memory_t* shadow_memory_init_from_snapshot(const char* snapshot_folder, b
     fclose(file_mem_meta);
 
     if(self->ram_regions_num != head.shadow_memory_regions){
-        fprintf(stderr, "Error: self->ram_regions_num (%d) != head.shadow_memory_regions (%d)\n", self->ram_regions_num, head.shadow_memory_regions);
+        nyx_error("Error: self->ram_regions_num (%d) != head.shadow_memory_regions (%d)\n", self->ram_regions_num, head.shadow_memory_regions);
         exit(1);
     }
 
@@ -186,17 +186,17 @@ shadow_memory_t* shadow_memory_init_from_snapshot(const char* snapshot_folder, b
     fseek(file_mem_dump, 0L, SEEK_END);
     uint64_t file_mem_dump_size = ftell(file_mem_dump);
 
-    debug_fprintf(stderr, "guest_ram_size == ftell(f) => 0x%lx vs 0x%lx (%s)\n", self->memory_size, file_mem_dump_size, path_dump);
+    nyx_debug("guest_ram_size == ftell(f) => 0x%lx vs 0x%lx (%s)\n", self->memory_size, file_mem_dump_size, path_dump);
 
     #define VGA_SIZE (16<<20)
 
     if(self->memory_size != file_mem_dump_size){
         if (file_mem_dump_size >= VGA_SIZE){
-    	    fprintf(stderr, "ERROR: guest size should be %ld MB - set it to %ld MB\n", (file_mem_dump_size-VGA_SIZE)>>20, (self->memory_size-VGA_SIZE)>>20);
+    	    nyx_error("ERROR: guest size should be %ld MB - set it to %ld MB\n", (file_mem_dump_size-VGA_SIZE)>>20, (self->memory_size-VGA_SIZE)>>20);
             exit(1);
         }
         else{
-    	    fprintf(stderr, "ERROR: guest size: %ld bytes\n", file_mem_dump_size);
+    	    nyx_error("ERROR: guest size: %ld bytes\n", file_mem_dump_size);
             exit(1);
         }
     }
@@ -218,7 +218,7 @@ shadow_memory_t* shadow_memory_init_from_snapshot(const char* snapshot_folder, b
     uint8_t i = 0;
     uint8_t regions_num = 0;
     QLIST_FOREACH_RCU(block, &ram_list.blocks, next) {
-        QEMU_PT_PRINTF(RELOAD_PREFIX, "%lx %lx %lx\t%s\t%p", block->offset, block->used_length, block->max_length, block->idstr, block->host);
+        nyx_debug_p(RELOAD_PREFIX, "%lx %lx %lx\t%s\t%p", block->offset, block->used_length, block->max_length, block->idstr, block->host);
         //printf("%lx %lx %lx\t%s\t%p\n", block->offset, block->used_length, block->max_length, block->idstr, block->host);
 
         block_array[i] = block;
@@ -354,16 +354,16 @@ void shadow_memory_serialize(shadow_memory_t* self, const char* snapshot_folder)
     //assert(file_ptr_meta);
     //assert(file_ptr_data);
     /*
-    debug_printf("black_list_pages_num: %lx\n", self->black_list_pages_num);
-    debug_printf("black_list_pages_size: %lx\n", self->black_list_pages_size);
-    debug_printf("black_list_pages ...\n");
+    nyx_debug("black_list_pages_num: %lx\n", self->black_list_pages_num);
+    nyx_debug("black_list_pages_size: %lx\n", self->black_list_pages_size);
+    nyx_debug("black_list_pages ...\n");
     for (uint64_t i = 0; i < self->black_list_pages_num; i++ ){
-        debug_printf("self->black_list_pages[%ld] = %lx\n", i, self->black_list_pages[i]);
+        nyx_debug("self->black_list_pages[%ld] = %lx\n", i, self->black_list_pages[i]);
     }
     */
 
     //printf("shadow_memory_regions: %d\n", self->ram_regions_num);
-    //debug_printf("ram_region_index: %d\n", self->ram_region_index);
+    //nyx_debug("ram_region_index: %d\n", self->ram_region_index);
 
     /*
     for (uint32_t i = 0; i < self->ram_regions_num; i++){

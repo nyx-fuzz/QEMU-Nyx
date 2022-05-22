@@ -118,20 +118,20 @@ static inline void perform_task_debug_mode(fast_vm_reload_sync_t* self, FastRelo
 
 static inline void create_root_snapshot(void){
   if (GET_GLOBAL_STATE()->fast_reload_enabled){
-		debug_printf("===> GET_GLOBAL_STATE()->fast_reload_enabled: TRUE\n");
+		nyx_debug("===> GET_GLOBAL_STATE()->fast_reload_enabled: TRUE\n");
 		if (GET_GLOBAL_STATE()->fast_reload_mode){
-			debug_printf("===> GET_GLOBAL_STATE()->fast_reload_mode: TRUE\n");
+			nyx_debug("===> GET_GLOBAL_STATE()->fast_reload_mode: TRUE\n");
       /* we've loaded an external snapshot folder - so do nothing and don't create any new snapshot files */
 		}
 		else{
-			debug_printf("===> GET_GLOBAL_STATE()->fast_reload_mode: FALSE\n");
+			nyx_debug("===> GET_GLOBAL_STATE()->fast_reload_mode: FALSE\n");
       /* store the current state as a snapshot folder */
       fast_reload_create_in_memory(get_fast_reload_snapshot());
       fast_reload_serialize_to_file(get_fast_reload_snapshot(), GET_GLOBAL_STATE()->fast_reload_path, false);
     }
 	}
 	else{
-		debug_printf("===> GET_GLOBAL_STATE()->fast_reload_enabled: FALSE\n");
+		nyx_debug("===> GET_GLOBAL_STATE()->fast_reload_enabled: FALSE\n");
     /* so we haven't set a path for our snapshot files - just store everything in memory */
 		fast_reload_create_in_memory(get_fast_reload_snapshot());
 	}

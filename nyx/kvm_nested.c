@@ -198,14 +198,14 @@ static void write_address(uint64_t address, uint64_t size, uint64_t prot){
 		/* do not print guard pages or empty pages without any permissions */
 		if(last_address && (CHECK_BIT(last_prot, 1) || !CHECK_BIT(last_prot, 63))){
 			if(CHECK_BIT(last_prot, 1) && !CHECK_BIT(last_prot, 63)){
-				QEMU_PT_PRINTF(NESTED_VM_PREFIX, "%016lx - %016lx %c%c%c [WARNING]",
+				nyx_debug_p(NESTED_VM_PREFIX, "%016lx - %016lx %c%c%c [WARNING]",
 					last_address, next_address,
 		            CHECK_BIT(last_prot, 1) ? 'W' : '-', 
 		            CHECK_BIT(last_prot, 2) ? 'U' : 'K', 
 		            !CHECK_BIT(last_prot, 63)? 'X' : '-');
 			}
 			else{
-				QEMU_PT_PRINTF(NESTED_VM_PREFIX, "%016lx - %016lx %c%c%c",
+				nyx_debug_p(NESTED_VM_PREFIX, "%016lx - %016lx %c%c%c",
 					last_address, next_address,
 		            CHECK_BIT(last_prot, 1) ? 'W' : '-', 
 		            CHECK_BIT(last_prot, 2) ? 'U' : 'K', 
@@ -359,10 +359,10 @@ void kvm_nested_get_info(CPUState *cpu){
 	kvm_vcpu_ioctl(cpu, KVM_GET_NESTED_STATE, env->nested_state);
 	
 	struct vmcs12* saved_vmcs = (struct vmcs12*)&(env->nested_state->data);
-	QEMU_PT_PRINTF(NESTED_VM_PREFIX, "VMCS host_cr3:\t%lx", saved_vmcs->host_cr3);
-	QEMU_PT_PRINTF(NESTED_VM_PREFIX, "VMCS host_cr4:\t%lx", saved_vmcs->host_cr4);
-	QEMU_PT_PRINTF(NESTED_VM_PREFIX, "VMCS host_ia32_efer:\t%lx", saved_vmcs->host_ia32_efer);
-	QEMU_PT_PRINTF(NESTED_VM_PREFIX, "VMCS host_cr0:\t%lx", saved_vmcs->host_cr0);
+	nyx_debug_p(NESTED_VM_PREFIX, "VMCS host_cr3:\t%lx", saved_vmcs->host_cr3);
+	nyx_debug_p(NESTED_VM_PREFIX, "VMCS host_cr4:\t%lx", saved_vmcs->host_cr4);
+	nyx_debug_p(NESTED_VM_PREFIX, "VMCS host_ia32_efer:\t%lx", saved_vmcs->host_ia32_efer);
+	nyx_debug_p(NESTED_VM_PREFIX, "VMCS host_cr0:\t%lx", saved_vmcs->host_cr0);
 
 	return;
 
@@ -383,28 +383,28 @@ void kvm_nested_get_info(CPUState *cpu){
     	if (saved_vmcs->host_cr4 & CR4_PAE_MASK) {
 	        if (saved_vmcs->host_ia32_efer & (1 << 10)) {
 	            if (saved_vmcs->host_cr0 & CR4_LA57_MASK) {
-	            	QEMU_PT_PRINTF(NESTED_VM_PREFIX, "mem_info_la57");
+	            	nyx_debug_p(NESTED_VM_PREFIX, "mem_info_la57");
 	            	abort();
 	                //mem_info_la57(mon, env);
 	            } else {
-	            	QEMU_PT_PRINTF(NESTED_VM_PREFIX, " ==== L1 Page Tables ====");
+	            	nyx_debug_p(NESTED_VM_PREFIX, " ==== L1 Page Tables ====");
 	            	print_48_paging(saved_vmcs->host_cr3);
 
 	            	if(saved_vmcs->ept_pointer){
-		            	QEMU_PT_PRINTF(NESTED_VM_PREFIX, " ==== L2 Page Tables ====");
+		            	nyx_debug_p(NESTED_VM_PREFIX, " ==== L2 Page Tables ====");
 		            	print_48_paging(saved_vmcs->ept_pointer);
 		            }
 	                //mem_info_la48(mon, env);
 	            }
 	        } 
 	        else{
-	        	QEMU_PT_PRINTF(NESTED_VM_PREFIX, "mem_info_pae32");
+	        	nyx_debug_p(NESTED_VM_PREFIX, "mem_info_pae32");
 	        	abort();
 	            //mem_info_pae32(mon, env);
 	        }
 	    } 
 	    else {
-	    	QEMU_PT_PRINTF(NESTED_VM_PREFIX, "mem_info_32");
+	    	nyx_debug_p(NESTED_VM_PREFIX, "mem_info_32");
 	    	abort();
 	        //mem_info_32(mon, env);
 	    }

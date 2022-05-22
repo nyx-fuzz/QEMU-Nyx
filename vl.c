@@ -133,6 +133,7 @@ int main(int argc, char **argv)
 #include "qemu/guest-random.h"
 
 #ifdef QEMU_NYX
+#include "nyx/debug.h"
 #include "nyx/pt.h"
 #include "nyx/hypercall/hypercall.h"
 #include "nyx/synchronization.h"
@@ -1652,7 +1653,7 @@ void qemu_system_reset_request(ShutdownCause reason)
 {
 #ifdef QEMU_NYX
    if(GET_GLOBAL_STATE()->in_fuzzing_mode){
-        fprintf(stderr, "%s!\n", __func__);
+        nyx_trace();
         GET_GLOBAL_STATE()->shutdown_requested = true;
         return;
     }
@@ -1678,7 +1679,7 @@ void qemu_system_suspend_request(void)
 {
 #ifdef CONFIG_PROCESSOR_TRACE
     if(GET_GLOBAL_STATE()->in_fuzzing_mode){
-        fprintf(stderr, "%s!\n", __func__);
+        nyx_trace();
         GET_GLOBAL_STATE()->shutdown_requested = true;
         return;
     }
@@ -1754,7 +1755,7 @@ void qemu_system_shutdown_request(ShutdownCause reason)
 {
 #ifdef CONFIG_PROCESSOR_TRACE
     if(GET_GLOBAL_STATE()->in_fuzzing_mode){
-        fprintf(stderr, "%s!\n", __func__);
+        nyx_trace();
         GET_GLOBAL_STATE()->shutdown_requested = true;
         return;
     }
@@ -1781,7 +1782,7 @@ void qemu_system_powerdown_request(void)
 {
 #ifdef CONFIG_PROCESSOR_TRACE
     if(GET_GLOBAL_STATE()->in_fuzzing_mode){
-        fprintf(stderr, "%s!\n", __func__);
+        nyx_trace();
         GET_GLOBAL_STATE()->shutdown_requested = true;
         return;
     }
@@ -4568,7 +4569,7 @@ int main(int argc, char **argv, char **envp)
     if (fast_vm_reload){
 
         if(getenv("NYX_DISABLE_BLOCK_COW")){
-            fprintf(stderr, "ERROR: Nyx block COW cache layer cannot be disabled while using fast snapshots\n");
+            nyx_error("Nyx block COW cache layer cannot be disabled while using fast snapshots\n");
             exit(1);
         }
 
@@ -4603,27 +4604,27 @@ int main(int argc, char **argv, char **envp)
         bool skip_serialization = qemu_opt_get_bool(opts, "skip_serialization", false);
 
         if((snapshot_used || load_mode || skip_serialization) && getenv("NYX_DISABLE_DIRTY_RING")){
-		    fprintf(stderr, "ERROR: NYX_DISABLE_DIRTY_RING is only allowed during pre-snapshot creation\n");
+		    error_report("NYX_DISABLE_DIRTY_RING is only allowed during pre-snapshot creation\n");
             exit(1);
         }
 
         if((pre_snapshot_used && !snapshot_used && !load_mode) && !getenv("NYX_DISABLE_DIRTY_RING")){
-		    fprintf(stderr, "ERROR: NYX_DISABLE_DIRTY_RING is required during pre-snapshot creation\n");
+		    error_report("NYX_DISABLE_DIRTY_RING is required during pre-snapshot creation\n");
             exit(1);
         }
 
         if(pre_snapshot_used && load_mode){
-            fprintf(stderr, "[!] qemu-nyx: invalid argument (pre_snapshot_used && load_mode)!\n");
+            error_report("invalid argument (pre_snapshot_used && load_mode)!\n");
             exit(1);
         }
 
         if((!snapshot_used && !pre_snapshot_used) && load_mode){
-            fprintf(stderr, "[!] qemu-nyx: invalid argument ((!pre_snapshot_used && !pre_snapshot_used) && load_mode)!\n");
+            error_report("invalid argument ((!pre_snapshot_used && !pre_snapshot_used) && load_mode)!\n");
             exit(1);
         }
 
         if(pre_snapshot_used && snapshot_used){
-            fprintf(stderr, "[!] qemu-nyx: loading pre image to start fuzzing...\n");
+            nyx_printf("[Qemu-Nyx]: loading pre image to start fuzzing...\n");
             set_fast_reload_mode(false);
             set_fast_reload_path(snapshot_path);
             if(!skip_serialization){
@@ -4636,7 +4637,7 @@ int main(int argc, char **argv, char **envp)
         }
         else{
             if(pre_snapshot_used){
-                fprintf(stderr, "[!] qemu-nyx: preparing to create pre image...\n");
+                nyx_printf("[Qemu-Nyx]: preparing to create pre image...\n");
                 set_fast_reload_pre_path(pre_snapshot_path);
                 set_fast_reload_pre_image();
             }
@@ -4647,7 +4648,7 @@ int main(int argc, char **argv, char **envp)
                 }
                 if (load_mode){
                     set_fast_reload_mode(true);
-                    fprintf(stderr, "[!] qemu-nyx: waiting for snapshot to start fuzzing...\n");
+                    nyx_printf("[Qemu-Nyx]: waiting for snapshot to start fuzzing...\n");
                     fast_reload_create_from_file(get_fast_reload_snapshot(), snapshot_path, false);
                     //cpu_synchronize_all_post_reset();
                     set_state_auxiliary_result_buffer(GET_GLOBAL_STATE()->auxilary_buffer, 3);
@@ -4655,7 +4656,7 @@ int main(int argc, char **argv, char **envp)
                     //GET_GLOBAL_STATE()->pt_trace_mode = false;
                 }
                 else{
-                    fprintf(stderr, "[QEMU-Nyx] Booting VM to start fuzzing...\n");
+                    nyx_printf("[Qemu-Nyx]: Booting VM to start fuzzing...\n");
                     set_fast_reload_mode(false);
                 }
             }

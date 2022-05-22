@@ -178,7 +178,7 @@ void init_page_cache(char* path){
     assert(global_state.page_cache == NULL);
     global_state.page_cache = page_cache_new((CPUState *)qemu_get_cpu(0), path);
     #ifdef STATE_VERBOSE
-    debug_printf("\n\nINIT PAGE_CACHE => %s\n", path);
+    nyx_debug("\n\nINIT PAGE_CACHE => %s\n", path);
     #endif
 }
 
@@ -203,7 +203,7 @@ static void* alloc_auxiliary_buffer(const char* file){
 	int fd = open(file, O_CREAT|O_RDWR, S_IRWXU|S_IRWXG|S_IRWXO);
 	assert(ftruncate(fd, AUX_BUFFER_SIZE) == 0);
 	stat(file, &st);
-	QEMU_PT_PRINTF(INTERFACE_PREFIX, "new aux buffer file: (max size: %x) %lx", AUX_BUFFER_SIZE, st.st_size);
+	nyx_debug_p(INTERFACE_PREFIX, "new aux buffer file: (max size: %x) %lx", AUX_BUFFER_SIZE, st.st_size);
 	
 	assert(AUX_BUFFER_SIZE == st.st_size);
 	ptr = mmap(0, AUX_BUFFER_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);

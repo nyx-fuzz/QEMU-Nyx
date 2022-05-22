@@ -88,7 +88,7 @@ static bool is_interessting_lea_at(redqueen_t* self, cs_insn *ins){
 	if(res){
 		x86_reg reg = op2->mem.index;
 		if(reg == X86_REG_EIP || reg == X86_REG_RIP || reg == X86_REG_EBP || reg == X86_REG_RBP){
-      //QEMU_PT_PRINTF(REDQUEEN_PREFIX, "got boring index");
+      //nyx_debug_p(REDQUEEN_PREFIX, "got boring index");
       res = false;
     } //don't instrument local stack offset computations
   }
@@ -180,26 +180,26 @@ static void opcode_analyzer(redqueen_t* self, cs_insn *ins){
 	//printf("INS %lx\n", ins->address);
   if(ins->id == X86_INS_CMP){
     set_rq_instruction(self, ins->address);
-    //QEMU_PT_PRINTF(REDQUEEN_PREFIX, "hooking cmp %lx %s %s", ins->address, ins->mnemonic, ins->op_str);
+    //nyx_debug_p(REDQUEEN_PREFIX, "hooking cmp %lx %s %s", ins->address, ins->mnemonic, ins->op_str);
   }
   if(ins->id == X86_INS_LEA && is_interessting_lea_at(self, ins)){
-    //QEMU_PT_PRINTF(REDQUEEN_PREFIX, "hooking lea %lx", ins->address);
+    //nyx_debug_p(REDQUEEN_PREFIX, "hooking lea %lx", ins->address);
     set_rq_instruction(self, ins->address);
   }
   if(ins->id == X86_INS_SUB && is_interessting_sub_at(self, ins)){
-    //QEMU_PT_PRINTF(REDQUEEN_PREFIX, "hooking sub %lx", ins->address);
+    //nyx_debug_p(REDQUEEN_PREFIX, "hooking sub %lx", ins->address);
     set_rq_instruction(self, ins->address);
   }
   if(ins->id == X86_INS_ADD && is_interessting_add_at(self, ins)){
-    //QEMU_PT_PRINTF(REDQUEEN_PREFIX, "hooking add %lx", ins->address);
+    //nyx_debug_p(REDQUEEN_PREFIX, "hooking add %lx", ins->address);
     set_rq_instruction(self, ins->address);
   }
   if(ins->id == X86_INS_XOR && is_interessting_xor_at(self, ins)){
-    //QEMU_PT_PRINTF(REDQUEEN_PREFIX, "hooking xor %lx %s %s", ins->address, ins->mnemonic, ins->op_str);
+    //nyx_debug_p(REDQUEEN_PREFIX, "hooking xor %lx %s %s", ins->address, ins->mnemonic, ins->op_str);
     set_rq_instruction(self, ins->address);
   }
   if(ins->id ==X86_INS_CALL || ins->id == X86_INS_LCALL){
-    //QEMU_PT_PRINTF(REDQUEEN_PREFIX, "hooking call %lx %s %s", ins->address, ins->mnemonic, ins->op_str);
+    //nyx_debug_p(REDQUEEN_PREFIX, "hooking call %lx %s %s", ins->address, ins->mnemonic, ins->op_str);
     set_rq_instruction(self, ins->address);
   }
 }
@@ -327,7 +327,7 @@ static void insert_hooks_bitmap(redqueen_t* self){
 void redqueen_insert_hooks(redqueen_t* self){
  // 	fprintf(stderr, "%s %x\n", __func__, self->cpu->redqueen_instrumentation_mode);
 
-  QEMU_PT_PRINTF(REDQUEEN_PREFIX, "insert hooks");
+  nyx_debug_p(REDQUEEN_PREFIX, "insert hooks");
   assert(!self->hooks_applied);
   //switch(self->cpu->redqueen_instrumentation_mode){
   switch(GET_GLOBAL_STATE()->redqueen_instrumentation_mode){
@@ -346,7 +346,7 @@ void redqueen_insert_hooks(redqueen_t* self){
 }
 
 void redqueen_remove_hooks(redqueen_t* self){
-  QEMU_PT_PRINTF(REDQUEEN_PREFIX, "remove hooks");
+  nyx_debug_p(REDQUEEN_PREFIX, "remove hooks");
  // fprintf(stderr, "remove hooks\n");
   assert(self->hooks_applied);
 	remove_all_breakpoints(self->cpu);
@@ -492,7 +492,7 @@ static uint64_t eval_mem(cs_x86_op* op){
 
   uint64_t val = 0;
   assert(op->size == 1 || op->size == 2 || op->size == 4  || op->size == 8);
-	//QEMU_PT_PRINTF(REDQUEEN_PREFIX, "EVAL MEM FOR OP:");
+	//nyx_debug_p(REDQUEEN_PREFIX, "EVAL MEM FOR OP:");
 
   /* TODO @ sergej: replace me later */
   read_virtual_memory(eval_addr(op), (uint8_t*) &val, op->size, qemu_get_cpu(0));
@@ -526,7 +526,7 @@ static void print_comp_result(uint64_t addr, const char* type, uint64_t val1, ui
   const char *format = NULL;
 	uint8_t pos = 0;
 			pos += snprintf(result_buf+pos, 256-pos, "%lx\t\t %s", addr, type);
-	    //QEMU_PT_PRINTF(REDQUEEN_PREFIX, "got size: %ld", size);
+	    //nyx_debug_p(REDQUEEN_PREFIX, "got size: %ld", size);
       uint64_t mask = 0;
 			switch(size){
 				case 64: format = " 64\t%016lX-%016lX"; mask = 0xffffffffffffffff;  break;
@@ -697,7 +697,7 @@ static bool test_strcmp(uint64_t arg1, uint64_t arg2){
 	if(!is_addr_mapped(arg1, cpu) || ! is_addr_mapped(arg2, cpu)){
 		return false;
 	}
-	//QEMU_PT_PRINTF(REDQUEEN_PREFIX,"valid ptrs");
+	//nyx_debug_p(REDQUEEN_PREFIX,"valid ptrs");
 	uint8_t buf1[REDQUEEN_MAX_STRCMP_LEN];
 	uint8_t buf2[REDQUEEN_MAX_STRCMP_LEN];
   /* todo @ sergej */
@@ -710,7 +710,7 @@ static bool test_strcmp(uint64_t arg1, uint64_t arg2){
 static bool test_strcmp_cdecl(void){
 	uint64_t arg1 = read_stack(0);
 	uint64_t arg2 = read_stack(1);
-	//QEMU_PT_PRINTF(REDQUEEN_PREFIX, "extract call params cdecl %lx %lx", arg1, arg2);
+	//nyx_debug_p(REDQUEEN_PREFIX, "extract call params cdecl %lx %lx", arg1, arg2);
   test_strchr(arg1, arg2);
 	return test_strcmp(arg1, arg2) ;
 
@@ -720,7 +720,7 @@ static bool test_strcmp_fastcall(void){
 	CPUX86State *env = &(X86_CPU(qemu_get_cpu(0)))->env;
 	uint64_t arg1 = env->regs[RCX]; //rcx
 	uint64_t arg2 = env->regs[RDX]; //rdx
-	//QEMU_PT_PRINTF(REDQUEEN_PREFIX, "extract call params fastcall %lx %lx", arg1, arg2);
+	//nyx_debug_p(REDQUEEN_PREFIX, "extract call params fastcall %lx %lx", arg1, arg2);
   test_strchr(arg1, arg2);
 	return test_strcmp(arg1, arg2);
 }
@@ -730,13 +730,13 @@ static bool test_strcmp_sys_v(void){
 	CPUX86State *env = &(X86_CPU(qemu_get_cpu(0)))->env;
 	uint64_t arg1 = env->regs[RDI]; //rdx
 	uint64_t arg2 = env->regs[RSI]; //rsi
-	//QEMU_PT_PRINTF(REDQUEEN_PREFIX, "extract call params sysv %lx %lx", arg1, arg2);
+	//nyx_debug_p(REDQUEEN_PREFIX, "extract call params sysv %lx %lx", arg1, arg2);
   test_strchr(arg1, arg2);
 	return test_strcmp(arg1, arg2);
 }
 
 static void extract_call_params(void){
-	//QEMU_PT_PRINTF(REDQUEEN_PREFIX, "extract call at %lx", ip);
+	//nyx_debug_p(REDQUEEN_PREFIX, "extract call at %lx", ip);
 	test_strcmp_cdecl();
 	test_strcmp_fastcall();
 	test_strcmp_sys_v();
@@ -832,14 +832,14 @@ static void debug_print_disasm(char* desc, uint64_t ip, CPUState* cpu_state){
     cs_option(handle, CS_OPT_DETAIL, CS_OPT_ON);
     size_t count = cs_disasm(handle, &code[0], 64, ip, 1, &insn);
     if(count > 0){
-      QEMU_PT_PRINTF(REDQUEEN_PREFIX,"%s\t %lx: %s %s",desc, ip,  insn->mnemonic, insn->op_str);
+      nyx_debug_p(REDQUEEN_PREFIX,"%s\t %lx: %s %s",desc, ip,  insn->mnemonic, insn->op_str);
     } else {
-      QEMU_PT_PRINTF(REDQUEEN_PREFIX,"%s\t Failed to disassemble at: %lx",desc, ip);
+      nyx_debug_p(REDQUEEN_PREFIX,"%s\t Failed to disassemble at: %lx",desc, ip);
     }
     cs_close(&handle);
     cs_free(insn, count);
   } else {
-      QEMU_PT_PRINTF(REDQUEEN_PREFIX,"%s\t Failed to create capstone instance at: %lx",desc, ip);
+      nyx_debug_p(REDQUEEN_PREFIX,"%s\t Failed to create capstone instance at: %lx",desc, ip);
   }
 }
 */
@@ -849,7 +849,7 @@ static void debug_print_state(char* desc, CPUState* cpu_state){
   X86CPU *cpu = X86_CPU(cpu_state);
   CPUX86State *env = &cpu->env;
   debug_print_disasm(desc, env->eip, cpu_state);
-  QEMU_PT_PRINTF(REDQUEEN_PREFIX,"ECX: %lx", get_reg_cpu(cpu_state, (char*)"rcx"));
+  nyx_debug_p(REDQUEEN_PREFIX,"ECX: %lx", get_reg_cpu(cpu_state, (char*)"rcx"));
 }
 */
 

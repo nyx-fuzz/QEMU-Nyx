@@ -72,7 +72,7 @@ void patcher_set_addrs(patcher_t *self, uint64_t* addrs, size_t num_addrs){
   memset(&curr_instruction_code[0], 0, MAX_INSTRUCTION_SIZE);
 
   for(size_t i=0; i < self->num_patches; i++){
-    //QEMU_PT_PRINTF(REDQUEEN_PREFIX, "patching %lx", addrs[i]);
+    //nyx_debug_p(REDQUEEN_PREFIX, "patching %lx", addrs[i]);
     if( read_virtual_memory(addrs[i], &curr_instruction_code[0], MAX_INSTRUCTION_SIZE, self->cpu) ) {
       size_t size =_patcher_disassemble_size(self, &curr_instruction_code[0], addrs[i], X86_INS_CMP);
       assert(size != 0); //csopen failed, shouldn't happen
@@ -103,12 +103,12 @@ bool patcher_validate_patches(patcher_t *self){
       should_value = &self->patches[i].orig_bytes[0];
     }
 
-    QEMU_PT_PRINTF(REDQUEEN_PREFIX, "Validating, mem:");
+    nyx_debug_p(REDQUEEN_PREFIX, "Validating, mem:");
     print_hexdump(&buf[0], self->patches[i].size);
-    QEMU_PT_PRINTF(REDQUEEN_PREFIX, "should_be:");
+    nyx_debug_p(REDQUEEN_PREFIX, "should_be:");
     print_hexdump(should_value, self->patches[i].size);
     if(0 != memcmp(&buf[0], should_value, self->patches[i].size)){
-      QEMU_PT_PRINTF(REDQUEEN_PREFIX, "validating patches failed self->is_currently_applied = %d",  self->is_currently_applied);
+      nyx_debug_p(REDQUEEN_PREFIX, "validating patches failed self->is_currently_applied = %d",  self->is_currently_applied);
       return false;
     }
   }

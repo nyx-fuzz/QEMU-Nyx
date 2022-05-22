@@ -55,7 +55,7 @@ static void volatile_memcpy(void* dst, void* src, size_t size){
 }
 
 void init_auxiliary_buffer(auxilary_buffer_t* auxilary_buffer){
-  debug_fprintf(stderr, "%s\n", __func__);
+  nyx_trace();
   volatile_memset((void*) auxilary_buffer, 0, sizeof(auxilary_buffer_t));
 
   VOLATILE_WRITE_16(auxilary_buffer->header.version, QEMU_PT_VERSION);
@@ -220,7 +220,7 @@ void set_state_auxiliary_result_buffer(auxilary_buffer_t* auxilary_buffer, uint8
     VOLATILE_WRITE_8(auxilary_buffer->result.state, state);
   }
   else{
-    fprintf(stderr, "WARNING: auxilary_buffer pointer is zero\n");
+    nyx_error("WARNING: auxilary_buffer pointer is zero\n");
   }
 }
 
