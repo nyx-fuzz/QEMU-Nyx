@@ -346,8 +346,6 @@ nyx_device_state_t* nyx_device_state_init_from_snapshot(const char* snapshot_fol
     struct stat buffer;   
     assert(stat (qemu_state_file, &buffer) == 0);
 
-    debug_printf("FILE EXISTS...\n");
-
     void* state_buf2 = malloc(STATE_BUFFER);  
 
     f = fopen(qemu_state_file, "r");

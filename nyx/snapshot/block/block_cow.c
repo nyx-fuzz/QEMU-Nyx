@@ -4,6 +4,7 @@
 #include "nyx/snapshot/block/block_cow.h"
 #include "sysemu/block-backend.h"
 #include "nyx/state/state.h"
+#include "nyx/debug.h"
 
 
 //#define COW_CACHE_DEBUG
@@ -547,7 +548,7 @@ static int cow_cache_write(cow_cache_t* self, BlockBackend *blk, int64_t offset,
 void switch_to_fuzz_mode(cow_cache_t* self){
 	self->enabled_fuzz = true;
 	assert(!mprotect(self->data_primary, self->cow_primary_size, PROT_READ));
-	printf("[qemu-nyx] switching to secondary CoW buffer\n");
+	debug_printf("[qemu-nyx] switching to secondary CoW buffer\n");
 }
 
 void cow_cache_read_entry(void* opaque){
