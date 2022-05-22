@@ -30,9 +30,11 @@ error()
   echo "Available compile options: "
   echo " -  dynamic       dynamically link libxdc and capstone4"
   echo " -  static        statically link libxdc and capstone4"
-  echo " -  lto           statically link libxdc and capstone4 and enable LTO (up to 10% better performance)"
-  echo " -  debug         enable several debug options"
-  echo " -  debug_static  enable several debug options and statically link libxdc and capstone4"
+  echo " -  lto           enable static mode and LTO (up to 10% better performance)"
+  echo " -  debug         enable debug and verbose mode"
+  echo " -  debug_static  enable debug, verbose and static modes"
+  echo " -  asan          enable ASAN and debug mode"
+  echo " -  asan_static   enable ASAN, debug and static mode"
   echo ""
   exit 1
 }
@@ -52,10 +54,10 @@ compile_libraries()
 
 configure_qemu()
 {
-  QEMU_CONFIGURE="./configure --target-list=x86_64-softmmu --disable-gtk --disable-docs --enable-gtk --disable-werror --disable-capstone --disable-libssh --disable-tools"
+  QEMU_CONFIGURE="./configure --target-list=x86_64-softmmu --disable-docs --enable-gtk --disable-werror --disable-capstone --disable-libssh --disable-tools"
 
   case $1 in
-    "debug_static"|"static"|"lto")
+    "debug_static"|"static"|"lto"|"asan_static")
       export LIBS="-L$CAPSTONE_ROOT -L$LIBXDC_ROOT/ $LIBS"
       export QEMU_CFLAGS="-I$CAPSTONE_ROOT/include/ -I$LIBXDC_ROOT/ $QEMU_CFLAGS"
       ;;
@@ -67,11 +69,17 @@ configure_qemu()
     "dynamic")
       $QEMU_CONFIGURE --enable-nyx
       ;;
-    "debug")
+    "asan")
       $QEMU_CONFIGURE --enable-nyx --enable-sanitizers --enable-debug
       ;;
-    "debug_static")
+    "asan_static")
       $QEMU_CONFIGURE --enable-nyx --enable-sanitizers --enable-debug --enable-nyx-static
+      ;;
+    "debug")
+      $QEMU_CONFIGURE --enable-nyx --enable-debug --enable-nyx-verbose --enable-nyx-debug
+      ;;
+    "debug_static")
+      $QEMU_CONFIGURE --enable-nyx --enable-debug --enable-nyx-verbose --enable-nyx-debug --enable-nyx-static
       ;;
     "static")
       $QEMU_CONFIGURE --enable-nyx --enable-nyx-static
