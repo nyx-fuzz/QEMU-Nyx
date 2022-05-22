@@ -153,7 +153,7 @@ static int nyx_create_payload_buffer(nyx_interface_state *s, uint64_t buffer_siz
 	fd = open(file, O_CREAT|O_RDWR, S_IRWXU|S_IRWXG|S_IRWXO);
 	assert(ftruncate(fd, buffer_size) == 0);
 	stat(file, &st);
-	QEMU_PT_PRINTF(INTERFACE_PREFIX, "new shm file: (max size: %lx) %lx", buffer_size, st.st_size);
+	nyx_debug_p(INTERFACE_PREFIX, "new shm file: (max size: %lx) %lx", buffer_size, st.st_size);
 	
 	assert(buffer_size == st.st_size);
 	ptr = mmap(0, buffer_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
@@ -211,7 +211,7 @@ static bool verify_workdir_state(nyx_interface_state *s, Error **errp){
 	char* tmp;
 
 	if (!folder_exits(workdir)){
-		fprintf(stderr, "%s does not exist...\n", workdir);
+		nyx_error("Error: %s does not exist...\n", workdir);
 		return false;
 	}
 
@@ -225,7 +225,7 @@ static bool verify_workdir_state(nyx_interface_state *s, Error **errp){
 
 	assert(asprintf(&tmp, "%s/interface_%d", workdir, id) != -1);
 	if (!file_exits(tmp)){
-		fprintf(stderr,  "%s does not exist...\n", tmp);
+		nyx_error("Error: %s does not exist...\n", tmp);
 		free(tmp);
 		return false;
 	}
@@ -233,7 +233,7 @@ static bool verify_workdir_state(nyx_interface_state *s, Error **errp){
 
 	assert(asprintf(&tmp, "%s/payload_%d", workdir, id) != -1);
 	if (!file_exits(tmp)){
-		fprintf(stderr,  "%s does not exist...\n", tmp);
+		nyx_error("Error: %s does not exist...\n", tmp);
 		free(tmp);
 		return false;
 	}
@@ -244,7 +244,7 @@ static bool verify_workdir_state(nyx_interface_state *s, Error **errp){
 
 	assert(asprintf(&tmp, "%s/bitmap_%d", workdir, id) != -1);
 	if (!file_exits(tmp)){
-		fprintf(stderr,  "%s does not exist...\n", tmp);
+		nyx_error("Error: %s does not exist...\n", tmp);
 		free(tmp);
 		return false;
 	} else {
@@ -254,7 +254,7 @@ static bool verify_workdir_state(nyx_interface_state *s, Error **errp){
 
 	assert(asprintf(&tmp, "%s/ijon_%d", workdir, id) != -1);
 	if (!file_exits(tmp)){
-		fprintf(stderr,  "%s does not exist...\n", tmp);
+		nyx_error("Error: %s does not exist...\n", tmp);
 		free(tmp);
 		return false;
 	} else {
@@ -264,7 +264,7 @@ static bool verify_workdir_state(nyx_interface_state *s, Error **errp){
 
 	assert(asprintf(&tmp, "%s/page_cache.lock", workdir) != -1);
 	if (!file_exits(tmp)){
-		fprintf(stderr, "%s does not exist...", tmp);
+		nyx_error("Error: %s does not exist...", tmp);
 		free(tmp);
 		return false;
 	}
@@ -272,7 +272,7 @@ static bool verify_workdir_state(nyx_interface_state *s, Error **errp){
 
 	assert(asprintf(&tmp, "%s/page_cache.addr", workdir) != -1);
 	if (!file_exits(tmp)){
-		fprintf(stderr, "%s does not exist...\n", tmp);
+		nyx_error("Error: %s does not exist...\n", tmp);
 		free(tmp);
 		return false;
 	}
@@ -280,7 +280,7 @@ static bool verify_workdir_state(nyx_interface_state *s, Error **errp){
 
 	assert(asprintf(&tmp, "%s/page_cache.dump", workdir) != -1);
 	if (!file_exits(tmp)){
-		fprintf(stderr,  "%s does not exist...\n", tmp);
+		nyx_error("Error: %s does not exist...\n", tmp);
 		free(tmp);
 		return false;
 	}
@@ -291,7 +291,7 @@ static bool verify_workdir_state(nyx_interface_state *s, Error **errp){
 
 	assert(asprintf(&tmp, "%s/redqueen_workdir_%d/", workdir, id) != -1);
 	if (!folder_exits(tmp)){
-		fprintf(stderr,  "%s does not exist...\n", tmp);
+		nyx_error("%s does not exist...\n", tmp);
 		free(tmp);
 		return false;
 	}
@@ -316,7 +316,7 @@ static bool verify_workdir_state(nyx_interface_state *s, Error **errp){
 	assert(asprintf(&tmp, "%s/aux_buffer_%d", workdir, id) != -1);
 	/*
 	if (file_exits(tmp)){
-		QEMU_PT_PRINTF(INTERFACE_PREFIX, "%s does not already exists...", tmp);
+		nyx_debug_p(INTERFACE_PREFIX, "%s does not already exists...", tmp);
 		free(tmp);
 		return false;
 	}
@@ -339,12 +339,12 @@ static void check_ipt_range(uint8_t i){
 	ret = ioctl(kvm, KVM_VMX_PT_GET_ADDRN, NULL);
 
 	if(ret == -1){
-		fprintf(stderr, "[QEMU-Nyx] Error: Multi range tracing is not supported!\n");
+		nyx_error("Error: Multi range tracing is not supported!\n");
 		exit(1);
 	}
 
 	if(ret < (i+1)){
-		fprintf(stderr, "[QEMU-Nyx] Error: CPU supports only %d IP filters!\n", ret);
+		nyx_error("Error: CPU supports only %d IP filters!\n", ret);
 		exit(1);
 	}
 	close(kvm);
@@ -355,7 +355,7 @@ static void check_available_ipt_ranges(nyx_interface_state* s){
 
 	int kvm_fd = qemu_open("/dev/kvm", O_RDWR);
 	if (kvm_fd == -1) {
-	    fprintf(stderr, "[QEMU-Nyx] Error: could not access KVM kernel module: %m\n");
+	    nyx_error("Error: could not access KVM kernel module: %m\n");
 		exit(1);
 	}
 
@@ -381,7 +381,6 @@ static bool verify_sharedir_state(nyx_interface_state *s, Error **errp){
 	char* sharedir = s->sharedir;
 
 	if (!folder_exits(sharedir)){
-		QEMU_PT_PRINTF(INTERFACE_PREFIX, "%s does not exist...", sharedir);
 		return false;
 	}
 	return true;
@@ -397,7 +396,7 @@ static void nyx_realize(DeviceState *dev, Error **errp){
 
 
 	if(s->worker_id == 0xFFFF){
-		fprintf(stderr, "[QEMU-Nyx] Error: Invalid worker id...\n");
+		nyx_error("Error: Invalid worker id...\n");
 		exit(1);
 	}
 
@@ -407,12 +406,12 @@ static void nyx_realize(DeviceState *dev, Error **errp){
 	GET_GLOBAL_STATE()->worker_id = s->worker_id;
 
 	if (!s->workdir || !verify_workdir_state(s, errp)){
-		fprintf(stderr, "[QEMU-Nyx] Error:  work dir...\n");
+		nyx_error("Error: work dir...\n");
 		exit(1);
 	}
 
 	if (!s->sharedir || !verify_sharedir_state(s, errp)){
-		fprintf(stderr,  "Invalid sharedir...\n");
+		nyx_error("Warning: Invalid sharedir...\n");
 		//abort();
 	}
 	else{

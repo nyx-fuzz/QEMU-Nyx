@@ -8,16 +8,15 @@
 #include <stdio.h>
 
 void serialize_state(const char* filename_prefix, bool is_pre_snapshot){
-	debug_printf("%s\n", __func__);
+	nyx_trace();
 
 	char* tmp;
 
 	assert(asprintf(&tmp, "%s/global.state", filename_prefix) != -1);
-	debug_printf("%s\n", tmp);
 
 	FILE *fp = fopen(tmp, "wb");
 	if(fp == NULL) {                                                
-    	fprintf(stderr, "[%s] Could not open file %s.\n", __func__, tmp);
+        nyx_error("[%s] Could not open file %s.\n", __func__, tmp);
         assert(false);
     }
 
@@ -71,16 +70,15 @@ void serialize_state(const char* filename_prefix, bool is_pre_snapshot){
 }
 
 void deserialize_state(const char* filename_prefix){
-	debug_printf("%s\n", __func__);
+	nyx_trace();
 
 	char* tmp;
 
 	assert(asprintf(&tmp, "%s/global.state", filename_prefix) != -1);
-	debug_printf("%s\n", tmp);
 
 	FILE *fp = fopen(tmp, "rb");
 	if(fp == NULL) {                                                
-    	debug_fprintf(stderr, "[%s] Could not open file %s.\n", __func__, tmp);
+        nyx_debug("[%s] Could not open file %s.\n", __func__, tmp);
         assert(false);
         //exit(EXIT_FAILURE);                                         
     }

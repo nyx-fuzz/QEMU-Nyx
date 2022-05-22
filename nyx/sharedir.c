@@ -168,7 +168,7 @@ uint64_t sharedir_request_file(sharedir_t* self, const char* file, uint8_t* page
     }
   }
   else{
-	  debug_fprintf(stderr, "WARNING: No such file in sharedir: %s\n", file);
+	  nyx_error("Warning: No such file in sharedir: %s\n", file);
     return 0xFFFFFFFFFFFFFFFFUL;
   }
 }

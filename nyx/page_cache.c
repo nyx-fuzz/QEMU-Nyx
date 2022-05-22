@@ -306,7 +306,7 @@ uint64_t page_cache_fetch(page_cache_t* self, uint64_t page, bool* success, bool
 		return self->last_addr;
 	}
 
-	//QEMU_PT_PRINTF(PAGE_CACHE_PREFIX, "page_cache_fetch %lx", page);
+	//nyx_debug_p(PAGE_CACHE_PREFIX, "page_cache_fetch %lx", page);
 	
 	khiter_t k;
 	k = kh_get(PC_CACHE, self->lookup, page); 
@@ -382,9 +382,9 @@ page_cache_t* page_cache_new(const char* cache_file, uint8_t disassembler_word_w
 	self->last_addr = 0xFFFFFFFFFFFFFFFF;
 
 #ifndef STANDALONE_DECODER
-	QEMU_PT_PRINTF(PAGE_CACHE_PREFIX, "%s (%s - %s)", __func__, tmp1, tmp2);
+	nyx_debug_p(PAGE_CACHE_PREFIX, "%s (%s - %s)", __func__, tmp1, tmp2);
 #else
-	QEMU_PT_PRINTF(PAGE_CACHE_PREFIX, "%s (%s - %s) WORD_WIDTH: %d", __func__, tmp1, tmp2, disassembler_word_width);
+	nyx_debug_p(PAGE_CACHE_PREFIX, "%s (%s - %s) WORD_WIDTH: %d", __func__, tmp1, tmp2, disassembler_word_width);
 #endif
 
 	free(tmp3);

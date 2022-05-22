@@ -324,7 +324,7 @@ static void add_get(state_reallocation_t* self, void* fptr, void* opaque, size_t
     uint8_t* data = NULL;
 
     if(!strcmp(name, "timer")){
-        debug_fprintf(stderr, "SKPPING: %ld\n", size*-1);
+        nyx_debug("SKPPING: %ld\n", size*-1);
         qemu_file_skip(f, size * -1);
         handler = fast_timer_get;
         data = malloc(sizeof(uint64_t));
@@ -369,7 +369,7 @@ static void add_get(state_reallocation_t* self, void* fptr, void* opaque, size_t
     self->fast_state_get_fptr_pos++;
 
     if(self->fast_state_get_fptr_pos >= self->fast_state_get_fptr_size){
-        debug_printf("RESIZE %s\n", __func__);
+        nyx_debug("RESIZE %s\n", __func__);
         self->fast_state_get_fptr_size += REALLOC_SIZE;
         self->get_fptr = realloc(self->get_fptr, self->fast_state_get_fptr_size * sizeof(void*));
         self->get_opaque = realloc(self->get_opaque, self->fast_state_get_fptr_size * sizeof(void*));
@@ -515,7 +515,7 @@ static inline int get_handler(state_reallocation_t* self, QEMUFile* f, void* cur
         add_get(self, (void*) field->info->get, curr_elem, size, (void*) field, f, field->info->name);
     }
     else if(!strcmp(field->info->name, "fpreg")){
-        debug_fprintf(stderr, "type: %s (size: %lx)\n", field->info->name, size);
+        nyx_debug("type: %s (size: %lx)\n", field->info->name, size);
         assert(0);
         add_get(self, (void*) field->info->get, curr_elem, size, (void*) field, f, field->info->name);
     }
@@ -693,7 +693,7 @@ static int fdl_vmstate_load_state(state_reallocation_t* self, QEMUFile *f, const
                     //hexDump((void*)field->name, curr_elem, size);
 #endif
 
-                    debug_printf("*** vmstate_info_nullptr.get ***\n");
+                    nyx_debug("*** vmstate_info_nullptr.get ***\n");
                     ret = vmstate_info_nullptr.get(f, curr_elem, size, NULL);
                     add_mblock(self, (char*)vmsd->name, (const char*)field->name, field->offset, (uint64_t)(curr_elem), (uint64_t)(size));
 #ifdef VERBOSE_DEBUG
@@ -725,12 +725,12 @@ static int fdl_vmstate_load_state(state_reallocation_t* self, QEMUFile *f, const
                     ret = qemu_file_get_error(f);
                 }
                 if (ret < 0) {
-                    debug_fprintf(stderr, "RETURNING!\n");
+                    nyx_debug("RETURNING!\n");
                     return ret;
                 }
             }
         } else if (field->flags & VMS_MUST_EXIST) {
-            debug_printf("Input validation failed: %s/%s", vmsd->name, field->name);
+            nyx_debug("Input validation failed: %s/%s", vmsd->name, field->name);
             return -1;
         }
         else {
@@ -877,7 +877,7 @@ static int fdl_enumerate_section(state_reallocation_t* self, QEMUFile *f, Migrat
         ret = fdl_vmstate_load(self, f, se, version_id);
     }
     else{
-        debug_fprintf(stderr, "---------------------------------\nVMSD2: %p\n", (void*)se->vmsd);
+        nyx_debug("---------------------------------\nVMSD2: %p\n", (void*)se->vmsd);
         //abort();
         //fprintf(stderr, "---------------------------------\nVMSD2: %s\n", (VMStateDescription *)(se->vmsd)->name);
         ret = vmstate_load(f, se);
@@ -922,7 +922,7 @@ static void fdl_enumerate_global_states(state_reallocation_t* self, QEMUFile *f)
                 break;
             default:
                 /* oops */
-                fprintf(stderr, "==> ERROR: unkown section_type: %x\n", section_type);
+                nyx_error("==> ERROR: unkown section_type: %x\n", section_type);
                 //abort();
                 break;
         } 

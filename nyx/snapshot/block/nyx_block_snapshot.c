@@ -41,7 +41,7 @@ nyx_block_t* nyx_block_snapshot_init_from_file(const char* folder, bool pre_snap
 
     for (blk = blk_next(NULL); blk; blk = blk_next(blk)) {
         if(blk && blk->cow_cache){
-            debug_printf("%p %s\n", blk->cow_cache, blk->cow_cache->filename);
+            nyx_debug("%p %s\n", blk->cow_cache, blk->cow_cache->filename);
             self->cow_cache_array_size++;
         }
     }
@@ -50,7 +50,7 @@ nyx_block_t* nyx_block_snapshot_init_from_file(const char* folder, bool pre_snap
 
     assert(fread(&temp_cow_cache_array_size, sizeof(uint32_t), 1, f) == 1);
 
-    debug_printf("%d vs %x\n", temp_cow_cache_array_size, self->cow_cache_array_size);
+    nyx_debug("%d vs %x\n", temp_cow_cache_array_size, self->cow_cache_array_size);
     assert(self->cow_cache_array_size == temp_cow_cache_array_size);
 
     self->cow_cache_array = (cow_cache_t**)malloc(sizeof(cow_cache_t*)*self->cow_cache_array_size);
@@ -88,7 +88,7 @@ nyx_block_t* nyx_block_snapshot_init(void){
     BlockBackend *blk;
     for (blk = blk_next(NULL); blk; blk = blk_next(blk)) {
         if(blk && blk->cow_cache){
-            debug_printf("%p %s\n", blk->cow_cache, blk->cow_cache->filename);
+            nyx_debug("%p %s\n", blk->cow_cache, blk->cow_cache->filename);
             self->cow_cache_array_size++;
         }
     }

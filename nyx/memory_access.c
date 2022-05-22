@@ -209,17 +209,17 @@ bool remap_slot(uint64_t addr, uint32_t slot, CPUState *cpu, int fd, uint64_t sh
 
     //printf("phys_addr -> %lx\n", phys_addr);
         
-    debug_fprintf(stderr, "%s: addr => %lx phys_addr => %lx\n", __func__, addr, phys_addr);
+    nyx_debug("%s: addr => %lx phys_addr => %lx\n", __func__, addr, phys_addr);
 
     QLIST_FOREACH_RCU(block, &ram_list.blocks, next) {
         if(!memcmp(block->idstr, "pc.ram", 6)){
             /* TODO: put assert calls here */ 
       if (munmap((void*)(((uint64_t)block->host) + phys_addr_ram_offset), x86_64_PAGE_SIZE) == -1) {
-				fprintf(stderr, "%s: munmap failed!\n", __func__);
+				nyx_error("%s: munmap failed!\n", __func__);
 				assert(false);
 			}
             if (mmap((void*)(((uint64_t)block->host) + phys_addr_ram_offset), 0x1000, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, fd, (i*x86_64_PAGE_SIZE)) == MAP_FAILED) {
-				fprintf(stderr, "%s: mmap failed!\n", __func__);
+				nyx_error("%s: mmap failed!\n", __func__);
 				assert(false);
 			}
 
@@ -307,14 +307,14 @@ bool remap_payload_buffer(uint64_t virt_guest_addr, CPUState *cpu){
             if(!memcmp(block->idstr, "pc.ram", 6)){
                 //printf("MMUNMAP: %d\n", munmap((void*)(((uint64_t)block->host) + phys_addr), x86_64_PAGE_SIZE));
                 if(munmap((void*)(((uint64_t)block->host) + phys_addr_ram_offset), x86_64_PAGE_SIZE) == -1){
-                    fprintf(stderr, "munmap failed!\n");
+                    nyx_error("munmap failed!\n");
                     //exit(1);
                     assert(false);
                 }
                 //printf("MMAP: %lx\n", mmap((void*)(((uint64_t)block->host) + phys_addr), 0x1000, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, shared_payload_buffer_fd, (i*x86_64_PAGE_SIZE)));
 
                 if(mmap((void*)(((uint64_t)block->host) + phys_addr_ram_offset), 0x1000, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, GET_GLOBAL_STATE()->shared_payload_buffer_fd, (i*x86_64_PAGE_SIZE)) == MAP_FAILED){
-                    fprintf(stderr, "mmap failed!\n");
+                    nyx_error("mmap failed!\n");
                     //exit(1);
                     assert(false);
                 }
@@ -356,14 +356,14 @@ bool write_virtual_memory(uint64_t address, uint8_t* data, uint32_t size, CPUSta
         phys_addr = cpu_get_phys_page_attrs_debug(cpu, (address & x86_64_PAGE_MASK), &attrs);
 
         if (phys_addr == INVALID_ADDRESS){
-            QEMU_PT_PRINTF(MEM_PREFIX, "phys_addr == -1:\t%lx", address);
+            nyx_debug_p(MEM_PREFIX, "phys_addr == -1:\t%lx", address);
             return false;
         }
         
         phys_addr += (address & ~x86_64_PAGE_MASK);   
         res = address_space_rw(cpu_get_address_space(cpu, asidx), phys_addr, MEMTXATTRS_UNSPECIFIED, data, l, true);
         if (res != MEMTX_OK){
-            QEMU_PT_PRINTF(MEM_PREFIX, "!MEMTX_OK:\t%lx", address);
+            nyx_debug_p(MEM_PREFIX, "!MEMTX_OK:\t%lx", address);
             return false;
         }   
 
@@ -830,7 +830,7 @@ bool read_virtual_memory(uint64_t address, uint8_t* data, uint32_t size, CPUStat
         phys_addr_2 = cpu_get_phys_page_attrs_debug(cpu, (address & x86_64_PAGE_MASK), &attrs);
 #endif
         phys_addr = (hwaddr)get_paging_phys_addr(cpu, env->cr[3], address) & 0xFFFFFFFFFFFFF000ULL;// != 0xFFFFFFFFFFFFFFFFULL)
-        //QEMU_PT_PRINTF(MEM_PREFIX, "TRANSLATE: %lx -> %lx == %lx", address, phys_addr, phys_addr_2);
+        //nyx_debug_p(MEM_PREFIX, "TRANSLATE: %lx -> %lx == %lx", address, phys_addr, phys_addr_2);
 
 #ifdef DEBUG_48BIT_WALK
         assert(phys_addr == phys_addr_2);
@@ -843,8 +843,8 @@ bool read_virtual_memory(uint64_t address, uint8_t* data, uint32_t size, CPUStat
                 len_skipped = size-amount_copied;
             }
 
-            fprintf(stderr, "Warning, read from unmapped memory:\t%lx, skipping to %lx", address, next_page);
-            QEMU_PT_PRINTF(MEM_PREFIX, "Warning, read from unmapped memory:\t%lx, skipping to %lx", address, next_page);
+            nyx_error("Warning, read from unmapped memory:\t%lx, skipping to %lx", address, next_page);
+            nyx_debug_p(MEM_PREFIX, "Warning, read from unmapped memory:\t%lx, skipping to %lx", address, next_page);
             memset( data+amount_copied, ' ',  len_skipped);
             address += len_skipped;
             amount_copied += len_skipped;
@@ -859,7 +859,7 @@ bool read_virtual_memory(uint64_t address, uint8_t* data, uint32_t size, CPUStat
 
         MemTxResult txt = address_space_rw(cpu_get_address_space(cpu, asidx), phys_addr, MEMTXATTRS_UNSPECIFIED, tmp_buf, len_to_copy, 0);
         if(txt){
-            QEMU_PT_PRINTF(MEM_PREFIX, "Warning, read failed:\t%lx (%lx)", address, phys_addr);
+            nyx_debug_p(MEM_PREFIX, "Warning, read failed:\t%lx (%lx)", address, phys_addr);
         }
         
         memcpy(data+amount_copied, tmp_buf, len_to_copy);
@@ -902,7 +902,7 @@ bool dump_page_cr3_ht(uint64_t address, uint8_t* data, CPUState *cpu, uint64_t c
     int asidx = cpu_asidx_from_attrs(cpu, MEMTXATTRS_UNSPECIFIED);
     if(phys_addr == INVALID_ADDRESS || address_space_rw(cpu_get_address_space(cpu, asidx), phys_addr, MEMTXATTRS_UNSPECIFIED, data, 0x1000, 0)){
         if(phys_addr != INVALID_ADDRESS){
-            fprintf(stderr, "%s: Warning, read failed:\t%lx (%lx)\n", __func__, address, phys_addr);
+            nyx_error("%s: Warning, read failed:\t%lx (%lx)\n", __func__, address, phys_addr);
         }
         return false;
     }
@@ -916,7 +916,7 @@ bool dump_page_ht(uint64_t address, uint8_t* data, CPUState *cpu){
     int asidx = cpu_asidx_from_attrs(cpu, MEMTXATTRS_UNSPECIFIED);
     if(phys_addr == 0xffffffffffffffffULL || address_space_rw(cpu_get_address_space(cpu, asidx), phys_addr, MEMTXATTRS_UNSPECIFIED, data, 0x1000, 0)){
         if(phys_addr != 0xffffffffffffffffULL){
-            fprintf(stderr, "%s: Warning, read failed:\t%lx (%lx)\n", __func__, address, phys_addr);
+            nyx_error("%s: Warning, read failed:\t%lx (%lx)\n", __func__, address, phys_addr);
         }
     }
     return true;
@@ -943,11 +943,11 @@ uint64_t disassemble_at_rip(int fd, uint64_t address, CPUState *cpu, uint64_t cr
     int count = cs_disasm(handle, code_ptr, code_size, address, 5, &insn);
     if(count > 0){
         for(int i = 0; i < count; i++){
-            fprintf(stderr, "=> 0x%"PRIx64":\t%s\t\t%s\n", insn[i].address, insn[i].mnemonic, insn[i].op_str);
+            nyx_error("=> 0x%"PRIx64":\t%s\t\t%s\n", insn[i].address, insn[i].mnemonic, insn[i].op_str);
         }
     }
     else{
-        fprintf(stderr, "ERROR in %s at %lx (cr3: %lx)\n", __func__, address, cr3);
+        nyx_error("ERROR in %s at %lx (cr3: %lx)\n", __func__, address, cr3);
     }
     
     

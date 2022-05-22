@@ -87,7 +87,7 @@ void handle_hypercall_kafl_nested_prepare(struct kvm_run *run, CPUState *cpu, ui
 	kvm_arch_get_registers(cpu);
 
 	if((uint64_t)run->hypercall.args[0]){
-		QEMU_PT_PRINTF(CORE_PREFIX, "handle_hypercall_kafl_nested_prepare:\t NUM:\t%lx\t ADDRESS:\t%lx\t CR3:\t%lx", (uint64_t)run->hypercall.args[0], (uint64_t)run->hypercall.args[1], (uint64_t)run->hypercall.args[2]);
+		nyx_debug_p(CORE_PREFIX, "handle_hypercall_kafl_nested_prepare:\t NUM:\t%lx\t ADDRESS:\t%lx\t CR3:\t%lx", (uint64_t)run->hypercall.args[0], (uint64_t)run->hypercall.args[1], (uint64_t)run->hypercall.args[2]);
 	}
 	else{
 		abort();
@@ -103,7 +103,7 @@ void handle_hypercall_kafl_nested_prepare(struct kvm_run *run, CPUState *cpu, ui
 		if(i == 0){
 			htos_config = buffer[i];
 		}
-		QEMU_PT_PRINTF(CORE_PREFIX, "ADDRESS: %lx", buffer[i]);
+		nyx_debug_p(CORE_PREFIX, "ADDRESS: %lx", buffer[i]);
 		remap_payload_slot(buffer[i], i, cpu);
 	}
 
@@ -178,7 +178,7 @@ void handle_hypercall_kafl_nested_release(struct kvm_run *run, CPUState *cpu, ui
 	
 	return;
 	//assert(false);
-	QEMU_PT_PRINTF_DEBUG("%s %d", __func__, init_state);
+	nyx_debug_p("%s %d", __func__, init_state);
 	//sleep(10);
 
 	/* magic */
@@ -193,7 +193,7 @@ void handle_hypercall_kafl_nested_release(struct kvm_run *run, CPUState *cpu, ui
 
 		//synchronization_disable_pt(cpu);
 
-		QEMU_PT_PRINTF_DEBUG("Protocol - SEND: KAFL_PROTO_RELEASE");
+		nyx_debug_p("Protocol - SEND: KAFL_PROTO_RELEASE");
 
 	} else {
 		
@@ -206,7 +206,7 @@ void handle_hypercall_kafl_nested_release(struct kvm_run *run, CPUState *cpu, ui
 		//synchronization_disable_pt(cpu);
 
 
-		QEMU_PT_PRINTF_DEBUG("%s UNLOCKED", __func__);
+		nyx_debug_p("%s UNLOCKED", __func__);
 
 		//		printf("INTEL PT is disabled!\n");
 
@@ -217,7 +217,7 @@ void handle_hypercall_kafl_nested_release(struct kvm_run *run, CPUState *cpu, ui
 		//fast_reload_restore(get_fast_reload_snapshot());
 		qemu_mutex_unlock_iothread();
 
-		QEMU_PT_PRINTF_DEBUG("%s UNLOCKED 2", __func__);
+		nyx_debug_p("%s UNLOCKED 2", __func__);
 
 
 		//kvm_cpu_synchronize_state(cpu);

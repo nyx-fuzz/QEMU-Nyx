@@ -115,22 +115,22 @@ bool apply_capabilities(CPUState *cpu){
 	//X86CPU *cpux86 = X86_CPU(cpu);
   //CPUX86State *env = &cpux86->env;
 
-	debug_fprintf(stderr, "%s: agent supports timeout detection: %d\n", __func__, GET_GLOBAL_STATE()->cap_timeout_detection);
-	debug_fprintf(stderr, "%s: agent supports only-reload mode: %d\n", __func__, GET_GLOBAL_STATE()->cap_only_reload_mode);
-	debug_fprintf(stderr, "%s: agent supports compile-time tracing: %d\n", __func__, GET_GLOBAL_STATE()->cap_compile_time_tracing );
+	nyx_debug("%s: agent supports timeout detection: %d\n", __func__, GET_GLOBAL_STATE()->cap_timeout_detection);
+	nyx_debug("%s: agent supports only-reload mode: %d\n", __func__, GET_GLOBAL_STATE()->cap_only_reload_mode);
+	nyx_debug("%s: agent supports compile-time tracing: %d\n", __func__, GET_GLOBAL_STATE()->cap_compile_time_tracing );
 
 	if(GET_GLOBAL_STATE()->cap_compile_time_tracing){
 		GET_GLOBAL_STATE()->pt_trace_mode = false;
 
-		debug_fprintf(stderr, "%s: agent trace buffer at vaddr: %lx\n", __func__, GET_GLOBAL_STATE()->cap_compile_time_tracing_buffer_vaddr);
+		nyx_debug("%s: agent trace buffer at vaddr: %lx\n", __func__, GET_GLOBAL_STATE()->cap_compile_time_tracing_buffer_vaddr);
 		kvm_arch_get_registers_fast(cpu);
 
-		debug_printf("--------------------------\n");
-		debug_printf("GET_GLOBAL_STATE()->cap_compile_time_tracing_buffer_vaddr: %lx\n", GET_GLOBAL_STATE()->cap_compile_time_tracing_buffer_vaddr);
-		debug_printf("GET_GLOBAL_STATE()->shared_bitmap_fd: %d\n", GET_GLOBAL_STATE()->shared_bitmap_fd);
-		debug_printf("GET_GLOBAL_STATE()->shared_bitmap_size: %x\n", GET_GLOBAL_STATE()->shared_bitmap_size);
-		debug_printf("GET_GLOBAL_STATE()->cap_cr3: %lx\n", GET_GLOBAL_STATE()->cap_cr3);
-		debug_printf("--------------------------\n");
+		nyx_debug("--------------------------\n");
+		nyx_debug("GET_GLOBAL_STATE()->cap_compile_time_tracing_buffer_vaddr: %lx\n", GET_GLOBAL_STATE()->cap_compile_time_tracing_buffer_vaddr);
+		nyx_debug("GET_GLOBAL_STATE()->shared_bitmap_fd: %d\n", GET_GLOBAL_STATE()->shared_bitmap_fd);
+		nyx_debug("GET_GLOBAL_STATE()->shared_bitmap_size: %x\n", GET_GLOBAL_STATE()->shared_bitmap_size);
+		nyx_debug("GET_GLOBAL_STATE()->cap_cr3: %lx\n", GET_GLOBAL_STATE()->cap_cr3);
+		nyx_debug("--------------------------\n");
 
 		if (GET_GLOBAL_STATE()->input_buffer_size != GET_GLOBAL_STATE()->shared_payload_buffer_size){
 			resize_shared_memory(GET_GLOBAL_STATE()->input_buffer_size, &GET_GLOBAL_STATE()->shared_payload_buffer_size, NULL, GET_GLOBAL_STATE()->shared_payload_buffer_fd);
@@ -153,10 +153,10 @@ bool apply_capabilities(CPUState *cpu){
 	}
 	
 	if(GET_GLOBAL_STATE()->cap_ijon_tracing){
-		debug_printf("%s: agent trace buffer at vaddr: %lx\n", __func__, GET_GLOBAL_STATE()->cap_ijon_tracing_buffer_vaddr);
+		nyx_debug("%s: agent trace buffer at vaddr: %lx\n", __func__, GET_GLOBAL_STATE()->cap_ijon_tracing_buffer_vaddr);
 
 		if(GET_GLOBAL_STATE()->cap_ijon_tracing_buffer_vaddr&0xfff){
-			fprintf(stderr, "[QEMU-Nyx] Error: guest's ijon buffer v_addr (0x%lx) is not page aligned!\n", GET_GLOBAL_STATE()->cap_ijon_tracing_buffer_vaddr);
+			error_printf("[QEMU-Nyx] Error: guest's ijon buffer v_addr (0x%lx) is not page aligned!\n", GET_GLOBAL_STATE()->cap_ijon_tracing_buffer_vaddr);
 			return false;
 		}
 

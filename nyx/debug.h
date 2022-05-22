@@ -8,10 +8,11 @@
 #include "qemu/osdep.h"
 #include "qemu-common.h"
 #include "qemu/log.h"
+#include "qemu/error-report.h"
 
 #define ENABLE_BACKTRACES
 
-#define QEMU_PT_PRINT_PREFIX  "[QEMU-NYX] "
+#define NYX_LOG_PREFIX        "[QEMU-NYX] "
 #define CORE_PREFIX           "Core:      "
 #define MEM_PREFIX            "Memory:    "
 #define RELOAD_PREFIX         "Reload:    "
@@ -20,40 +21,28 @@
 #define REDQUEEN_PREFIX       "Redqueen:  "
 #define DISASM_PREFIX         "Disasm:    "
 #define PAGE_CACHE_PREFIX     "PageCache: "
-#define INTERFACE_PREFIX      "Interface: "
 #define NESTED_VM_PREFIX      "Nested:    "
-
-
-#define DEBUG_VM_PREFIX       "Debug:     "
-
-#define COLOR	"\033[1;35m"
-#define ENDC	"\033[0m"
-
 
 #ifdef NYX_DEBUG
 /*
  * qemu_log() is the standard logging enabled with -D
  * qemu_log_mask() is activated with additional -t nyx option
  */
-#define debug_printf(format, ...)               qemu_log_mask(LOG_NYX, QEMU_PT_PRINT_PREFIX "(%s#:%d)\t"format, __BASE_FILE__, __LINE__, ##__VA_ARGS__)
-#define debug_fprintf(fd, format, ...)          qemu_log_mask(LOG_NYX, QEMU_PT_PRINT_PREFIX "(%s#:%d)\t"format, __BASE_FILE__, __LINE__, ##__VA_ARGS__)
-
-#define QEMU_PT_PRINTF(PREFIX, format, ...)     qemu_log_mask(LOG_NYX, QEMU_PT_PRINT_PREFIX COLOR PREFIX format ENDC "\n", ##__VA_ARGS__)
-#define QEMU_PT_PRINTF_DBG(PREFIX, format, ...) qemu_log_mask(LOG_NYX, QEMU_PT_PRINT_PREFIX PREFIX "(%s#:%d)\t"format, __BASE_FILE__, __LINE__, ##__VA_ARGS__)
-#define QEMU_PT_PRINTF_DEBUG(format, ...)       qemu_log_mask(LOG_NYX, QEMU_PT_PRINT_PREFIX DEBUG_VM_PREFIX "(%s#:%d)\t"format, __BASE_FILE__, __LINE__, ##__VA_ARGS__)
+//#define nyx_debug(format, ...)         qemu_log_mask(LOG_NYX, NYX_LOG_PREFIX "(%s#:%d)\t"format, __BASE_FILE__, __LINE__, ##__VA_ARGS__)
+#define nyx_debug(format, ...)           qemu_log_mask(LOG_NYX, NYX_LOG_PREFIX format, ##__VA_ARGS__)
+#define nyx_debug_p(PREFIX, format, ...) qemu_log_mask(LOG_NYX, NYX_LOG_PREFIX PREFIX format, ##__VA_ARGS__)
 #else
-#define debug_printf(format, ...) 
-#define debug_fprintf(fd, format, ...) 
-#define QEMU_PT_PRINTF(PREFIX, format, ...)
-#define QEMU_PT_PRINTF_DBG(PREFIX, format, ...)
-#define QEMU_PT_PRINTF_DEBUG(format, ...)  
+#define nyx_debug(...)
+#define nyx_debug_p(...)
 #endif
+
+#define nyx_printf(format, ...)          qemu_log(format, ##__VA_ARGS__)
+#define nyx_error(format, ...)           error_printf(format, ##__VA_ARGS__)
+#define nyx_trace(format, ...)           nyx_debug("=> %s\n", __func__)
 
 
 #ifdef ENABLE_BACKTRACES
-
 void qemu_backtrace(void);
 void init_crash_handler(void);
 void hexdump_kafl(const void* data, size_t size);
-
 #endif

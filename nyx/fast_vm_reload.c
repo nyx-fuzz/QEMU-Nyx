@@ -289,7 +289,7 @@ void fast_reload_serialize_to_file(fast_reload_t* self, const char* folder, bool
 
     /* sanity check */
     if(!folder_exits(folder)){
-        QEMU_PT_PRINTF(RELOAD_PREFIX,"Folder %s does not exist...failed!", folder);
+        nyx_debug_p(RELOAD_PREFIX,"Folder %s does not exist...failed!", folder);
         assert(0);
     }
 
@@ -317,7 +317,7 @@ static void fast_reload_create_from_snapshot(fast_reload_t* self, const char* fo
     assert(self != NULL);
     wait_for_snapshot(folder);
 
-    QEMU_PT_PRINTF(RELOAD_PREFIX,"=> CREATING FAST RELOAD SNAPSHOT FROM DUMP (located in: %s)", folder);
+    nyx_debug_p(RELOAD_PREFIX,"=> CREATING FAST RELOAD SNAPSHOT FROM DUMP (located in: %s)", folder);
 
     rcu_read_lock();
 
@@ -363,8 +363,8 @@ void fast_reload_create_from_file_pre_image(fast_reload_t* self, const char* fol
 void fast_reload_create_in_memory(fast_reload_t* self){
 
     assert(self != NULL);
-    debug_fprintf(stderr, "===>%s\n", __func__);
-    QEMU_PT_PRINTF(RELOAD_PREFIX,"=> CREATING FAST RELOAD SNAPSHOT FROM CURRENT VM STATE");
+    nyx_trace();
+    nyx_debug_p(RELOAD_PREFIX,"=> CREATING FAST RELOAD SNAPSHOT FROM CURRENT VM STATE");
 
     rcu_read_lock();
 
