@@ -26,18 +26,19 @@
 #define ENDC	"\033[0m"
 
 
-//#define debug_printf(format, ...) printf (format, ##__VA_ARGS__)
-//#define debug_fprintf(fd, format, ...) fprintf (fd, format, ##__VA_ARGS__)
-//#define QEMU_PT_PRINTF(PREFIX, format, ...) printf (QEMU_PT_PRINT_PREFIX COLOR PREFIX format ENDC "\n", ##__VA_ARGS__)
-//#define QEMU_PT_PRINTF_DBG(PREFIX, format, ...) printf (QEMU_PT_PRINT_PREFIX PREFIX "(%s#:%d)\t"format, __BASE_FILE__, __LINE__, ##__VA_ARGS__)
-//#define QEMU_PT_PRINTF_DEBUG(format, ...)  fprintf (stderr, QEMU_PT_PRINT_PREFIX DEBUG_VM_PREFIX "(%s#:%d)\t"format "\n", __BASE_FILE__, __LINE__, ##__VA_ARGS__)
-
+#ifdef NYX_DEBUG
+#define debug_printf(format, ...) printf (format, ##__VA_ARGS__)
+#define debug_fprintf(fd, format, ...) fprintf (fd, format, ##__VA_ARGS__)
+#define QEMU_PT_PRINTF(PREFIX, format, ...) printf (QEMU_PT_PRINT_PREFIX COLOR PREFIX format ENDC "\n", ##__VA_ARGS__)
+#define QEMU_PT_PRINTF_DBG(PREFIX, format, ...) printf (QEMU_PT_PRINT_PREFIX PREFIX "(%s#:%d)\t"format, __BASE_FILE__, __LINE__, ##__VA_ARGS__)
+#define QEMU_PT_PRINTF_DEBUG(format, ...)  fprintf (stderr, QEMU_PT_PRINT_PREFIX DEBUG_VM_PREFIX "(%s#:%d)\t"format "\n", __BASE_FILE__, __LINE__, ##__VA_ARGS__)
+#else
 #define debug_printf(format, ...) 
 #define debug_fprintf(fd, format, ...) 
 #define QEMU_PT_PRINTF(PREFIX, format, ...)
 #define QEMU_PT_PRINTF_DBG(PREFIX, format, ...)
 #define QEMU_PT_PRINTF_DEBUG(format, ...)  
-
+#endif
 
 
 #ifdef ENABLE_BACKTRACES

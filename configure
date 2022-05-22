@@ -955,6 +955,8 @@ for opt do
   ;;
   --enable-nyx-flto) nyx_flto="yes"
   ;;
+  --enable-nyx-debug) nyx_debug="yes"
+  ;;
   --version|-V) exec cat $source_path/VERSION
   ;;
   --prefix=*) prefix="$optarg"
@@ -6103,6 +6105,10 @@ write_c_skeleton
 
 if test "$nyx" = "yes" ; then
   CFLAGS="-DNESTED_PATCH -Wno-error=maybe-uninitialized -DQEMU_NYX -g -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2 $QEMU_CFLAGS"
+
+  if test "$nyx_debug" = "yes"; then
+    CFLAGS="-DNYX_DEBUG $CFLAGS"
+  fi
 
   if test "$nyx_static" = "yes" ; then
     LIBS="-l:libcapstone.a -l:libxdc.a $LIBS"
