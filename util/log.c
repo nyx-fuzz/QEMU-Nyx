@@ -273,6 +273,10 @@ const QEMULogItem qemu_log_items[] = {
     { CPU_LOG_TB_NOCHAIN, "nochain",
       "do not chain compiled TBs so that \"exec\" and \"cpu\" show\n"
       "complete traces" },
+#ifdef QEMU_NYX
+    { LOG_NYX, "nyx",
+      "trace Nyx/Redqueen execution" },
+#endif
 #ifdef CONFIG_PLUGIN
     { CPU_LOG_PLUGIN, "plugin", "output from TCG plugins\n"},
 #endif
