@@ -128,7 +128,7 @@ bool apply_capabilities(CPUState *cpu){
 		debug_printf("--------------------------\n");
 		debug_printf("GET_GLOBAL_STATE()->cap_compile_time_tracing_buffer_vaddr: %lx\n", GET_GLOBAL_STATE()->cap_compile_time_tracing_buffer_vaddr);
 		debug_printf("GET_GLOBAL_STATE()->shared_bitmap_fd: %d\n", GET_GLOBAL_STATE()->shared_bitmap_fd);
-		debug_printf("GET_GLOBAL_STATE()->shared_bitmap_size: %lx\n", GET_GLOBAL_STATE()->shared_bitmap_size);
+		debug_printf("GET_GLOBAL_STATE()->shared_bitmap_size: %x\n", GET_GLOBAL_STATE()->shared_bitmap_size);
 		debug_printf("GET_GLOBAL_STATE()->cap_cr3: %lx\n", GET_GLOBAL_STATE()->cap_cr3);
 		debug_printf("--------------------------\n");
 
