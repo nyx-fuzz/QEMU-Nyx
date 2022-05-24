@@ -262,6 +262,30 @@ static bool verify_workdir_state(nyx_interface_state *s, Error **errp){
 	}
 	free(tmp);
 
+	assert(asprintf(&tmp, "%s/page_cache.lock", workdir) != -1);
+	if (!file_exits(tmp)){
+		fprintf(stderr, "%s does not exist...", tmp);
+		free(tmp);
+		return false;
+	}
+	free(tmp);
+
+	assert(asprintf(&tmp, "%s/page_cache.addr", workdir) != -1);
+	if (!file_exits(tmp)){
+		fprintf(stderr, "%s does not exist...\n", tmp);
+		free(tmp);
+		return false;
+	}
+	free(tmp);
+
+	assert(asprintf(&tmp, "%s/page_cache.dump", workdir) != -1);
+	if (!file_exits(tmp)){
+		fprintf(stderr,  "%s does not exist...\n", tmp);
+		free(tmp);
+		return false;
+	}
+	free(tmp);
+
 	assert(asprintf(&tmp, "%s/page_cache", workdir) != -1);
 	init_page_cache(tmp);
 
