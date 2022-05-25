@@ -131,7 +131,7 @@ void handle_hypercall_kafl_debug(struct kvm_run *run, CPUState *cpu, uint64_t hy
 	}
 }
 #else
-void handle_hypercall_kafl_debug_tmp_snapshot(struct kvm_run *run, CPUState *cpu, uint64_t hypercall_arg){
+void handle_hypercall_kafl_debug(struct kvm_run *run, CPUState *cpu, uint64_t hypercall_arg){
 	fprintf(stderr, "[QEMU-Nyx] Error: This hypercall (HYPERCALL_KAFL_DEBUG_TMP) is not enabled!\n");
 	set_abort_reason_auxiliary_buffer(GET_GLOBAL_STATE()->auxilary_buffer, (char*)"Disabled debug hypercall called...", strlen("Disabled debug hypercall called..."));
 	synchronization_lock();
