@@ -1949,10 +1949,10 @@ static int kvm_init(MachineState *ms)
             fprintf(stderr, "\n[QEMU-Nyx] ERROR: vmware backdoor is not enabled...\n");
             fprintf(stderr, "\n\tRun the following commands to fix the issue:\n");
             fprintf(stderr, "\t-----------------------------------------\n");
-            fprintf(stderr, "\tsudo modprobe -r kvm-intel\n");
+            fprintf(stderr, "\tsudo modprobe -r kvm-intel # or kvm-amd for AMD processors\n");
             fprintf(stderr, "\tsudo modprobe -r kvm\n");
             fprintf(stderr, "\tsudo modprobe  kvm enable_vmware_backdoor=y\n");
-            fprintf(stderr, "\tsudo modprobe  kvm-intel\n");
+            fprintf(stderr, "\tsudo modprobe  kvm-intel # or kvm-amd for AMD processors\n");
             fprintf(stderr, "\tcat /sys/module/kvm/parameters/enable_vmware_backdoor\n");
             fprintf(stderr, "\t-----------------------------------------\n\n");
             ret = -errno;
