@@ -127,8 +127,8 @@ bool apply_capabilities(CPUState *cpu){
 
 		debug_printf("--------------------------\n");
 		debug_printf("GET_GLOBAL_STATE()->cap_compile_time_tracing_buffer_vaddr: %lx\n", GET_GLOBAL_STATE()->cap_compile_time_tracing_buffer_vaddr);
-		debug_printf("GET_GLOBAL_STATE()->shared_bitmap_fd: %lx\n", GET_GLOBAL_STATE()->shared_bitmap_fd);
-		debug_printf("GET_GLOBAL_STATE()->shared_bitmap_size: %lx\n", GET_GLOBAL_STATE()->shared_bitmap_size);
+		debug_printf("GET_GLOBAL_STATE()->shared_bitmap_fd: %d\n", GET_GLOBAL_STATE()->shared_bitmap_fd);
+		debug_printf("GET_GLOBAL_STATE()->shared_bitmap_size: %x\n", GET_GLOBAL_STATE()->shared_bitmap_size);
 		debug_printf("GET_GLOBAL_STATE()->cap_cr3: %lx\n", GET_GLOBAL_STATE()->cap_cr3);
 		debug_printf("--------------------------\n");
 
@@ -153,7 +153,7 @@ bool apply_capabilities(CPUState *cpu){
 	}
 	
 	if(GET_GLOBAL_STATE()->cap_ijon_tracing){
-		debug_printf(stderr, "%s: agent trace buffer at vaddr: %lx\n", __func__, GET_GLOBAL_STATE()->cap_ijon_tracing_buffer_vaddr);
+		debug_printf("%s: agent trace buffer at vaddr: %lx\n", __func__, GET_GLOBAL_STATE()->cap_ijon_tracing_buffer_vaddr);
 
 		if(GET_GLOBAL_STATE()->cap_ijon_tracing_buffer_vaddr&0xfff){
 			fprintf(stderr, "[QEMU-Nyx] Error: guest's ijon buffer v_addr (0x%lx) is not page aligned!\n", GET_GLOBAL_STATE()->cap_ijon_tracing_buffer_vaddr);
