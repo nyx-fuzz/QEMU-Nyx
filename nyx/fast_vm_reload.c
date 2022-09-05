@@ -347,7 +347,7 @@ static void fast_reload_create_from_snapshot(fast_reload_t* self, const char* fo
     }
 
     //fast_reload_restore(self);
-    vm_start();
+    //vm_start();
 }
 
 void fast_reload_create_from_file(fast_reload_t* self, const char* folder, bool lock_iothread){
