@@ -1,19 +1,22 @@
 #include "qemu/osdep.h"
-#include "exec/memory.h"
-#include "qemu/main-loop.h"
-#include "sysemu/kvm.h"
-#include "sysemu/kvm_int.h"
-#include "qemu-common.h"
-#include "nyx/helpers.h"
-#include "nyx/debug.h"
-#include "nyx/helpers.h"
-#include "nyx/memory_access.h"
-#include "nyx/state/state.h"
+
 #include <linux/kvm.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
+
+#include "exec/memory.h"
+#include "qemu/main-loop.h"
+#include "sysemu/kvm.h"
+#include "sysemu/kvm_int.h"
+#include "qemu-common.h"
+
+#include "nyx/helpers.h"
+#include "nyx/debug.h"
+#include "nyx/helpers.h"
+#include "nyx/memory_access.h"
+#include "nyx/state/state.h"
 
 void nyx_abort(char *msg)
 {
@@ -134,9 +137,6 @@ static void resize_coverage_bitmap(uint32_t new_bitmap_size)
 
 bool apply_capabilities(CPUState *cpu)
 {
-    // X86CPU *cpux86 = X86_CPU(cpu);
-    // CPUX86State *env = &cpux86->env;
-
     nyx_debug("%s: agent supports timeout detection: %d\n", __func__,
               GET_GLOBAL_STATE()->cap_timeout_detection);
     nyx_debug("%s: agent supports only-reload mode: %d\n", __func__,

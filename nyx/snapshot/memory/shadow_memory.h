@@ -1,7 +1,8 @@
 #pragma once
 
-#include "nyx/snapshot/devices/state_reallocation.h"
 #include <stdint.h>
+
+#include "nyx/snapshot/devices/state_reallocation.h"
 
 /* munmap & mmap incremental snapshot area after RESTORE_RATE restores to avoid high memory pressure */
 #define RESTORE_RATE 2000
@@ -70,8 +71,6 @@ void shadow_memory_prepare_incremental(shadow_memory_t *self);
 void shadow_memory_switch_snapshot(shadow_memory_t *self, bool incremental);
 
 void shadow_memory_restore_memory(shadow_memory_t *self);
-
-// void shadow_memory_prepare_incremental_snapshot(shadow_memory_t* self);
 
 static inline void shadow_memory_track_dirty_root_pages(shadow_memory_t *self,
                                                         uint64_t         address,

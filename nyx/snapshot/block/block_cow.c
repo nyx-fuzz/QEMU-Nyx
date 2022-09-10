@@ -1,18 +1,19 @@
-#include "sysemu/block-backend.h"
-#include "nyx/snapshot/block/block_cow.h"
-#include "nyx/debug.h"
-#include "nyx/state/state.h"
+#include "qemu/osdep.h"
+
 #include <stdint.h>
 #include <sys/mman.h>
 #include <sys/types.h>
 
-// #define COW_CACHE_DEBUG
+#include "sysemu/block-backend.h"
+#include "nyx/debug.h"
+#include "nyx/snapshot/block/block_cow.h"
+#include "nyx/state/state.h"
 
+// #define COW_CACHE_DEBUG
 // #define COW_CACHE_VERBOSE
 
 #define CHUNK_SIZE 0x1000
-// 0x200
-#define PAGE_MASK 0xFFFFFFFFFFFFF000
+#define PAGE_MASK  0xFFFFFFFFFFFFF000
 
 uint64_t global_cow_primary_size            = COW_CACHE_PRIMARY_MINIMUM_SIZE;
 bool     global_cow_primary_size_adjustable = true;
@@ -34,8 +35,6 @@ static inline uint64_t get_global_cow_cache_primary_size(void)
 
 cow_cache_t *cow_cache_new(const char *filename)
 {
-    // printf("%s: \"%s\"\n", __func__, filename);
-
     cow_cache_t *self          = malloc(sizeof(cow_cache_t));
     self->lookup_primary       = kh_init(COW_CACHE);
     self->lookup_secondary     = kh_init(COW_CACHE);
@@ -45,7 +44,6 @@ cow_cache_t *cow_cache_new(const char *filename)
     self->data_primary = mmap(NULL, self->cow_primary_size, PROT_READ | PROT_WRITE,
                               MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
     assert(self->data_primary != MAP_FAILED);
-    // memset(self->data_primary, COW_CACHE_PRIMARY_MINIMUM_SIZE/CHUNK_SIZE, CHUNK_SIZE);
 
     self->data_secondary = mmap(NULL, COW_CACHE_SECONDARY_SIZE, PROT_READ | PROT_WRITE,
                                 MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
@@ -62,9 +60,7 @@ cow_cache_t *cow_cache_new(const char *filename)
     self->offset_secondary_tmp = 0;
 
     if (getenv("NYX_DISABLE_BLOCK_COW")) {
-        fprintf(stderr,
-                "WARNING: Nyx block COW layer disabled for %s (** write operations "
-                "are not cached **)\n",
+        fprintf(stderr, "WARNING: Nyx block COW layer disabled for file %s!\n",
                 filename);
         self->enabled = false;
     } else {
@@ -99,7 +95,6 @@ static char *gen_file_name(cow_cache_t *self,
     }
 
     assert(asprintf(&tmp1, "%s_%s.%s", filename_prefix, tmp2, filename_postfix) != -1);
-
     free(tmp2);
 
     return tmp1;
@@ -110,27 +105,19 @@ void read_primary_buffer(cow_cache_t *self, const char *filename_prefix, bool sw
     assert(!self->enabled_fuzz);
     global_cow_primary_size_adjustable = false;
 
-    // printf("%s: %s\n", __func__, self->filename);
-
     char *tmp1;
     char *tmp2;
-
-    // assert(asprintf(&tmp1, "%s_%s.khash", filename_prefix, self->filename) != -1);
-    // assert(asprintf(&tmp2, "%s_%s.pcow", filename_prefix, self->filename) != -1);
 
     tmp1 = gen_file_name(self, filename_prefix, "khash");
     tmp2 = gen_file_name(self, filename_prefix, "pcow");
 
-    // printf("%s\n", tmp1);
     kh_destroy(COW_CACHE, self->lookup_primary);
 
     struct stat buffer;
     assert(stat(tmp2, &buffer) == 0);
 
     if (buffer.st_size > get_global_cow_cache_primary_size()) {
-        fprintf(stderr,
-                "ERROR: in-memory CoW buffer is too small compared to snapshot file "
-                "(buffer: 0x%lx / file: 0x%lx)\n",
+        fprintf(stderr, "ERROR: in-memory CoW buffer is smaller than snapshot file (0x%lx < 0x%lx)\n",
                 get_global_cow_cache_primary_size(), buffer.st_size);
         exit(1);
     }
@@ -143,7 +130,6 @@ void read_primary_buffer(cow_cache_t *self, const char *filename_prefix, bool sw
 
     int fd = open(tmp2, O_RDONLY);
 
-    // printf("TRY TO MMAP : %lx\n",  buffer.st_size);
     if (switch_mode) {
         munmap(self->data_primary, self->cow_primary_size);
         self->cow_primary_size = get_global_cow_cache_primary_size();
@@ -166,11 +152,9 @@ void read_primary_buffer(cow_cache_t *self, const char *filename_prefix, bool sw
         memcpy(self->data_primary, ptr, buffer.st_size);
         munmap(ptr, COW_CACHE_PRIMARY_MINIMUM_SIZE);
     }
-    // printf("self->data_primary  -> %p\n", self->data_primary );
     close(fd);
 
     self->offset_primary = buffer.st_size;
-    // fprintf(stderr, "self->offset_primary: %lx\n", self->offset_primary);
 
     if (switch_mode) {
         switch_to_fuzz_mode(self);
@@ -178,26 +162,18 @@ void read_primary_buffer(cow_cache_t *self, const char *filename_prefix, bool sw
 
     free(tmp1);
     free(tmp2);
-
-    // printf("DONE!\n");
 }
 
 void dump_primary_buffer(cow_cache_t *self, const char *filename_prefix)
 {
     assert(self->enabled_fuzz);
 
-    // printf("%s: %s\n", __func__, self->filename);
-
     char *tmp1;
     char *tmp2;
-
-    // assert(asprintf(&tmp1, "%s_%s.khash", filename_prefix, self->filename) != -1);
-    // assert(asprintf(&tmp2, "%s_%s.pcow", filename_prefix, self->filename) != -1);
 
     tmp1 = gen_file_name(self, filename_prefix, "khash");
     tmp2 = gen_file_name(self, filename_prefix, "pcow");
 
-    // printf("%s\n", tmp1);
     if (self->offset_primary) {
         kh_write(COW_CACHE, self->lookup_primary, tmp1);
     } else {
@@ -208,7 +184,6 @@ void dump_primary_buffer(cow_cache_t *self, const char *filename_prefix)
     if (fp == NULL) {
         fprintf(stderr, "[%s] Could not open file %s.\n", __func__, tmp2);
         assert(false);
-        // exit(EXIT_FAILURE);
     }
 
     if (self->offset_primary) {
@@ -220,18 +195,6 @@ void dump_primary_buffer(cow_cache_t *self, const char *filename_prefix)
 
     free(tmp1);
     free(tmp2);
-
-    // printf("DONE!\n");
-
-    /*
-     *
-     *  qemu_mutex_unlock_iothread();
-     *  fast_reload_t* snapshot = fast_reload_new();
-     *  fast_reload_create(snapshot);
-     *  qemu_mutex_lock_iothread();
-     *
-     *  printf("CREATED!\n");
-     */
 }
 
 void cow_cache_reset(cow_cache_t *self)
@@ -336,8 +299,6 @@ static inline void read_from_primary_buffer(cow_cache_t     *self,
                "OFFSET: %lx\n",
                offset_addr, iov_offset, self->offset_primary);
 #endif
-        // iov_from_buf_full_register(qiov->iov, qiov->niov, iov_offset,
-        // self->data_primary + kh_value(self->lookup_primary, k), CHUNK_SIZE);
         qemu_iovec_from_buf(qiov, iov_offset,
                             self->data_primary + kh_value(self->lookup_primary, k),
                             CHUNK_SIZE);
@@ -366,8 +327,6 @@ static inline void read_from_secondary_buffer(cow_cache_t     *self,
                    "OFFSET: %lx\n",
                    offset_addr, iov_offset, self->offset_secondary);
 #endif
-            // iov_from_buf_full_register(qiov->iov, qiov->niov, iov_offset,
-            // self->data_secondary_tmp + kh_value(self->lookup_secondary_tmp, k), CHUNK_SIZE);
             qemu_iovec_from_buf(qiov, iov_offset,
                                 self->data_secondary_tmp +
                                     kh_value(self->lookup_secondary_tmp, k),
@@ -384,8 +343,6 @@ static inline void read_from_secondary_buffer(cow_cache_t     *self,
                "OFFSET: %lx\n",
                offset_addr, iov_offset, self->offset_secondary);
 #endif
-        // iov_from_buf_full_register(qiov->iov, qiov->niov, iov_offset,
-        // self->data_secondary + kh_value(self->lookup_secondary, k), CHUNK_SIZE);
         qemu_iovec_from_buf(qiov, iov_offset,
                             self->data_secondary + kh_value(self->lookup_secondary, k),
                             CHUNK_SIZE);
@@ -400,8 +357,6 @@ static inline void read_from_secondary_buffer(cow_cache_t     *self,
                "OFFSET: %lx\n",
                offset_addr, iov_offset, self->offset_primary);
 #endif
-        // iov_from_buf_full_register(qiov->iov, qiov->niov, iov_offset,
-        // self->data_primary + kh_value(self->lookup_primary, k), CHUNK_SIZE);
         qemu_iovec_from_buf(qiov, iov_offset,
                             self->data_primary + kh_value(self->lookup_primary, k),
                             CHUNK_SIZE);
@@ -425,8 +380,6 @@ static int cow_cache_read(cow_cache_t     *self,
         }
     }
 #endif
-
-    // iov_from_buf_full_register(qiov->iov, qiov->niov, offset, NULL, bytes);
 
     blk_co_preadv(blk, offset, bytes, qiov, flags);
 
@@ -472,7 +425,6 @@ static inline void write_to_primary_buffer(cow_cache_t     *self,
     k = kh_get(COW_CACHE, self->lookup_primary, offset_addr);
     if (unlikely(k == kh_end(self->lookup_primary))) {
         /* create page */
-
         k = kh_put(COW_CACHE, self->lookup_primary, offset_addr, &ret);
 #ifdef COW_CACHE_DEBUG
         printf("ADD NEW COW PAGE: ADDR: %lx IOVEC OFFSET: %lx DATA OFFSET: %lx\n",
@@ -502,14 +454,6 @@ static inline void write_to_primary_buffer(cow_cache_t     *self,
     qemu_iovec_to_buf(qiov, iov_offset,
                       self->data_primary + kh_value(self->lookup_primary, k),
                       CHUNK_SIZE);
-
-    /*
-     * if(self->offset_primary >= 0xA00000){
-     *  printf("SWITCH TO SECONDARY\n");
-     *  switch_to_fuzz_mode(self);
-     *  dump_primary_buffer(self, "/tmp/cow_dump");
-     * }
-     */
 }
 
 static inline void write_to_secondary_buffer(cow_cache_t     *self,
@@ -522,8 +466,6 @@ static inline void write_to_secondary_buffer(cow_cache_t     *self,
                                              uint64_t         iov_offset)
 {
     int ret;
-
-    // assert((offset_addr&(CHUNK_SIZE-1)) == 0);
 
     if (!self->enabled_fuzz_tmp) {
         /* L2 mode */
@@ -587,8 +529,6 @@ static int cow_cache_write(cow_cache_t     *self,
                            QEMUIOVector    *qiov,
                            BdrvRequestFlags flags)
 {
-    // khiter_t k;
-
 #ifdef DEBUG_COW_LAYER
     if (self->enabled_fuzz) {
         if (!self->enabled_fuzz_tmp) {
@@ -605,7 +545,6 @@ static int cow_cache_write(cow_cache_t     *self,
 #endif
         return 0;
     }
-    // printf("qiov->size: %lx %lx\n", qiov->size, CHUNK_SIZE);
     if ((qiov->size % CHUNK_SIZE) && GET_GLOBAL_STATE()->in_fuzzing_mode) {
         GET_GLOBAL_STATE()->cow_cache_full = true;
         fprintf(stderr, "WARNING: %s write in %lx CHUNKSIZE\n", __func__, qiov->size);
@@ -648,11 +587,8 @@ void cow_cache_read_entry(void *opaque)
     printf("%s %lx %lx\n", __func__, rwco->offset, acb->bytes);
 #endif
 
-    // printf("rwco->ret: %lx %lx\n", rwco->ret, acb->bytes);
     rwco->ret = cow_cache_read(*((cow_cache_t **)(rwco->blk)), rwco->blk,
                                rwco->offset, acb->bytes, rwco->qiov, rwco->flags);
-
-    // last_read = PAGE_MASK;
 
     blk_aio_complete(acb);
 }

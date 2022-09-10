@@ -1,8 +1,9 @@
 #pragma once
 
-#include "sysemu/runstate.h"
 #include <stdint.h>
 #include <stdlib.h>
+
+#include "sysemu/runstate.h"
 
 #define RELOAD_HANDLER_KVM_CLOCK 0
 #define RELOAD_HANDLER_KVM_PIT   1

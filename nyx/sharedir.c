@@ -1,5 +1,5 @@
-#include "sharedir.h"
-#include "nyx/debug.h"
+#include "qemu/osdep.h"
+
 #include <assert.h>
 #include <dirent.h>
 #include <stdbool.h>
@@ -7,6 +7,9 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+
+#include "nyx/debug.h"
+#include "sharedir.h"
 
 // #define SHAREDIR_DEBUG
 
@@ -103,7 +106,6 @@ static sharedir_file_t *sharedir_get_object(sharedir_t *self, const char *file)
             obj->mod_time   = get_file_mod_time(obj->path);
 
             /* put into hash_list */
-
             char *new_file = NULL;
             assert(asprintf(&new_file, "%s", file) != -1);
             k = kh_put(SHAREDIR_LOOKUP, self->lookup, new_file, &ret);
@@ -136,7 +138,8 @@ static FILE *get_file_ptr(sharedir_t *self, sharedir_file_t *obj)
 uint64_t sharedir_request_file(sharedir_t *self, const char *file, uint8_t *page_buffer)
 {
     if (!self->dir) {
-        fprintf(stderr, "WARNING: New file request received, but no share dir configured! [FILE: %s]\n",
+        fprintf(stderr,
+                "WARNING: File request received, but no sharedir configured! [%s]\n",
                 file);
         return 0xFFFFFFFFFFFFFFFFUL;
     }

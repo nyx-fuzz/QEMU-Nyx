@@ -1,7 +1,9 @@
 #pragma once
-#include "khash.h"
+
 #include <stdint.h>
 #include <stdio.h>
+
+#include "khash.h"
 
 typedef struct sharedir_file_s {
     char    *file;

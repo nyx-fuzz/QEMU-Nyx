@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stdint.h>
+
 #include "nyx/snapshot/memory/block_list.h"
 #include "nyx/snapshot/memory/shadow_memory.h"
 

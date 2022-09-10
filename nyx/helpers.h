@@ -1,7 +1,5 @@
 #pragma once
 
-#include "qemu/osdep.h"
-
 uint64_t get_rip(CPUState *cpu);
 
 typedef struct nyx_coverage_bitmap_copy_s {

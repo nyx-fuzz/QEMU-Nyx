@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stdint.h>
+
 /* HyperTrash! */
 void handle_hypercall_kafl_nested_hprintf(struct kvm_run *run,
                                           CPUState       *cpu,

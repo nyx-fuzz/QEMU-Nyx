@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stdint.h>
+
 #include "nyx/snapshot/memory/block_list.h"
 #include "nyx/snapshot/memory/shadow_memory.h"
 
@@ -38,11 +40,13 @@ nyx_dirty_ring_t *nyx_dirty_ring_init(shadow_memory_t *shadow_memory);
 uint32_t nyx_snapshot_nyx_dirty_ring_restore(nyx_dirty_ring_t *self,
                                              shadow_memory_t  *shadow_memory_state,
                                              snapshot_page_blocklist_t *blocklist);
+
 void     nyx_snapshot_nyx_dirty_ring_save_root_pages(nyx_dirty_ring_t *self,
                                                      shadow_memory_t *shadow_memory_state,
                                                      snapshot_page_blocklist_t *blocklist);
 
 void nyx_snapshot_nyx_dirty_ring_flush(void);
+
 void nyx_snapshot_nyx_dirty_ring_flush_and_collect(nyx_dirty_ring_t *self,
                                                    shadow_memory_t *shadow_memory_state,
                                                    snapshot_page_blocklist_t *blocklist);

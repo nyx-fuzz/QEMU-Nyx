@@ -1,11 +1,14 @@
-
 #include "qemu/osdep.h"
+
+#include <stdint.h>
+#include <stdio.h>
+
 #include "sysemu/cpus.h"
+
 #include "nyx/state/snapshot_state.h"
 #include "nyx/debug.h"
 #include "nyx/memory_access.h"
 #include "nyx/state/state.h"
-#include <stdio.h>
 
 void serialize_state(const char *filename_prefix, bool is_pre_snapshot)
 {
@@ -86,7 +89,6 @@ void deserialize_state(const char *filename_prefix)
     if (fp == NULL) {
         nyx_debug("[%s] Could not open file %s.\n", __func__, tmp);
         assert(false);
-        // exit(EXIT_FAILURE);
     }
 
     serialized_state_header_t header = { 0 };

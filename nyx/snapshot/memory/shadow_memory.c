@@ -1,8 +1,7 @@
-
 #include "qemu/osdep.h"
+
 #include "qemu/main-loop.h"
 #include "sysemu/sysemu.h"
-#include "cpu.h"
 
 #include "exec/ram_addr.h"
 #include "migration/migration.h"
@@ -10,7 +9,6 @@
 
 #include "nyx/debug.h"
 #include "nyx/memory_access.h"
-
 #include "nyx/snapshot/helper.h"
 #include "nyx/snapshot/memory/shadow_memory.h"
 
@@ -69,8 +67,6 @@ shadow_memory_t *shadow_memory_init(void)
     fcntl(self->snapshot_ptr_fd, F_ADD_SEALS,
           F_SEAL_GROW | F_SEAL_SHRINK | F_SEAL_SEAL);
 
-    // printf("MMAP -> 0x%lx\n", self->memory_size);
-
     self->snapshot_ptr = mmap(NULL, self->memory_size, PROT_READ | PROT_WRITE,
                               MAP_SHARED, self->snapshot_ptr_fd, 0);
     madvise(self->snapshot_ptr, self->memory_size, MADV_RANDOM | MADV_MERGEABLE);
@@ -84,8 +80,6 @@ shadow_memory_t *shadow_memory_init(void)
     QLIST_FOREACH_RCU (block, &ram_list.blocks, next) {
         nyx_debug_p(RELOAD_PREFIX, "%lx %lx %lx\t%s\t%p", block->offset,
                     block->used_length, block->max_length, block->idstr, block->host);
-        // printf("%lx %lx %lx\t%s\t%p\n", block->offset, block->used_length,
-        // block->max_length, block->idstr, block->host);
 
         block_array[i] = block;
 
@@ -116,39 +110,34 @@ shadow_memory_t *shadow_memory_init(void)
                 self->ram_regions_num++;
 
                 self->ram_regions[self->ram_regions_num].ram_region = i;
-                self->ram_regions[self->ram_regions_num].base =
-MEM_SPLIT_END
-;
-self->ram_regions[self->ram_regions_num].size = block->used_length - MEM_SPLIT_START;
-self->ram_regions[self->ram_regions_num].offset =
-    (snapshot_ptr_offset_array[i] + MEM_SPLIT_START) - snapshot_ptr_offset_array[0];
-self->ram_regions[self->ram_regions_num].host_region_ptr =
-    block->host + MEM_SPLIT_START;
-// self->ram_regions[self->ram_regions_num].snapshot_region_ptr = self->ptr+self->ram_regions[self->ram_regions_num].offset;
-self->ram_regions[self->ram_regions_num].snapshot_region_ptr =
-    snapshot_ptr_offset_array[i] + MEM_SPLIT_START;
-self->ram_regions[self->ram_regions_num].idstr = malloc(strlen(block->idstr) + 1);
-memset(self->ram_regions[self->ram_regions_num].idstr, 0, strlen(block->idstr) + 1);
-strcpy(self->ram_regions[self->ram_regions_num].idstr, block->idstr);
-}
-else {
-    self->ram_regions[self->ram_regions_num].ram_region = i;
-    self->ram_regions[self->ram_regions_num].base       = block->mr->addr;
-    self->ram_regions[self->ram_regions_num].size       = block->used_length;
-    self->ram_regions[self->ram_regions_num].offset =
-        snapshot_ptr_offset_array[i] - snapshot_ptr_offset_array[0];
-    self->ram_regions[self->ram_regions_num].host_region_ptr = block->host;
-    self->ram_regions[self->ram_regions_num].snapshot_region_ptr =
-        self->snapshot_ptr + self->ram_regions[self->ram_regions_num].offset;
-    self->ram_regions[self->ram_regions_num].idstr = malloc(strlen(block->idstr) + 1);
-    memset(self->ram_regions[self->ram_regions_num].idstr, 0,
-           strlen(block->idstr) + 1);
-    strcpy(self->ram_regions[self->ram_regions_num].idstr, block->idstr);
-}
-
-self->ram_regions_num++;
-}
-}
+                self->ram_regions[self->ram_regions_num].base       = MEM_SPLIT_END;
+                self->ram_regions[self->ram_regions_num].size       = block->used_length -
+                                                                      MEM_SPLIT_START;
+                self->ram_regions[self->ram_regions_num].offset =
+                    (snapshot_ptr_offset_array[i] + MEM_SPLIT_START) - snapshot_ptr_offset_array[0];
+                self->ram_regions[self->ram_regions_num].host_region_ptr =
+                    block->host + MEM_SPLIT_START;
+                self->ram_regions[self->ram_regions_num].snapshot_region_ptr =
+                    snapshot_ptr_offset_array[i] + MEM_SPLIT_START;
+                self->ram_regions[self->ram_regions_num].idstr = malloc(strlen(block->idstr) + 1);
+                memset(self->ram_regions[self->ram_regions_num].idstr, 0, strlen(block->idstr) + 1);
+                strcpy(self->ram_regions[self->ram_regions_num].idstr, block->idstr);
+            } else {
+                self->ram_regions[self->ram_regions_num].ram_region = i;
+                self->ram_regions[self->ram_regions_num].base       = block->mr->addr;
+                self->ram_regions[self->ram_regions_num].size       = block->used_length;
+                self->ram_regions[self->ram_regions_num].offset     =
+                    snapshot_ptr_offset_array[i] - snapshot_ptr_offset_array[0];
+                self->ram_regions[self->ram_regions_num].host_region_ptr     = block->host;
+                self->ram_regions[self->ram_regions_num].snapshot_region_ptr =
+                    self->snapshot_ptr + self->ram_regions[self->ram_regions_num].offset;
+                self->ram_regions[self->ram_regions_num].idstr = malloc(strlen(block->idstr) + 1);
+                memset(self->ram_regions[self->ram_regions_num].idstr, 0, strlen(block->idstr) + 1);
+                strcpy(self->ram_regions[self->ram_regions_num].idstr, block->idstr);
+            }
+            self->ram_regions_num++;
+        }
+    }
 
 shadow_memory_init_generic(self);
 return self;
@@ -188,9 +177,7 @@ shadow_memory_t *shadow_memory_init_from_snapshot(const char *snapshot_folder,
 
     FILE *file_mem_meta = fopen(path_meta, "r");
     assert(file_mem_meta != NULL);
-
     assert(fread(&head, sizeof(fast_reload_dump_head_t), 1, file_mem_meta) == 1);
-
     fclose(file_mem_meta);
 
     if (self->ram_regions_num != head.shadow_memory_regions) {
@@ -225,7 +212,6 @@ shadow_memory_t *shadow_memory_init_from_snapshot(const char *snapshot_folder,
     }
     assert(self->memory_size == ftell(file_mem_dump));
     fseek(file_mem_dump, 0L, SEEK_SET);
-
     fclose(file_mem_dump);
 
     self->snapshot_ptr_fd = open(path_dump, O_RDONLY);
@@ -243,8 +229,6 @@ shadow_memory_t *shadow_memory_init_from_snapshot(const char *snapshot_folder,
     QLIST_FOREACH_RCU (block, &ram_list.blocks, next) {
         nyx_debug_p(RELOAD_PREFIX, "%lx %lx %lx\t%s\t%p", block->offset,
                     block->used_length, block->max_length, block->idstr, block->host);
-        // printf("%lx %lx %lx\t%s\t%p\n", block->offset, block->used_length,
-        // block->max_length, block->idstr, block->host);
 
         block_array[i]                 = block;
         snapshot_ptr_offset_array[i++] = self->snapshot_ptr + offset;
@@ -274,49 +258,45 @@ shadow_memory_t *shadow_memory_init_from_snapshot(const char *snapshot_folder,
                 self->ram_regions_num++;
 
                 self->ram_regions[self->ram_regions_num].ram_region = i;
-                self->ram_regions[self->ram_regions_num].base =
-MEM_SPLIT_END
-;
-self->ram_regions[self->ram_regions_num].size = block->used_length - MEM_SPLIT_START;
-self->ram_regions[self->ram_regions_num].offset =
-    (snapshot_ptr_offset_array[i] + MEM_SPLIT_START) - snapshot_ptr_offset_array[0];
-self->ram_regions[self->ram_regions_num].host_region_ptr =
-    block->host + MEM_SPLIT_START;
-// self->ram_regions[self->ram_regions_num].snapshot_region_ptr = self->ptr+self->ram_regions[self->ram_regions_num].offset;
-self->ram_regions[self->ram_regions_num].snapshot_region_ptr =
-    snapshot_ptr_offset_array[i] + MEM_SPLIT_START;
-self->ram_regions[self->ram_regions_num].idstr = malloc(strlen(block->idstr) + 1);
-memset(self->ram_regions[self->ram_regions_num].idstr, 0, strlen(block->idstr) + 1);
-strcpy(self->ram_regions[self->ram_regions_num].idstr, block->idstr);
-}
-else {
-    self->ram_regions[self->ram_regions_num].ram_region = i;
-    self->ram_regions[self->ram_regions_num].base       = block->mr->addr;
-    self->ram_regions[self->ram_regions_num].size       = block->used_length;
-    self->ram_regions[self->ram_regions_num].offset =
-        snapshot_ptr_offset_array[i] - snapshot_ptr_offset_array[0];
-    self->ram_regions[self->ram_regions_num].host_region_ptr = block->host;
-    self->ram_regions[self->ram_regions_num].snapshot_region_ptr =
-        self->snapshot_ptr + self->ram_regions[self->ram_regions_num].offset;
-    self->ram_regions[self->ram_regions_num].idstr = malloc(strlen(block->idstr) + 1);
-    memset(self->ram_regions[self->ram_regions_num].idstr, 0,
-           strlen(block->idstr) + 1);
-    strcpy(self->ram_regions[self->ram_regions_num].idstr, block->idstr);
-}
+                self->ram_regions[self->ram_regions_num].base       = MEM_SPLIT_END;
+                self->ram_regions[self->ram_regions_num].size       = block->used_length -
+                                                                      MEM_SPLIT_START;
+                self->ram_regions[self->ram_regions_num].offset =
+                    (snapshot_ptr_offset_array[i] + MEM_SPLIT_START) - snapshot_ptr_offset_array[0];
+                self->ram_regions[self->ram_regions_num].host_region_ptr =
+                    block->host + MEM_SPLIT_START;
+                self->ram_regions[self->ram_regions_num].snapshot_region_ptr =
+                    snapshot_ptr_offset_array[i] + MEM_SPLIT_START;
+                self->ram_regions[self->ram_regions_num].idstr = malloc(strlen(block->idstr) + 1);
+                memset(self->ram_regions[self->ram_regions_num].idstr, 0, strlen(block->idstr) + 1);
+                strcpy(self->ram_regions[self->ram_regions_num].idstr, block->idstr);
+            } else {
+                self->ram_regions[self->ram_regions_num].ram_region = i;
+                self->ram_regions[self->ram_regions_num].base       = block->mr->addr;
+                self->ram_regions[self->ram_regions_num].size       = block->used_length;
+                self->ram_regions[self->ram_regions_num].offset     =
+                    snapshot_ptr_offset_array[i] - snapshot_ptr_offset_array[0];
+                self->ram_regions[self->ram_regions_num].host_region_ptr     = block->host;
+                self->ram_regions[self->ram_regions_num].snapshot_region_ptr = self->snapshot_ptr +
+                                                                               self->ram_regions[
+                    self->ram_regions_num].offset;
+                self->ram_regions[self->ram_regions_num].idstr = malloc(strlen(block->idstr) + 1);
+                memset(self->ram_regions[self->ram_regions_num].idstr, 0, strlen(block->idstr) + 1);
+                strcpy(self->ram_regions[self->ram_regions_num].idstr, block->idstr);
+            }
 
 self->ram_regions_num++;
 }
 }
 
+#ifdef DEBUG_SHADOW_MEMCPY_VERSION
 /* memcpy version */
-/*
- * for(uint8_t i = 0; i < self->ram_regions_num; i++){
- *  void* host_addr = self->ram_regions[i].host_region_ptr + 0;
- *  void* snapshot_addr = self->ram_regions[i].snapshot_region_ptr + 0;
- *  memcpy(host_addr, snapshot_addr, self->ram_regions[i].size);
- * }
- */
-
+for (uint8_t i = 0; i < self->ram_regions_num; i++) {
+    void *host_addr     = self->ram_regions[i].host_region_ptr + 0;
+    void *snapshot_addr = self->ram_regions[i].snapshot_region_ptr + 0;
+    memcpy(host_addr, snapshot_addr, self->ram_regions[i].size);
+}
+#else
 /* munmap + mmap version */
 for (uint8_t i = 0; i < self->ram_regions_num; i++) {
     void *host_addr = self->ram_regions[i].host_region_ptr + 0;
@@ -325,6 +305,7 @@ for (uint8_t i = 0; i < self->ram_regions_num; i++) {
                 PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_FIXED,
                 self->snapshot_ptr_fd, self->ram_regions[i].offset) != MAP_FAILED);
 }
+#endif
 
 shadow_memory_init_generic(self);
 return self;
@@ -394,31 +375,24 @@ void shadow_memory_serialize(shadow_memory_t *self, const char *snapshot_folder)
     FILE *file_mem_meta = fopen(tmp1, "w+b");
     FILE *file_mem_data = fopen(tmp2, "w+b");
 
-    //} FILE* file_ptr_meta, FILE* file_ptr_data){
+#ifdef DEBUG_SHADOW_DUMP_SERIALIZE
+    nyx_debug("black_list_pages_num: %lx\n", self->black_list_pages_num);
+    nyx_debug("black_list_pages_size: %lx\n", self->black_list_pages_size);
+    nyx_debug("black_list_pages ...\n");
+    for (uint64_t i = 0; i < self->black_list_pages_num; i++) {
+        nyx_debug("self->black_list_pages[%ld] = %lx\n", i, self->black_list_pages[i]);
+    }
 
-    // assert(self);
-    // assert(file_ptr_meta);
-    // assert(file_ptr_data);
-    /*
-     * nyx_debug("black_list_pages_num: %lx\n", self->black_list_pages_num);
-     * nyx_debug("black_list_pages_size: %lx\n", self->black_list_pages_size);
-     * nyx_debug("black_list_pages ...\n");
-     * for (uint64_t i = 0; i < self->black_list_pages_num; i++ ){
-     *  nyx_debug("self->black_list_pages[%ld] = %lx\n", i, self->black_list_pages[i]);
-     * }
-     */
+    nyx_debug("shadow_memory_regions: %d\n", self->ram_regions_num);
+    nyx_debug("ram_region_index: %d\n", self->ram_region_index);
 
-    // printf("shadow_memory_regions: %d\n", self->ram_regions_num);
-    // nyx_debug("ram_region_index: %d\n", self->ram_region_index);
+    for (uint32_t i = 0; i < self->ram_regions_num; i++) {
+        nyx_debug("self->shadow_memory[%d] = %lx %s\n", i, self->ram_regions[i].base,
+                  self->ram_regions[i].idstr);
+    }
 
-    /*
-     * for (uint32_t i = 0; i < self->ram_regions_num; i++){
-     *  printf("self->shadow_memory[%d] = %lx %s\n", i, self->ram_regions[i].base,
-     * self->ram_regions[i].idstr);
-     * }
-     *
-     * printf("ram_size: %lx\n", self->memory_size);
-     */
+    nyx_debug("ram_size: %lx\n", self->memory_size);
+#endif
 
     fast_reload_dump_head_t  head;
     fast_reload_dump_entry_t entry;

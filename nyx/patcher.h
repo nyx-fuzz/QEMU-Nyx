@@ -1,18 +1,20 @@
 #ifndef __GUARD_REDQUEEN_PATCHER_STRUCT__
 #define __GUARD_REDQUEEN_PATCHER_STRUCT__
 
+#include "qemu/osdep.h"
+
 #include <stddef.h>
 #include <stdint.h>
 
 #include <capstone/capstone.h>
 #include <capstone/x86.h>
 
-#include "qemu/osdep.h"
-
 #define MAX_INSTRUCTION_SIZE 64
-// Patch used to replace cmp instructions. It encodes CMP AL, AL a comparision which
-// always evaluates to true. This can be used to remove hash checks that we suspsect
-// can later on be patched.
+/*
+ * Patch used to replace cmp instructions. It encodes CMP AL, AL a comparison
+ * which always evaluates to true. This can be used to remove hash checks that
+ * we suspsect can later on be patched.
+ */
 extern const uint8_t *cmp_patch;
 
 typedef struct patch_info_s {

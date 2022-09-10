@@ -1,4 +1,5 @@
 #include "qemu/osdep.h"
+
 #include "nyx/hypercall/configuration.h"
 #include "nyx/helpers.h"
 #include "nyx/memory_access.h"
@@ -63,8 +64,8 @@ void handle_hypercall_kafl_set_agent_config(struct kvm_run *run,
         if (config.agent_version != NYX_AGENT_VERSION) {
             fprintf(stderr,
                     "[QEMU-Nyx] Error: NYX_AGENT_VERSION does not match in agent "
-                    "configuration (%d "
-                    "!= %d) - You are probably using an outdated agent...\n",
+                    "configuration (%d != %d) - "
+                    "You are probably using an outdated agent...\n",
                     config.agent_version, NYX_AGENT_VERSION);
             exit(1);
         }
@@ -97,9 +98,7 @@ void handle_hypercall_kafl_set_agent_config(struct kvm_run *run,
         }
 
         GET_GLOBAL_STATE()->cap_cr3 = env->cr[3];
-
         GET_GLOBAL_STATE()->cap_coverage_bitmap_size = config.coverage_bitmap_size;
-
         GET_GLOBAL_STATE()->input_buffer_size =
             GET_GLOBAL_STATE()->shared_payload_buffer_size;
 

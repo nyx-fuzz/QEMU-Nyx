@@ -22,18 +22,19 @@
 #ifndef REDQUEEN_H
 #define REDQUEEN_H
 
-#include "qemu/osdep.h"
-#include "khash.h"
-#include "page_cache.h"
-#include "redqueen_trace.h"
-#include <capstone/capstone.h>
-#include <capstone/x86.h>
 #include <linux/kvm.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include <capstone/capstone.h>
+#include <capstone/x86.h>
+
+#include "khash.h"
+#include "page_cache.h"
+#include "redqueen_trace.h"
 
 // #define RQ_DEBUG
 

@@ -5,7 +5,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#include "qemu/osdep.h"
 #include "qemu/error-report.h"
 #include "qemu/log.h"
 #include "qemu-common.h"
@@ -28,8 +27,6 @@
  * qemu_log() is the standard logging enabled with -D
  * qemu_log_mask() is activated with additional -t nyx option
  */
-// #define nyx_debug(format, ...)         qemu_log_mask(LOG_NYX, NYX_LOG_PREFIX
-// "(%s#:%d)\t"format, __BASE_FILE__, __LINE__, ##__VA_ARGS__)
 #define nyx_debug(format, ...) \
     qemu_log_mask(LOG_NYX, NYX_LOG_PREFIX format, ##__VA_ARGS__)
 #define nyx_debug_p(PREFIX, format, ...) \

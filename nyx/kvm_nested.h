@@ -1,5 +1,6 @@
 #pragma once
-#include "qemu/osdep.h"
+
+#include <stdint.h>
 
 void     print_48_paging(uint64_t cr3);
 void     kvm_nested_get_info(CPUState *cpu);

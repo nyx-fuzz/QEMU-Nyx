@@ -1,14 +1,13 @@
 #include "qemu/osdep.h"
+
 #include "qemu/main-loop.h"
 #include "sysemu/sysemu.h"
-#include "cpu.h"
 
 #include "exec/ram_addr.h"
 #include "migration/migration.h"
 #include "qemu/rcu_queue.h"
 
 #include "nyx/memory_access.h"
-
 #include "nyx/snapshot/helper.h"
 #include "nyx/snapshot/memory/block_list.h"
 #include "nyx/snapshot/memory/shadow_memory.h"
@@ -22,12 +21,14 @@ snapshot_page_blocklist_t *snapshot_page_blocklist_init(void)
     snapshot_page_blocklist_t *self = malloc(sizeof(snapshot_page_blocklist_t));
 
     uint64_t ram_size = get_ram_size();
+
+    if (ram_size <= MEM_SPLIT_START) {
+        self->phys_area_size = ram_size;
+    } else {
+        self->phys_area_size = ram_size + (MEM_SPLIT_END - MEM_SPLIT_START);
+    }
+
     // printf("%s: ram_size: 0x%lx\n", __func__, ram_size);
-
-    self->phys_area_size = ram_size <= MEM_SPLIT_START ?
-                               ram_size :
-                               ram_size + (MEM_SPLIT_END - MEM_SPLIT_START);
-
     // printf("%s: phys_area_size: 0x%lx\n", __func__, self->phys_area_size);
 
     self->phys_bitmap = malloc(BITMAP_SIZE(self->phys_area_size));

@@ -1,12 +1,15 @@
 #include "qemu/osdep.h"
+
+#include <sys/time.h>
+
+#include "sysemu/kvm.h"
+
 #include "nyx/hypercall/debug.h"
 #include "nyx/fast_vm_reload.h"
 #include "nyx/state/state.h"
 #include "nyx/synchronization.h"
-#include <sys/time.h>
 
 // #define NYX_ENABLE_DEBUG_HYPERCALLS
-
 #ifdef NYX_ENABLE_DEBUG_HYPERCALLS
 
 static double get_time(void)
@@ -40,7 +43,6 @@ static void meassure_performance(void)
 {
     static int perf_counter = 0;
     if ((perf_counter % 1000) == 0) {
-        // printf("perf_counter -> %d \n", perf_counter);
         print_time_diff(1000);
     }
     perf_counter++;
@@ -50,11 +52,8 @@ void handle_hypercall_kafl_debug_tmp_snapshot(struct kvm_run *run,
                                               CPUState       *cpu,
                                               uint64_t        hypercall_arg)
 {
-    // X86CPU *x86_cpu = X86_CPU(cpu);
-    // CPUX86State *env = &x86_cpu->env;
     static bool first = true;
 
-    // printf("CALLED %s: %lx\n", __func__, hypercall_arg);
     switch (hypercall_arg & 0xFFF) {
     case 0: /* create root snapshot */
         if (!fast_snapshot_exists(GET_GLOBAL_STATE()->reload_state,
@@ -95,40 +94,29 @@ void handle_hypercall_kafl_debug_tmp_snapshot(struct kvm_run *run,
             first = false;
             request_fast_vm_reload(GET_GLOBAL_STATE()->reload_state,
                                    REQUEST_SAVE_SNAPSHOT_ROOT);
-            // request_fast_vm_reload(GET_GLOBAL_STATE()->reload_state, REQUEST_SAVE_SNAPSHOT_TMP);
-
             break;
         } else {
             request_fast_vm_reload(GET_GLOBAL_STATE()->reload_state,
                                    REQUEST_LOAD_SNAPSHOT_ROOT);
             break;
         }
-    /*
-     * case 6:
-     *  printf("%s: -> request to add 0x%lx to block-list\n", __func__, hypercall_arg&(~0xFFF));
-     *  CPUX86State *env = &(X86_CPU(cpu))->env;
-     * kvm_arch_get_registers_fast(cpu);
-     * hwaddr phys_addr = (hwaddr) get_paging_phys_addr(cpu, env->cr[3], hypercall_arg&(~0xFFF));
-     * fast_reload_blacklist_page(get_fast_reload_snapshot(), phys_addr);
-     *
-     *  break;
-     */
     default:
         abort();
     }
 }
 
-#else
+#else /* NYX_ENABLE_DEBUG_HYPERCALLS */
+
 void handle_hypercall_kafl_debug_tmp_snapshot(struct kvm_run *run,
                                               CPUState       *cpu,
                                               uint64_t        hypercall_arg)
 {
-    fprintf(stderr, "[QEMU-Nyx] Error: This hypercall (HYPERCALL_KAFL_DEBUG_TMP) is "
-                    "not enabled!\n");
-    set_abort_reason_auxiliary_buffer(GET_GLOBAL_STATE()->auxilary_buffer,
-                                      (char *)"Disabled debug hypercall called...",
-                                      strlen("Disabled debug hypercall called..."));
+    fprintf(stderr, "[QEMU-Nyx] Error: HYPERCALL_KAFL_DEBUG_TMP not enabled!\n");
+    set_abort_reason_auxiliary_buffer(
+        GET_GLOBAL_STATE()->auxilary_buffer,
+        (char *)"HYPERCALL_KAFL_DEBUG_TMP is not enabled.",
+        strlen("HYPERCALL_KAFL_DEBUG_TMP is not enabled."));
     synchronization_lock();
 }
 
-#endif
+#endif /* NYX_ENABLE_DEBUG_HYPERCALLS */

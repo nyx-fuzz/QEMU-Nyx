@@ -19,13 +19,16 @@
  *
  */
 
+#include "qemu/osdep.h"
+
+#include <stdbool.h>
+#include <stdio.h>
+#include <string.h>
+
 #include "nyx/auxiliary_buffer.h"
 #include "nyx/debug.h"
 #include "nyx/state/state.h"
 #include "nyx/trace_dump.h"
-#include <stdbool.h>
-#include <stdio.h>
-#include <string.h>
 
 /* experimental feature (currently broken)
  * enabled via trace mode
@@ -70,7 +73,6 @@ void init_auxiliary_buffer(auxilary_buffer_t *auxilary_buffer)
         0xFFFF;
 
     VOLATILE_WRITE_16(auxilary_buffer->header.hash, hash);
-
     VOLATILE_WRITE_64(auxilary_buffer->header.magic, AUX_MAGIC);
 }
 
@@ -173,7 +175,6 @@ void check_auxiliary_config_buffer(auxilary_buffer_t        *auxilary_buffer,
                         auxilary_buffer->configuration.trace_mode);
         VOLATILE_READ_8(shadow_config->reload_mode,
                         auxilary_buffer->configuration.reload_mode);
-
         VOLATILE_READ_8(shadow_config->verbose_level,
                         auxilary_buffer->configuration.verbose_level);
 
@@ -213,7 +214,6 @@ void set_exec_done_auxiliary_result_buffer(auxilary_buffer_t *auxilary_buffer,
                                            uint32_t           num_dirty_pages)
 {
     VOLATILE_WRITE_8(auxilary_buffer->result.exec_done, 1);
-
     VOLATILE_WRITE_32(auxilary_buffer->result.runtime_sec, sec);
     VOLATILE_WRITE_32(auxilary_buffer->result.runtime_usec, usec);
     VOLATILE_WRITE_32(auxilary_buffer->result.dirty_pages, num_dirty_pages);
@@ -274,7 +274,7 @@ void reset_page_not_found_result_buffer(auxilary_buffer_t *auxilary_buffer)
 void set_success_auxiliary_result_buffer(auxilary_buffer_t *auxilary_buffer,
                                          uint8_t            success)
 {
-    // should refactor to let caller directly set the result codes
+    // TODO refactor to let caller directly set the result codes
     if (success == 2) {
         VOLATILE_WRITE_8(auxilary_buffer->result.exec_result_code, rc_starved);
     } else {

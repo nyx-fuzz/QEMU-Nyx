@@ -1,20 +1,24 @@
 #include "qemu/osdep.h"
+
+#include <assert.h>
+#include <stdint.h>
+#include <stdio.h>
+
 #include "exec/memory.h"
 #include "qapi/error.h"
 #include "qapi/qapi-types-run-state.h"
 #include "qemu/main-loop.h"
+#include "qemu-common.h"
+
 #include "sysemu/kvm.h"
 #include "sysemu/kvm_int.h"
 #include "sysemu/runstate.h"
-#include "qemu-common.h"
+
 #include "fast_vm_reload_sync.h"
 #include "nyx/debug.h"
 #include "nyx/fast_vm_reload.h"
 #include "nyx/kvm_nested.h"
 #include "nyx/state/state.h"
-#include <assert.h>
-#include <stdint.h>
-#include <stdio.h>
 
 extern int save_snapshot(const char *name, Error **errp);
 extern int load_snapshot(const char *name, Error **errp);
@@ -151,8 +155,6 @@ static inline void perform_task_no_block_mode(fast_vm_reload_sync_t *self,
     switch (request) {
     case REQUEST_SAVE_SNAPSHOT_PRE:
         vm_stop(RUN_STATE_SAVE_VM);
-        // fast_reload_create_to_file(get_fast_reload_snapshot(),
-        // GET_GLOBAL_STATE()->fast_reload_pre_path, true);
         fast_reload_create_in_memory(get_fast_reload_snapshot());
         fast_reload_serialize_to_file(get_fast_reload_snapshot(),
                                       GET_GLOBAL_STATE()->fast_reload_pre_path, true);
@@ -164,34 +166,26 @@ static inline void perform_task_no_block_mode(fast_vm_reload_sync_t *self,
         adjust_rip(env, get_fast_reload_snapshot());
         kvm_arch_put_registers(cpu, KVM_PUT_FULL_STATE);
     case REQUEST_SAVE_SNAPSHOT_ROOT:
-
         kvm_arch_get_registers(cpu);
         vm_stop(RUN_STATE_SAVE_VM);
         create_root_snapshot();
 
         fast_reload_restore(get_fast_reload_snapshot());
-        // call_fast_change_handlers();
         break;
-
     case REQUEST_SAVE_SNAPSHOT_TMP_FIX_RIP:
         adjust_rip(env, get_fast_reload_snapshot());
         kvm_arch_put_registers(cpu, KVM_PUT_FULL_STATE);
     case REQUEST_SAVE_SNAPSHOT_TMP:
         fast_reload_create_tmp_snapshot(get_fast_reload_snapshot());
         fast_reload_restore(get_fast_reload_snapshot());
-
         break;
     case REQUEST_LOAD_SNAPSHOT_PRE:
         abort();
         break;
     case REQUEST_LOAD_SNAPSHOT_ROOT:
     case REQUEST_LOAD_SNAPSHOT_TMP:
-
-        // vm_stop(RUN_STATE_RESTORE_VM);
         fast_reload_restore(get_fast_reload_snapshot());
-        // call_fast_change_handlers();
         break;
-
     case REQUEST_SAVE_SNAPSHOT_ROOT_NESTED_FIX_RIP:
         kvm_arch_get_registers(cpu);
 
@@ -199,20 +193,17 @@ static inline void perform_task_no_block_mode(fast_vm_reload_sync_t *self,
         set_nested_rip(cpu, env->eip);
         kvm_arch_put_registers(cpu, KVM_PUT_FULL_STATE);
 
-        // case REQUEST_SAVE_SNAPSHOT_ROOT_NESTED:
         kvm_arch_get_registers(cpu);
         vm_stop(RUN_STATE_SAVE_VM);
         create_root_snapshot();
 
         fast_reload_restore(get_fast_reload_snapshot());
         break;
-
     default:
         abort();
     }
 
     vm_start();
-    // call_fast_change_handlers();
     cpu_resume(cpu);
     qemu_mutex_unlock_iothread();
 }
@@ -224,8 +215,6 @@ static inline void perform_task_block_mode(fast_vm_reload_sync_t *self,
     case REQUEST_SAVE_SNAPSHOT_PRE_FIX_RIP:
     case REQUEST_SAVE_SNAPSHOT_PRE:
         vm_stop(RUN_STATE_SAVE_VM);
-        // fast_reload_create_to_file(get_fast_reload_snapshot(),
-        // GET_GLOBAL_STATE()->fast_reload_pre_path, true);
         fast_reload_create_in_memory(get_fast_reload_snapshot());
         fast_reload_serialize_to_file(get_fast_reload_snapshot(),
                                       GET_GLOBAL_STATE()->fast_reload_pre_path, true);
@@ -251,7 +240,6 @@ static inline void perform_task_block_mode(fast_vm_reload_sync_t *self,
         vm_stop(RUN_STATE_RESTORE_VM);
         fast_reload_restore(get_fast_reload_snapshot());
         break;
-
     default:
         abort();
     }
@@ -282,7 +270,6 @@ void request_fast_vm_reload(fast_vm_reload_sync_t *self, FastReloadRequest reque
     if (self->mode == RELOAD_MODE_NO_BLOCK) {
         CPUState *cpu = qemu_get_cpu(0);
         kvm_arch_get_registers(cpu);
-        // perform_task(self, request);
         perform_task_no_block_mode(self, request);
     } else {
         self->current_request    = request;
@@ -303,6 +290,7 @@ void reload_request_discard_tmp(fast_vm_reload_sync_t *self)
 
 bool check_if_relood_request_exists_pre(fast_vm_reload_sync_t *self)
 {
+    /* TODO: always returns false or abort() ? */
     if (self->request_exists_pre) {
         self->request_exists_pre = false;
         abort();
@@ -373,11 +361,11 @@ bool check_if_relood_request_exists_post(fast_vm_reload_sync_t *self)
         self->current_request = REQUEST_VOID;
         perform_task(self, request);
 
-        /*
-         *  qemu_clock_enable(QEMU_CLOCK_HOST, true);
-         *  qemu_clock_enable(QEMU_CLOCK_VIRTUAL_RT, true);
-         *  qemu_clock_enable(QEMU_CLOCK_VIRTUAL, true);
-         */
+#if 0
+        qemu_clock_enable(QEMU_CLOCK_HOST, true);
+        qemu_clock_enable(QEMU_CLOCK_VIRTUAL_RT, true);
+        qemu_clock_enable(QEMU_CLOCK_VIRTUAL, true);
+#endif
 
         return true;
     }

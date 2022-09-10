@@ -1,3 +1,5 @@
+#include "qemu/osdep.h"
+
 #include <assert.h>
 #include <string.h>
 
@@ -10,17 +12,17 @@
 #include "file_helper.h"
 #include "redqueen.h"
 
-///////////////////////////////////////////////////////////////////////////////////
-// Private Helper Functions Declarations
-///////////////////////////////////////////////////////////////////////////////////
+/*
+ * Private Helper Functions Declarations
+ */
 
 size_t _count_lines_in_file(FILE *fp);
 
 void _parse_addresses_in_file(FILE *fp, size_t num_addrs, uint64_t *addrs);
 
-///////////////////////////////////////////////////////////////////////////////////
-// Public Functions
-///////////////////////////////////////////////////////////////////////////////////
+/*
+ * Public Functions
+ */
 
 void write_debug_result(char *buf)
 {
@@ -78,13 +80,11 @@ void fsync_redqueen_files(void)
 
 void write_se_result(char *buf)
 {
-    // int fd;
     int unused __attribute__((unused));
     if (!se_fd)
         se_fd = open(redqueen_workdir.symbolic_results,
                      O_WRONLY | O_CREAT | O_APPEND, S_IRWXU);
     unused = write(se_fd, buf, strlen(buf));
-    // close(fd);
 }
 
 void delete_redqueen_files(void)
@@ -100,9 +100,9 @@ void delete_redqueen_files(void)
     unused = ftruncate(se_fd, 0);
 }
 
-///////////////////////////////////////////////////////////////////////////////////
-// Private Helper Functions Definitions
-///////////////////////////////////////////////////////////////////////////////////
+/*
+ * Private Helper Functions Definitions
+ */
 
 size_t _count_lines_in_file(FILE *fp)
 {

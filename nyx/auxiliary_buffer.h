@@ -20,6 +20,7 @@
  */
 
 #pragma once
+
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -27,8 +28,7 @@
 
 #define AUX_MAGIC 0x54502d554d4551
 
-#define QEMU_PT_VERSION \
-    3 /* let's start at 1 for the initial version using the aux buffer */
+#define QEMU_PT_VERSION 3
 
 #define HEADER_SIZE 128
 #define CAP_SIZE    256
@@ -50,7 +50,7 @@ enum nyx_result_codes {
 };
 
 typedef struct auxilary_buffer_header_s {
-    uint64_t magic; /* 0x54502d554d4551 */
+    uint64_t magic;
     uint16_t version;
     uint16_t hash;
     /* more to come */
@@ -58,16 +58,16 @@ typedef struct auxilary_buffer_header_s {
 
 typedef struct auxilary_buffer_cap_s {
     uint8_t redqueen;
-    uint8_t agent_timeout_detection; /* agent implements its own timeout detection;
-                                        host timeout detection is still in used, but
-                                        treshold is increased by x2; */
-    uint8_t agent_trace_bitmap; /* agent implements its own tracing mechanism; PT tracing is disabled */
-    uint8_t agent_ijon_trace_bitmap; /* agent uses the ijon shm buffer */
-
-    uint32_t agent_input_buffer_size; /* agent requests a custom input buffer size (if
-                                         the size is 0, the minimum buffer size is used) */
-    uint32_t agent_coverage_bitmap_size; /* agent requests a custom coverage bitmap
-                                            size (if the size is 0, the minimum buffer size is used) */
+    /* agent implements its own timeout detection; host timeout detection is still in used, but treshold is increased by x2; */
+    uint8_t agent_timeout_detection;
+    /* agent implements its own tracing mechanism; PT tracing is disabled */
+    uint8_t agent_trace_bitmap;
+    /* agent uses the ijon shm buffer */
+    uint8_t agent_ijon_trace_bitmap;
+    /* agent requests a custom input buffer size (if the size is 0, the minimum buffer size is used) */
+    uint32_t agent_input_buffer_size;
+    /* agent requests a custom coverage bitmap size (if the size is 0, the minimum buffer size is used) */
+    uint32_t agent_coverage_bitmap_size;
     /* more to come */
 } __attribute__((packed)) auxilary_buffer_cap_t;
 
@@ -90,12 +90,6 @@ typedef struct auxilary_buffer_config_s {
     /* nested mode only */
     uint8_t protect_payload_buffer;
 
-    /*  0 -> disabled
-     *  1 -> decoding
-     *  2 -> decoding + full disassembling
-     */
-    // uint8_t pt_processing_mode;
-
     /* snapshot extension */
     uint8_t discard_tmp_snapshot;
 
@@ -103,10 +97,11 @@ typedef struct auxilary_buffer_config_s {
 } __attribute__((packed)) auxilary_buffer_config_t;
 
 typedef struct auxilary_buffer_result_s {
-    /*  0 -> booting,
-     *  1 -> loader level 1,
-     *  2 -> loader level 2,
-     *  3 -> ready to fuzz
+    /*
+     * 0 -> booting,
+     * 1 -> loader level 1,
+     * 2 -> loader level 2,
+     * 3 -> ready to fuzz
      */
     uint8_t state;
     uint8_t exec_done;
@@ -189,7 +184,6 @@ void set_cap_agent_ijon_trace_bitmap(auxilary_buffer_t *auxilary_buffer, bool va
 
 void set_result_dirty_pages(auxilary_buffer_t *auxilary_buffer, uint32_t value);
 void set_result_pt_trace_size(auxilary_buffer_t *auxilary_buffer, uint32_t value);
-
 void set_result_bb_coverage(auxilary_buffer_t *auxilary_buffer, uint32_t value);
 
 void set_payload_buffer_write_reason_auxiliary_buffer(

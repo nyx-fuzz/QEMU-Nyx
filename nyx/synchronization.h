@@ -1,7 +1,7 @@
 #pragma once
 
-#include "qemu/osdep.h"
-#include <linux/kvm.h>
+#include <stdint.h>
+#include <sys/time.h>
 
 typedef struct timeout_detector_s {
     int           kvm_tid;
