@@ -1,3 +1,5 @@
+#include "qemu/osdep.h"
+
 #include <assert.h>
 #include <stdint.h>
 #include <stdio.h>

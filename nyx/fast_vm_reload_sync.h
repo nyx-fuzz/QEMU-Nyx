@@ -35,11 +35,9 @@ typedef enum FastReloadMode {
 typedef struct fast_vm_reload_sync_s {
     bool              request_exists;
     bool              request_exists_pre;
+    bool              debug_mode;
     FastReloadRequest current_request;
-
-    bool debug_mode;
-
-    FastReloadMode mode;
+    FastReloadMode    mode;
 } fast_vm_reload_sync_t;
 
 fast_vm_reload_sync_t *init_fast_vm_reload_sync(void);

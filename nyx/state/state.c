@@ -19,7 +19,13 @@
  *
  */
 
+#include "qemu/osdep.h"
+
+#include <stdint.h>
+#include <stdio.h>
+
 #include "sysemu/kvm.h"
+
 #include "nyx/state/state.h"
 #include "nyx/auxiliary_buffer.h"
 #include "nyx/debug.h"
@@ -183,9 +189,6 @@ void init_page_cache(char *path)
 {
     assert(global_state.page_cache == NULL);
     global_state.page_cache = page_cache_new((CPUState *)qemu_get_cpu(0), path);
-#ifdef STATE_VERBOSE
-    nyx_debug("\n\nINIT PAGE_CACHE => %s\n", path);
-#endif
 }
 
 page_cache_t *get_page_cache(void)
@@ -211,8 +214,10 @@ static void *alloc_auxiliary_buffer(const char *file)
     void       *ptr;
     struct stat st;
     int         fd = open(file, O_CREAT | O_RDWR, S_IRWXU | S_IRWXG | S_IRWXO);
+
     assert(ftruncate(fd, AUX_BUFFER_SIZE) == 0);
     stat(file, &st);
+
     nyx_debug_p(INTERFACE_PREFIX, "new aux buffer file: (max size: %x) %lx",
                 AUX_BUFFER_SIZE, st.st_size);
 

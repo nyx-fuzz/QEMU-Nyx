@@ -20,48 +20,45 @@
  */
 
 #include "qemu/osdep.h"
-#include "qemu/main-loop.h"
-#include "sysemu/sysemu.h"
-#include "cpu.h"
 
+#include <stdint.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+
+#include <immintrin.h>
+
+#include "block/qapi.h"
 #include "exec/ram_addr.h"
+
 #include "migration/global_state.h"
 #include "migration/migration.h"
 #include "migration/qemu-file.h"
 #include "migration/register.h"
 #include "migration/savevm.h"
+#include "migration/vmstate.h"
+
+#include "qemu/main-loop.h"
 #include "qemu/rcu_queue.h"
 
-#include <immintrin.h>
-#include <linux/kvm.h>
-#include <stdint.h>
-#include <sys/ioctl.h>
-#include <sys/mman.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-
+#include "sysemu/block-backend.h"
 #include "sysemu/cpus.h"
 #include "sysemu/kvm_int.h"
 #include "sysemu/reset.h"
+#include "sysemu/runstate.h"
+#include "sysemu/sysemu.h"
 
 #include "nyx/debug.h"
 #include "nyx/fast_vm_reload.h"
 #include "nyx/state/snapshot_state.h"
 #include "nyx/state/state.h"
 
-#include "block/qapi.h"
-#include "migration/vmstate.h"
-#include "sysemu/block-backend.h"
-#include "sysemu/runstate.h"
-
-#include "nyx/memory_access.h"
-
 #include "nyx/helpers.h"
+#include "nyx/memory_access.h"
 
 #include "nyx/snapshot/helper.h"
 #include "nyx/snapshot/memory/block_list.h"
 #include "nyx/snapshot/memory/shadow_memory.h"
-
 #include "nyx/snapshot/block/nyx_block_snapshot.h"
 #include "nyx/snapshot/devices/nyx_device_state.h"
 #include "nyx/snapshot/memory/backend/nyx_debug.h"
@@ -109,7 +106,6 @@ static void fast_snapshot_init_operation(fast_reload_t *self,
         }
 
         self->fdl_user_state = nyx_fdl_user_init(self->shadow_memory_state);
-
         nyx_fdl_user_enable(self->fdl_user_state);
     }
 
@@ -164,15 +160,12 @@ static void fast_snapshot_restore_operation(fast_reload_t *self)
                                                 self->blocklist);
         num_dirty_pages += nyx_snapshot_debug_restore(self->shadow_memory_state,
                                                       self->blocklist, true);
-        // assert(false);
-        // sleep(1);
         break;
     }
 
     num_dirty_pages += nyx_snapshot_user_fdl_restore(self->fdl_user_state,
                                                      self->shadow_memory_state,
                                                      self->blocklist);
-    // nyx_device_state_post_restore(self->device_state);
     GET_GLOBAL_STATE()->num_dirty_pages = num_dirty_pages;
 }
 
@@ -180,7 +173,6 @@ static inline void fast_snapshot_pre_create_incremental_operation(fast_reload_t 
 {
     /* flush all pending block writes */
     bdrv_drain_all();
-
     memory_global_dirty_log_sync();
 
     nyx_device_state_switch_incremental(self->device_state);
@@ -265,10 +257,9 @@ void fast_reload_init(fast_reload_t *self)
     self->blocklist = snapshot_page_blocklist_init();
 }
 
-/* fix this */
 void fast_reload_destroy(fast_reload_t *self)
 {
-    /* complete me */
+    /* TODO: complete me */
 
     // close(self->vmx_fdl_fd);
     // munmap(self->fdl_data, (self->guest_ram_size/0x1000)*8);
@@ -287,9 +278,8 @@ inline static void unlock_snapshot(const char *folder)
     char *info_file;
     char *lock_file;
 
-    assert(asprintf(&info_file, "%s/INFO.txt", folder) != -1);
-
     /* info file */
+    assert(asprintf(&info_file, "%s/INFO.txt", folder) != -1);
     FILE *f_info = fopen(info_file, "w+b");
     if (GET_GLOBAL_STATE()->fast_reload_pre_image) {
         const char *msg = "THIS IS A NYX PRE IMAGE SNAPSHOT FOLDER!\n";
@@ -301,7 +291,6 @@ inline static void unlock_snapshot(const char *folder)
     fclose(f_info);
 
     assert(asprintf(&lock_file, "%s/ready.lock", folder) != -1);
-
     int fd = open(lock_file, O_WRONLY | O_CREAT, S_IRWXU);
     close(fd);
 
@@ -313,7 +302,6 @@ inline static void wait_for_snapshot(const char *folder)
     char *lock_file;
 
     assert(asprintf(&lock_file, "%s/ready.lock", folder) != -1);
-
     while (access(lock_file, F_OK) == -1) {
         sleep(1);
     }
@@ -324,7 +312,7 @@ void fast_reload_serialize_to_file(fast_reload_t *self,
                                    const char    *folder,
                                    bool           is_pre_snapshot)
 {
-    // printf("================ %s => %s =============\n", __func__, folder);
+    nyx_trace();
 
     /* sanity check */
     if (!folder_exits(folder)) {
@@ -353,7 +341,7 @@ static void fast_reload_create_from_snapshot(fast_reload_t *self,
                                              bool           lock_iothread,
                                              bool           pre_snapshot)
 {
-    // printf("%s called\n", __func__);
+    nyx_trace();
 
     assert(self != NULL);
     wait_for_snapshot(folder);
@@ -387,16 +375,13 @@ static void fast_reload_create_from_snapshot(fast_reload_t *self,
     if (!pre_snapshot) {
         nyx_device_state_save_tsc(self->device_state);
     }
-
-    // fast_reload_restore(self);
-    // vm_start();
 }
 
 void fast_reload_create_from_file(fast_reload_t *self,
                                   const char    *folder,
                                   bool           lock_iothread)
 {
-    // printf("CALL: %s\n", __func__);
+    nyx_trace();
     fast_reload_create_from_snapshot(self, folder, lock_iothread, false);
 }
 
@@ -404,14 +389,16 @@ void fast_reload_create_from_file_pre_image(fast_reload_t *self,
                                             const char    *folder,
                                             bool           lock_iothread)
 {
-    // printf("CALL: %s\n", __func__);
+    nyx_trace();
     fast_reload_create_from_snapshot(self, folder, lock_iothread, true);
 }
 
 void fast_reload_create_in_memory(fast_reload_t *self)
 {
-    assert(self != NULL);
     nyx_trace();
+    nyx_debug_p(RELOAD_PREFIX,
+                "=> CREATING FAST RELOAD SNAPSHOT FROM CURRENT VM STATE");
+    assert(self != NULL);
     nyx_debug_p(RELOAD_PREFIX,
                 "=> CREATING FAST RELOAD SNAPSHOT FROM CURRENT VM STATE");
 
@@ -436,47 +423,18 @@ void fast_reload_restore(fast_reload_t *self)
     assert(self != NULL);
     self->dirty_pages = 0;
 
-    // rcu_read_lock();
-    // cpu_synchronize_all_states();
-    // bdrv_drain_all_begin();
-
     /* flush all pending block writes */
     bdrv_drain_all();
-    // bdrv_flush_all();
-
     memory_global_dirty_log_sync();
-    // unset_black_list_pages(self);
 
     nyx_block_snapshot_reset(self->block_state);
-    /*
-     * for(uint32_t i = 0; i < self->cow_cache_array_size; i++){
-     *  //if(!self->tmp_snapshot.enabled)
-     *  cow_cache_reset(self->cow_cache_array[i]);
-     * }
-     */
-
     nyx_device_state_restore(self->device_state);
-    // fdl_fast_reload(self->qemu_state);
-    // fdl_fast_reload(self->device_state->qemu_state);
-
     nyx_block_snapshot_flush(self->block_state);
-    // GET_GLOBAL_STATE()->cow_cache_full = false;
-    // call_fast_change_handlers();
-
     fast_snapshot_restore_operation(self);
-
-    // find_dirty_pages_fdl(self);
-    // fast_reload_qemu_user_fdl_restore(self);
-
-    // set_tsc_value(self, self->tmp_snapshot.enabled);
     nyx_device_state_post_restore(self->device_state);
+
     kvm_arch_put_registers(qemu_get_cpu(0), KVM_PUT_FULL_STATE_FAST);
     qemu_get_cpu(0)->vcpu_dirty = false;
-
-    // bdrv_drain_all_end();
-    // rcu_read_unlock();
-
-    // printf("========================= NEXT\n\n");
 
     return;
 }
@@ -487,10 +445,9 @@ bool read_snapshot_memory(fast_reload_t *self, uint64_t address, void *ptr, size
                                               ptr, size);
 }
 
-/* fix this */
 void *fast_reload_get_physmem_shadow_ptr(fast_reload_t *self, uint64_t physaddr)
 {
-    abort(); /* fix this function first -> pc_piix memory split issue */
+    abort(); /* TODO -> pc_piix memory split issue */
 
     /*
      * assert(self != NULL);
@@ -515,7 +472,7 @@ void fast_reload_blacklist_page(fast_reload_t *self, uint64_t physaddr)
 
 bool fast_reload_snapshot_exists(fast_reload_t *self)
 {
-    if (!self) { // || !self->qemu_state){
+    if (!self) {
         return false;
     }
     return true;
@@ -523,20 +480,15 @@ bool fast_reload_snapshot_exists(fast_reload_t *self)
 
 void fast_reload_create_tmp_snapshot(fast_reload_t *self)
 {
-    assert(self); // && self->qemu_state);
+    assert(self);
 
     self->dirty_pages = 0;
-
     fast_snapshot_pre_create_incremental_operation(self);
 
     if (!self->bitmap_copy) {
         self->bitmap_copy = new_coverage_bitmaps();
     }
     coverage_bitmap_copy_to_buffer(self->bitmap_copy);
-
-    // GET_GLOBAL_STATE()->cow_cache_full = false;
-
-    // self->tmp_snapshot.root_dirty_pages_num = 0;
 
     fast_snapshot_create_incremental_operation(self);
     self->incremental_snapshot_enabled = true;
@@ -550,30 +502,16 @@ void fast_reload_discard_tmp_snapshot(fast_reload_t *self)
 
     /* flush all pending block writes */
     bdrv_drain_all();
-
     memory_global_dirty_log_sync();
-    // unset_black_list_pages(self);
 
     fast_snapshot_restore_operation(self);
 
-    // find_dirty_pages_fdl(self);
-    // fast_reload_qemu_user_fdl_restore(self);
-
     shadow_memory_restore_memory(self->shadow_memory_state);
     shadow_memory_switch_snapshot(self->shadow_memory_state, false);
-    // restore_root_memory(self);
 
     nyx_device_state_disable_incremental(self->device_state);
-    // fdl_fast_disable_tmp(self->qemu_state);
-    // fdl_fast_disable_tmp(self->device_state->qemu_state);
-
     nyx_block_snapshot_disable_incremental(self->block_state);
 
-    /*
-     * for(uint32_t i = 0; i < self->cow_cache_array_size; i++){
-     *  cow_cache_disable_tmp_mode(self->cow_cache_array[i]);
-     * }
-     */
     self->incremental_snapshot_enabled = false;
 }
 

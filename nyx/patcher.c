@@ -1,3 +1,5 @@
+#include "qemu/osdep.h"
+
 #include "patcher.h"
 #include "debug.h"
 #include "nyx/disassembler.h"
@@ -9,14 +11,12 @@ uint8_t cmp_patch_data[] = {
 }; // CMP AL,AL; NOP, NOP ...
 const uint8_t *cmp_patch = &cmp_patch_data[0];
 
-///////////////////////////////////////////////////////////////////////////////////
-// Private Helper Functions Declarations
-///////////////////////////////////////////////////////////////////////////////////
-//
+/*
+ * Private Helper Functions Declarations
+ */
+
 static void _patcher_apply_patch(patcher_t *self, size_t index);
-
 static void _patcher_restore_patch(patcher_t *self, size_t index);
-
 static void _patcher_save_patch(patcher_t *self,
                                 size_t     index,
                                 uint8_t   *data,
@@ -29,14 +29,13 @@ static size_t _patcher_disassemble_size(patcher_t *self,
                                         x86_insn   id);
 
 static void _patcher_alloc_patch_infos(patcher_t *self, size_t num_patches);
-
 static void _patcher_free_patch_infos(patcher_t *self);
 
 static redqueen_t *_redq_ptr(patcher_t *self);
 
-///////////////////////////////////////////////////////////////////////////////////
-// Public Functions
-///////////////////////////////////////////////////////////////////////////////////
+/*
+ * Public Functions
+ */
 
 patcher_t *patcher_new(CPUState *cpu)
 {
@@ -140,9 +139,9 @@ bool patcher_validate_patches(patcher_t *self)
     return true;
 }
 
-///////////////////////////////////////////////////////////////////////////////////
-// Private Helper Functions Definitions
-///////////////////////////////////////////////////////////////////////////////////
+/*
+ * Private Helper Functions Definitions
+ */
 
 static void _patcher_apply_patch(patcher_t *self, size_t index)
 {

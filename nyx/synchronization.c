@@ -1,8 +1,13 @@
 #include "qemu/osdep.h"
+
+#include <linux/kvm.h>
+#include <sys/syscall.h>
+
 #include "qemu/main-loop.h"
 #include "sysemu/kvm.h"
 #include "sysemu/sysemu.h"
 #include "qemu-common.h"
+
 #include "nyx/synchronization.h"
 #include "nyx/debug.h"
 #include "nyx/fast_vm_reload.h"
@@ -11,10 +16,6 @@
 #include "nyx/hypercall/hypercall.h"
 #include "nyx/interface.h"
 #include "nyx/state/state.h"
-#include "target/i386/cpu.h"
-#include <linux/kvm.h>
-#include <sys/syscall.h>
-
 #include "pt.h"
 
 pthread_mutex_t synchronization_lock_mutex       = PTHREAD_MUTEX_INITIALIZER;
@@ -26,6 +27,7 @@ volatile bool synchronization_kvm_loop_waiting = false;
 
 /* SIGALRM based timeout detection */
 // #define DEBUG_TIMEOUT_DETECTOR
+
 void init_timeout_detector(timeout_detector_t *timer)
 {
     timer->kvm_tid           = 0;
@@ -104,7 +106,6 @@ void arm_sigprof_timer(timeout_detector_t *timer)
                     "Attempting to re-arm an expired timer! => reset(%ld.%ld)\n",
                     timer->config.tv_sec, timer->config.tv_usec);
             reset_timeout_detector(timer);
-            // return true;
         }
         assert(setitimer(ITIMER_REAL, &timer->alarm, NULL) == 0);
     }
@@ -133,13 +134,11 @@ bool disarm_sigprof_timer(timeout_detector_t *timer)
 void block_signals(void)
 {
     sigset_t set;
-
     sigemptyset(&set);
     sigaddset(&set, SIGALRM);
     sigaddset(&set, SIGABRT);
     sigaddset(&set, SIGSEGV);
     pthread_sigmask(SIG_BLOCK, &set, NULL);
-    // fprintf(stderr, "%s!\n", __func__);
 }
 
 void unblock_signals(void)
@@ -151,7 +150,6 @@ void unblock_signals(void)
     sigaddset(&set, SIGSEGV);
     sigaddset(&set, SIGALRM);
     sigprocmask(SIG_UNBLOCK, &set, NULL);
-    // fprintf(stderr, "%s!\n", __func__);
 }
 
 /* -------------------- */
@@ -201,14 +199,11 @@ void synchronization_unlock(void)
 
     pthread_mutex_lock(&synchronization_lock_mutex);
     pthread_cond_signal(&synchronization_lock_condition);
-    // hypercall_reset_hprintf_counter();
     pthread_mutex_unlock(&synchronization_lock_mutex);
 }
 
 uint64_t run_counter     = 0;
 bool     in_fuzzing_loop = false;
-
-// bool last_timeout = false;
 
 void synchronization_lock_hprintf(void)
 {
@@ -254,8 +249,6 @@ void synchronization_lock(void)
         kvm_vcpu_ioctl(qemu_get_cpu(0), KVM_VMX_PT_DISABLE_PAGE_DUMP_CR3);
     }
 
-    // last_timeout = false;
-
     if (unlikely(GET_GLOBAL_STATE()->in_redqueen_reload_mode)) {
         fsync_redqueen_files();
     }
@@ -272,19 +265,12 @@ void synchronization_lock(void)
     check_auxiliary_config_buffer(GET_GLOBAL_STATE()->auxilary_buffer,
                                   &GET_GLOBAL_STATE()->shadow_config);
 
-    // set_success_auxiliary_result_buffer(GET_GLOBAL_STATE()->auxilary_buffer, 1);
     if (GET_GLOBAL_STATE()->starved == true)
         set_success_auxiliary_result_buffer(GET_GLOBAL_STATE()->auxilary_buffer, 2);
     else
         set_success_auxiliary_result_buffer(GET_GLOBAL_STATE()->auxilary_buffer, 1);
 
     GET_GLOBAL_STATE()->pt_trace_size = 0;
-    /*
-     * if(GET_GLOBAL_STATE()->dump_page){
-     *  fprintf(stderr, "DISABLING TIMEOUT DETECTION\n");
-     *  disable_timeout_detector(&(GET_GLOBAL_STATE()->timeout_detector));
-     * }
-     */
 }
 
 static void perform_reload(void)
@@ -317,8 +303,6 @@ void synchronization_lock_crash_found(void)
 
     perform_reload();
 
-    // synchronization_lock();
-
     in_fuzzing_loop = false;
 }
 
@@ -337,8 +321,6 @@ void synchronization_lock_asan_found(void)
     set_asan_auxiliary_result_buffer(GET_GLOBAL_STATE()->auxilary_buffer);
 
     perform_reload();
-
-    // synchronization_lock();
 
     in_fuzzing_loop = false;
 }
@@ -378,7 +360,6 @@ void synchronization_lock_shutdown_detected(void)
     perform_reload();
 
     in_fuzzing_loop = false;
-    // synchronization_lock();
 }
 
 void synchronization_payload_buffer_write_detected(void)
@@ -403,7 +384,6 @@ void synchronization_payload_buffer_write_detected(void)
     perform_reload();
 
     in_fuzzing_loop = false;
-    // synchronization_lock();
 }
 
 void synchronization_cow_full_detected(void)
@@ -420,21 +400,14 @@ void synchronization_cow_full_detected(void)
     perform_reload();
 
     in_fuzzing_loop = false;
-    // synchronization_lock();
 }
 
 void synchronization_disable_pt(CPUState *cpu)
 {
-    // fprintf(stderr, "==============> %s\n", __func__);
+    // nyx_trace();
     if (!in_fuzzing_loop) {
         // fprintf(stderr, "<%d-%ld>\t%s [NOT IN FUZZING LOOP]\n", getpid(), run_counter, __func__);
         set_success_auxiliary_result_buffer(GET_GLOBAL_STATE()->auxilary_buffer, 0);
-        /*
-         * qemu_backtrace();
-         * while(1){
-         *
-         * }
-         */
     }
 
     pt_disable(qemu_get_cpu(0), false);

@@ -1,7 +1,8 @@
 #pragma once
 
-#include "nyx/snapshot/block/block_cow.h"
 #include <stdint.h>
+
+#include "nyx/snapshot/block/block_cow.h"
 
 typedef struct nyx_block_s {
     cow_cache_t **cow_cache_array;

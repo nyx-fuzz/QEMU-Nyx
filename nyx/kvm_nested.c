@@ -1,12 +1,16 @@
+#include "qemu/osdep.h"
+
+#include <linux/kvm.h>
+
 #include "exec/ram_addr.h"
 #include "qemu/rcu_queue.h"
 #include "sysemu/kvm.h"
+#include "qemu-common.h"
+
 #include "nyx/kvm_nested.h"
-#include "cpu.h"
 #include "nyx/debug.h"
 #include "nyx/state/state.h"
 #include "pt.h"
-#include <linux/kvm.h>
 
 #define PPAGE_SIZE           0x1000
 #define PENTRIES             0x200
@@ -25,7 +29,8 @@ struct vmcs_hdr {
 };
 
 struct __attribute__((__packed__)) vmcs12 {
-    /* According to the Intel spec, a VMCS region must start with the
+    /*
+     * According to the Intel spec, a VMCS region must start with the
      * following two fields. Then follow implementation-specific data.
      */
     struct vmcs_hdr hdr;
@@ -228,6 +233,7 @@ void print_48_paging(uint64_t cr3)
 
     cpu_physical_memory_rw((cr3 & PAGETABLE_MASK), (uint8_t *)paging_entries_level_1,
                            PPAGE_SIZE, false);
+
     for (i1 = 0; i1 < 512; i1++) {
         if (paging_entries_level_1[i1]) {
             address_identifier_1 = ((uint64_t)i1) << PLEVEL_1_SHIFT;
@@ -265,19 +271,13 @@ void print_48_paging(uint64_t cr3)
                                                        PPAGE_SIZE, false);
                                 for (i3 = 0; i3 < PENTRIES; i3++) {
                                     if (paging_entries_level_3[i3]) {
-                                        address_identifier_3 =
-                                            (((uint64_t)i3) << PLEVEL_3_SHIFT) +
-                                            address_identifier_2;
-                                        if (CHECK_BIT(paging_entries_level_3[i3], 0))
-                                        { /* otherwise swapped out */
-                                            if (CHECK_BIT(paging_entries_level_3[i3],
-                                                          7))
-                                            {
-                                                write_address(
-                                                    address_identifier_3, 0x200000,
-                                                    (uint64_t)paging_entries_level_3[i3] &
-                                                        ((1ULL << 63) | (1ULL << 2) |
-                                                         (1ULL << 1)));
+                                        address_identifier_3 = (((uint64_t)i3) << PLEVEL_3_SHIFT) +
+                                                                                  address_identifier_2;
+                                        if (CHECK_BIT(paging_entries_level_3[i3], 0)) { /* otherwise swapped out */
+                                            if (CHECK_BIT(paging_entries_level_3[i3], 7)) {
+                                                write_address(address_identifier_3, 0x200000,
+                                                              (uint64_t)paging_entries_level_3[i3] &
+                                                              ((1ULL << 63) | (1ULL << 2) | (1ULL << 1)));
                                             } else {
                                                 cpu_physical_memory_rw(
                                                     (paging_entries_level_3[i3] &
@@ -287,21 +287,12 @@ void print_48_paging(uint64_t cr3)
                                                 for (i4 = 0; i4 < PENTRIES; i4++) {
                                                     if (paging_entries_level_4[i4]) {
                                                         address_identifier_4 =
-                                                            (((uint64_t)i4)
-                                                             << PLEVEL_4_SHIFT) +
-                                                            address_identifier_3;
-                                                        if (CHECK_BIT(
-                                                                paging_entries_level_4[i4],
-                                                                0))
-                                                        {
-                                                            write_address(
-                                                                address_identifier_4,
-                                                                0x1000,
-                                                                (uint64_t)paging_entries_level_4
-                                                                        [i4] &
-                                                                    ((1ULL << 63) |
-                                                                     (1ULL << 2) |
-                                                                     (1ULL << 1)));
+                                                            (((uint64_t)i4) << PLEVEL_4_SHIFT) + address_identifier_3;
+                                                        if (CHECK_BIT(paging_entries_level_4[i4], 0)) {
+                                                            write_address(address_identifier_4,
+                                                                          0x1000,
+                                                                          (uint64_t)paging_entries_level_4[i4] &
+                                                                          ((1ULL << 63) | (1ULL << 2) | (1ULL << 1)));
                                                         }
                                                     }
                                                 }
@@ -319,30 +310,12 @@ void print_48_paging(uint64_t cr3)
     write_address(0, 0x1000, 0);
 }
 
-/*
- * static bool change_page_permissions(uint64_t phys_addr, CPUState *cpu){
- *  RAMBlock *block;
- *
- *  //MemTxAttrs attrs = MEMTXATTRS_UNSPECIFIED;
- *
- *  QLIST_FOREACH_RCU(block, &ram_list.blocks, next) {
- *      if(!memcmp(block->idstr, "pc.ram", 6)){
- *          printf("FOUND AND MODIFIED! %lx\n",
- * mprotect((void*)(((uint64_t)block->host) + phys_addr), 0x1000, PROT_NONE)); break;
- *      }
- *  }
- *
- *  return true;
- * }
- */
-
 uint64_t get_nested_guest_rip(CPUState *cpu)
 {
     X86CPU      *cpux86 = X86_CPU(cpu);
     CPUX86State *env    = &cpux86->env;
 
     kvm_vcpu_ioctl(cpu, KVM_GET_NESTED_STATE, env->nested_state);
-
     struct vmcs12 *saved_vmcs = (struct vmcs12 *)&(env->nested_state->data);
 
     return saved_vmcs->guest_rip;
@@ -354,7 +327,6 @@ uint64_t get_nested_host_rip(CPUState *cpu)
     CPUX86State *env    = &cpux86->env;
 
     kvm_vcpu_ioctl(cpu, KVM_GET_NESTED_STATE, env->nested_state);
-
     struct vmcs12 *saved_vmcs = (struct vmcs12 *)&(env->nested_state->data);
 
     return saved_vmcs->host_rip;
@@ -366,7 +338,6 @@ uint64_t get_nested_host_cr3(CPUState *cpu)
     CPUX86State *env    = &cpux86->env;
 
     kvm_vcpu_ioctl(cpu, KVM_GET_NESTED_STATE, env->nested_state);
-
     struct vmcs12 *saved_vmcs = (struct vmcs12 *)&(env->nested_state->data);
 
     return saved_vmcs->host_cr3;
@@ -377,13 +348,8 @@ void set_nested_rip(CPUState *cpu, uint64_t rip)
     X86CPU      *cpux86 = X86_CPU(cpu);
     CPUX86State *env    = &cpux86->env;
 
-    // kvm_vcpu_ioctl(cpu, KVM_GET_NESTED_STATE, env->nested_state);
-
     struct vmcs12 *saved_vmcs = (struct vmcs12 *)&(env->nested_state->data);
-
     saved_vmcs->guest_rip = rip;
-
-    // return saved_vmcs->guest_rip;
 }
 
 void kvm_nested_get_info(CPUState *cpu)
@@ -393,56 +359,14 @@ void kvm_nested_get_info(CPUState *cpu)
 
     kvm_vcpu_ioctl(cpu, KVM_GET_NESTED_STATE, env->nested_state);
 
-    struct vmcs12 *saved_vmcs = (struct vmcs12 *)&(env->nested_state->data);
+    __attribute__((unused)) struct vmcs12 *saved_vmcs =
+        (struct vmcs12 *)&(env->nested_state->data);
+
     nyx_debug_p(NESTED_VM_PREFIX, "VMCS host_cr3:\t%lx", saved_vmcs->host_cr3);
     nyx_debug_p(NESTED_VM_PREFIX, "VMCS host_cr4:\t%lx", saved_vmcs->host_cr4);
     nyx_debug_p(NESTED_VM_PREFIX, "VMCS host_ia32_efer:\t%lx",
                 saved_vmcs->host_ia32_efer);
     nyx_debug_p(NESTED_VM_PREFIX, "VMCS host_cr0:\t%lx", saved_vmcs->host_cr0);
-
-    return;
-
-    // cpu->parent_cr3 = saved_vmcs->host_cr3+0x1000;
-    GET_GLOBAL_STATE()->parent_cr3 = saved_vmcs->host_cr3 + 0x1000;
-    fprintf(stderr, "saved_vmcs->guest_cr3: %lx %lx %lx\n", saved_vmcs->guest_cr3,
-            saved_vmcs->host_cr3, env->cr[3]);
-    pt_set_cr3(cpu, saved_vmcs->host_cr3 + 0x1000, false); /* USERSPACE */
-    // pt_set_cr3(cpu, saved_vmcs->host_cr3+0x1000, false); /* KERNELSPACE QEMU
-    // fuzzing fix...fucking kpti (https://gruss.cc/files/kaiser.pdf)!!! */
-
-    /* let's modify page permissions of our CR3 referencing PTs */
-    // change_page_permissions(cpu->parent_cr3, cpu);
-
-    if (!(saved_vmcs->host_cr0 & CR0_PG_MASK)) {
-        printf("PG disabled\n");
-    } else {
-        if (saved_vmcs->host_cr4 & CR4_PAE_MASK) {
-            if (saved_vmcs->host_ia32_efer & (1 << 10)) {
-                if (saved_vmcs->host_cr0 & CR4_LA57_MASK) {
-                    nyx_debug_p(NESTED_VM_PREFIX, "mem_info_la57");
-                    abort();
-                    // mem_info_la57(mon, env);
-                } else {
-                    nyx_debug_p(NESTED_VM_PREFIX, " ==== L1 Page Tables ====");
-                    print_48_paging(saved_vmcs->host_cr3);
-
-                    if (saved_vmcs->ept_pointer) {
-                        nyx_debug_p(NESTED_VM_PREFIX, " ==== L2 Page Tables ====");
-                        print_48_paging(saved_vmcs->ept_pointer);
-                    }
-                    // mem_info_la48(mon, env);
-                }
-            } else {
-                nyx_debug_p(NESTED_VM_PREFIX, "mem_info_pae32");
-                abort();
-                // mem_info_pae32(mon, env);
-            }
-        } else {
-            nyx_debug_p(NESTED_VM_PREFIX, "mem_info_32");
-            abort();
-            // mem_info_32(mon, env);
-        }
-    }
 }
 
 #define AREA_DESC_LEN 256
@@ -465,11 +389,8 @@ typedef struct {
 
 void print_configuration(FILE *stream, void *configuration, size_t size)
 {
-    // void print_configuration(void* configuration, size_t size){
-
     fprintf(stream, "%s: size: %lx\n", __func__, size);
     assert((size - sizeof(config_t)) % sizeof(area_t_export_t) == 0);
-
     assert(((config_t *)configuration)->magic == MAGIC_NUMBER);
 
     fprintf(stream, "%s: num_mmio_areas: %x\n", __func__,

@@ -22,11 +22,12 @@
 #ifndef MEMORY_ACCESS_H
 #define MEMORY_ACCESS_H
 
-#include "qemu/osdep.h"
+#include <linux/kvm.h>
+
 #include "sysemu/kvm_int.h"
 #include "qemu-common.h"
+
 #include "nyx/types.h"
-#include <linux/kvm.h>
 
 #define MEM_SPLIT_START 0x0C0000000
 #define MEM_SPLIT_END   0x100000000
@@ -55,6 +56,7 @@ bool remap_slots(uint64_t  addr,
                  uint64_t  shm_size,
                  bool virtual,
                  uint64_t cr3);
+
 bool remap_slot(uint64_t  addr,
                 uint32_t  slot,
                 CPUState *cpu,

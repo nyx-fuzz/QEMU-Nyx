@@ -21,9 +21,12 @@
 
 #pragma once
 
+#include <stdint.h>
+
 #define PAYLOAD_BUFFER_SIZE_64 26
 #define PAYLOAD_BUFFER_SIZE_32 20
 
+// FIXME: move to common nyx.h
 #define KAFL_MODE_64 0
 #define KAFL_MODE_32 1
 #define KAFL_MODE_16 2
@@ -97,6 +100,7 @@ bool check_bitmap_byte(uint32_t value);
  * 0f 01 c1                vmcall
  * c3                      retn
  */
+// FIXME: deprecated?
 #define PRINTK_PAYLOAD "\x0F\x01\xC1\xC3"
 
 void pt_setup_program(void *ptr);
@@ -108,7 +112,6 @@ void pt_disable_wrapper(CPUState *cpu);
 
 void hypercall_submit_address(uint64_t address);
 bool hypercall_check_tuple(uint64_t current_addr, uint64_t prev_addr);
-// void hypercall_check_in_range(uint64_t* addr);
 
 bool hypercall_check_transition(uint64_t value);
 void hypercall_submit_transition(uint32_t value);
@@ -168,6 +171,7 @@ int  handle_kafl_hypercall(struct kvm_run *run,
 
 void skip_init(void);
 
+// FIXME: move to common nyx.h
 typedef struct kafl_dump_file_s {
     uint64_t file_name_str_ptr;
     uint64_t data_ptr;

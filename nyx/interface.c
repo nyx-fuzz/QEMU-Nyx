@@ -20,6 +20,12 @@
  */
 
 #include "qemu/osdep.h"
+
+#include <sys/ioctl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <time.h>
+
 #include "chardev/char-fe.h"
 #include "exec/ram_addr.h"
 #include "hw/hw.h"
@@ -38,6 +44,7 @@
 #include "sysemu/hostmem.h"
 #include "sysemu/kvm.h"
 #include "sysemu/qtest.h"
+
 #include "nyx/interface.h"
 #include "nyx/debug.h"
 #include "nyx/helpers.h"
@@ -49,12 +56,6 @@
 #include "nyx/synchronization.h"
 #include "nyx/trace_dump.h"
 #include "pt.h"
-#include <sys/ioctl.h>
-#include <sys/mman.h>
-#include <sys/stat.h>
-
-#include <time.h>
-
 #include "redqueen.h"
 
 #define CONVERT_UINT64(x) (uint64_t)(strtoull(x, NULL, 16))
@@ -323,16 +324,6 @@ static bool verify_workdir_state(nyx_interface_state *s, Error **errp)
     }
 
     assert(asprintf(&tmp, "%s/aux_buffer_%d", workdir, id) != -1);
-    /*
-     * if (file_exits(tmp)){
-     *  nyx_debug_p(INTERFACE_PREFIX, "%s does not already exists...", tmp);
-     *  free(tmp);
-     *  return false;
-     * }
-     * else {
-     *  init_aux_buffer(tmp);
-     * }
-     */
     init_aux_buffer(tmp);
     free(tmp);
 
@@ -417,13 +408,12 @@ static void nyx_realize(DeviceState *dev, Error **errp)
     GET_GLOBAL_STATE()->worker_id = s->worker_id;
 
     if (!s->workdir || !verify_workdir_state(s, errp)) {
-        nyx_error("Error: work dir...\n");
+        nyx_error("Error: Invalid work dir...\n");
         exit(1);
     }
 
     if (!s->sharedir || !verify_sharedir_state(s, errp)) {
         nyx_error("Warning: Invalid sharedir...\n");
-        // abort();
     } else {
         sharedir_set_dir(GET_GLOBAL_STATE()->sharedir, s->sharedir);
     }
@@ -458,6 +448,7 @@ static Property nyx_interface_properties[] = {
     DEFINE_PROP_STRING("ip2_b", nyx_interface_state, ip_filter[2][1]),
     DEFINE_PROP_STRING("ip3_a", nyx_interface_state, ip_filter[3][0]),
     DEFINE_PROP_STRING("ip3_b", nyx_interface_state, ip_filter[3][1]),
+
     DEFINE_PROP_UINT32("bitmap_size",
                        nyx_interface_state,
                        bitmap_size,
@@ -466,6 +457,7 @@ static Property nyx_interface_properties[] = {
                        nyx_interface_state,
                        input_buffer_size,
                        DEFAULT_NYX_BITMAP_SIZE),
+
     DEFINE_PROP_BOOL("dump_pt_trace", nyx_interface_state, dump_pt_trace, false),
     DEFINE_PROP_BOOL("edge_cb_trace", nyx_interface_state, edge_cb_trace, false),
     DEFINE_PROP_END_OF_LIST(),
@@ -474,10 +466,8 @@ static Property nyx_interface_properties[] = {
 static void nyx_interface_class_init(ObjectClass *klass, void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
-    // PCIDeviceClass *k = PCI_DEVICE_CLASS(klass);
     dc->realize = nyx_realize;
-    // k->class_id = PCI_CLASS_MEMORY_RAM;
-    dc->props = nyx_interface_properties;
+    dc->props       = nyx_interface_properties;
     set_bit(DEVICE_CATEGORY_MISC, dc->categories);
     dc->desc = "Nyx Interface";
 }

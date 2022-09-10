@@ -1,9 +1,12 @@
-#include "nyx/debug.h"
-#include "signal.h"
+#include "qemu/osdep.h"
+
 #include <execinfo.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+
+#include "nyx/debug.h"
+#include "signal.h"
 
 #ifdef ENABLE_BACKTRACES
 #define BT_BUF_SIZE 100
@@ -19,7 +22,6 @@ void qemu_backtrace(void)
 
     char **strings = backtrace_symbols(buffer, nptrs);
     if (strings == NULL) {
-        // perror("backtrace_symbols");
         fprintf(stderr, "backtrace_symbols failed!\n");
         return;
         // exit(EXIT_FAILURE);
@@ -59,21 +61,8 @@ static void sigint_handler(int signo, siginfo_t *info, void *extra)
     exit(0);
 }
 
-/*
- * static void aexit_handler(void) {
- * fprintf(stderr, "ATTEMPT TO CALL EXIT (PID: %d)\n", getpid());
- * qemu_backtrace();
- * fprintf(stderr, "WAITING FOR GDB ATTACH (PID: %d...\n", getpid());
- * while(1){
- *  sleep(1);
- * }
- * }
- */
-
 void init_crash_handler(void)
 {
-    // qemu_backtrace();
-
     struct sigaction action;
     action.sa_flags     = SA_SIGINFO;
     action.sa_sigaction = sigsegfault_handler;
@@ -98,11 +87,6 @@ void init_crash_handler(void)
             _exit(1);
         }
     }
-    // atexit(aexit_handler);
-
-    /* test */
-    // int i = 0;
-    //((char*)i)[3] = 0;
 }
 
 void hexdump_kafl(const void *data, size_t size)

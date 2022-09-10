@@ -1,14 +1,13 @@
 #include "qemu/osdep.h"
+
 #include "qemu/main-loop.h"
 #include "sysemu/sysemu.h"
-#include "cpu.h"
 
 #include "exec/ram_addr.h"
 #include "migration/migration.h"
 #include "qemu/rcu_queue.h"
 
 #include "nyx/memory_access.h"
-
 #include "nyx/fast_vm_reload.h"
 #include "nyx/snapshot/memory/backend/nyx_debug.h"
 

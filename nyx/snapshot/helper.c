@@ -1,4 +1,5 @@
 #include "qemu/osdep.h"
+
 #include "qemu/main-loop.h"
 #include "sysemu/cpus.h"
 #include "sysemu/sysemu.h"
@@ -9,7 +10,6 @@
 #include "qemu/rcu_queue.h"
 
 #include "nyx/memory_access.h"
-
 #include "nyx/fast_vm_reload.h"
 #include "nyx/snapshot/helper.h"
 

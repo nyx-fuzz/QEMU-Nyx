@@ -1,6 +1,9 @@
-#include "mmh3.h"
+#include "qemu/osdep.h"
+
 #include <stdio.h>
 #include <stdlib.h>
+
+#include "mmh3.h"
 
 #define FORCE_INLINE inline __attribute__((always_inline))
 

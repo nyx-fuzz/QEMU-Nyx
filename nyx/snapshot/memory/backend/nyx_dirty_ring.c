@@ -1,11 +1,12 @@
+#include "qemu/osdep.h"
+
+#include <sys/ioctl.h>
+
 #include "nyx/snapshot/memory/backend/nyx_dirty_ring.h"
 #include "nyx/snapshot/helper.h"
 
 #include "sysemu/kvm.h"
 #include "sysemu/kvm_int.h"
-
-#include <linux/kvm.h>
-#include <sys/ioctl.h>
 
 #define FAST_IN_RANGE(address, start, end) (address < end && address >= start)
 
@@ -246,22 +247,23 @@ nyx_dirty_ring_t *nyx_dirty_ring_init(shadow_memory_t *shadow_memory)
         }
     }
 
-    /*
-     * for(int i = 0; i < self->kvm_region_slots_num; i++){
-     *  printf("[%d].enabled       = %d\n", i, self->kvm_region_slots[i].enabled);
-     *  printf("[%d].bitmap        = %p\n", i, self->kvm_region_slots[i].bitmap);
-     *  printf("[%d].stack         = %p\n", i, self->kvm_region_slots[i].stack);
-     *  printf("[%d].stack_ptr     = %ld\n", i, self->kvm_region_slots[i].stack_ptr);
-     *  if(self->kvm_region_slots[i].enabled){
-     *      printf("[%d].region_id     = %d\n", i, self->kvm_region_slots[i].region_id);
-     *      printf("[%d].region_offset = 0x%lx\n", i, self->kvm_region_slots[i].region_offset);
-     *  }
-     *  else{
-     *      printf("[%d].region_id     = -\n", i);
-     *      printf("[%d].region_offset = -\n", i);
-     *  }
-     * }
-     */
+#ifdef DEBUG__PRINT_DIRTY_RING
+    for (int i = 0; i < self->kvm_region_slots_num; i++) {
+        printf("[%d].enabled       = %d\n", i, self->kvm_region_slots[i].enabled);
+        printf("[%d].bitmap        = %p\n", i, self->kvm_region_slots[i].bitmap);
+        printf("[%d].stack         = %p\n", i, self->kvm_region_slots[i].stack);
+        printf("[%d].stack_ptr     = %ld\n", i, self->kvm_region_slots[i].stack_ptr);
+        if (self->kvm_region_slots[i].enabled) {
+            printf("[%d].region_id     = %d\n", i,
+                   self->kvm_region_slots[i].region_id);
+            printf("[%d].region_offset = 0x%lx\n", i,
+                   self->kvm_region_slots[i].region_offset);
+        } else {
+            printf("[%d].region_id     = -\n", i);
+            printf("[%d].region_offset = -\n", i);
+        }
+    }
+#endif
 
     dirty_ring_flush(kvm_get_vm_fd(kvm_state));
     return self;
@@ -373,22 +375,10 @@ static void save_root_pages(nyx_dirty_ring_t          *self,
     }
 }
 
-// entry = &ring->dirty_gfns[ring->reset_index & (ring->size - 1)];
-
 uint32_t nyx_snapshot_nyx_dirty_ring_restore(nyx_dirty_ring_t *self,
                                              shadow_memory_t  *shadow_memory_state,
                                              snapshot_page_blocklist_t *blocklist)
 {
-    /*
-     *  static int perf_counter = 0;
-     *
-     *  if((perf_counter%1000) == 0){
-     *      fprintf(stderr, "perf_counter -> %d\n", perf_counter); //, self->test_total, self->test);
-     *  }
-     *
-     *  perf_counter++;
-     */
-
     dirty_ring_flush_and_collect(self, shadow_memory_state, blocklist,
                                  kvm_get_vm_fd(kvm_state));
     return restore_memory(self, shadow_memory_state, blocklist);
@@ -402,10 +392,6 @@ void nyx_snapshot_nyx_dirty_ring_save_root_pages(nyx_dirty_ring_t *self,
                                  kvm_get_vm_fd(kvm_state));
     save_root_pages(self, shadow_memory_state, blocklist);
 }
-
-/* enable operation */
-
-/* restore operation */
 
 void nyx_snapshot_nyx_dirty_ring_flush(void)
 {

@@ -1,8 +1,9 @@
 #pragma once
 
-#include "nyx/snapshot/memory/shadow_memory.h"
 #include <stdbool.h>
 #include <stdint.h>
+
+#include "nyx/snapshot/memory/shadow_memory.h"
 
 typedef struct snapshot_page_blocklist_s {
     /* total number of blocklisted page frames */
@@ -20,8 +21,6 @@ typedef struct snapshot_page_blocklist_s {
     /* area of guest's physical memory (including RAM + PCI-hole) */
     uint64_t phys_area_size;
 } snapshot_page_blocklist_t;
-
-// snapshot_page_blocklist_t* snapshot_page_blocklist_init(shadow_memory_t* snapshot);
 
 void snapshot_page_blocklist_add(snapshot_page_blocklist_t *self, uint64_t phys_addr);
 

@@ -21,6 +21,8 @@
 
 #pragma once
 
+#include <libxdc.h>
+
 #include "nyx/auxiliary_buffer.h"
 #include "nyx/fast_vm_reload.h"
 #include "nyx/fast_vm_reload_sync.h"
@@ -30,8 +32,6 @@
 #include "nyx/sharedir.h"
 #include "nyx/synchronization.h"
 #include "nyx/types.h"
-
-#include <libxdc.h>
 
 #define INTEL_PT_MAX_RANGES 4
 

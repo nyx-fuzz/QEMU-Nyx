@@ -21,21 +21,19 @@
 
 #pragma once
 
-#include "qemu/osdep.h"
 #include "monitor/monitor.h"
 #include "sysemu/runstate.h"
 #include "qemu-common.h"
 
+#include "nyx/snapshot/block/nyx_block_snapshot.h"
 #include "nyx/snapshot/devices/nyx_device_state.h"
+#include "nyx/snapshot/memory/backend/nyx_dirty_ring.h"
 #include "nyx/snapshot/memory/backend/nyx_fdl.h"
 #include "nyx/snapshot/memory/block_list.h"
 #include "nyx/snapshot/memory/nyx_fdl_user.h"
 #include "nyx/snapshot/memory/shadow_memory.h"
 
-#include "nyx/snapshot/block/nyx_block_snapshot.h"
-
 #include "nyx/helpers.h"
-#include "nyx/snapshot/memory/backend/nyx_dirty_ring.h"
 
 typedef enum FastReloadMemoryMode {
     RELOAD_MEMORY_MODE_DEBUG, /* memcmp-based dirty tracing - it's super slow - only for debug purposes */
@@ -85,13 +83,14 @@ typedef struct fast_reload_s {
 
 fast_reload_t *fast_reload_new(void);
 
-/* get rid of this */
+/* TODO get rid of this */
 void fast_reload_create_to_file(fast_reload_t *self,
                                 const char    *folder,
                                 bool           lock_iothread);
 void fast_reload_create_from_file(fast_reload_t *self,
                                   const char    *folder,
                                   bool           lock_iothread);
+
 void fast_reload_create_from_file_pre_image(fast_reload_t *self,
                                             const char    *folder,
                                             bool           lock_iothread);

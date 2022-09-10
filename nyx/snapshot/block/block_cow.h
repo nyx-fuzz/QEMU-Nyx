@@ -1,12 +1,11 @@
 #pragma once
 
-#include "nyx/khash.h"
 #include <stdint.h>
 #include <sys/types.h>
 
-#include "qemu/osdep.h"
 #include "block/block.h"
 
+#include "nyx/khash.h"
 #include "nyx/redqueen_trace.h"
 
 // #define DEBUG_COW_LAYER
@@ -53,10 +52,6 @@ KHASH_MAP_INIT_INT64(COW_CACHE, uint64_t) typedef struct cow_cache_s {
 
 cow_cache_t *cow_cache_new(const char *filename);
 void         cow_cache_reset(cow_cache_t *self);
-// int coroutine_fn cow_cache_read(cow_cache_t* self, BlockBackend *blk, int64_t
-// offset,  unsigned int bytes, QEMUIOVector *qiov, BdrvRequestFlags flags); int
-// coroutine_fn cow_cache_write(cow_cache_t* self, BlockBackend *blk, int64_t offset,
-// unsigned int bytes, QEMUIOVector *qiov, BdrvRequestFlags flags);
 
 void switch_to_fuzz_mode(cow_cache_t *self);
 

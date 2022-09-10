@@ -1,6 +1,12 @@
+#include "qemu/osdep.h"
+
+#include <stdint.h>
+#include <stdio.h>
+
 #include "qemu/main-loop.h"
 #include "sysemu/kvm.h"
 #include "sysemu/sysemu.h"
+
 #include "nested_hypercalls.h"
 #include "debug.h"
 #include "interface.h"
@@ -9,19 +15,14 @@
 #include "nyx/helpers.h"
 #include "pt.h"
 #include "state/state.h"
-#include <stdint.h>
-#include <stdio.h>
 
 // #define DEBUG_NESTED_HYPERCALLS
 
 bool hypercalls_enabled = false;
-
-bool create_snapshot = false;
+bool create_snapshot    = false;
 
 uint64_t htos_cr3    = 0;
 uint64_t htos_config = 0;
-
-static bool init_state = true;
 
 int nested_once = 0;
 
@@ -32,66 +33,50 @@ void handle_hypercall_kafl_nested_config(struct kvm_run *run,
                                          uint64_t        hypercall_arg)
 {
     /* magic */
-#ifdef DEBUG_NESTED_HYPERCALLS
-    printf("============> %s\n", __func__);
-#endif
+    nyx_trace();
     uint32_t size = 0;
+
     read_physical_memory(htos_config, (uint8_t *)&size, sizeof(uint32_t), cpu);
-    fprintf(stderr, "--> %x\n", size);
     void *buffer = malloc(size);
 
     read_physical_memory(htos_config + sizeof(uint32_t), buffer, size, cpu);
-    /*
-     * hexdump_kafl(buffer, size);
-     *
-     * FILE *f = fopen("/tmp/htos_configuration", "w");
-     * fwrite(buffer, size, 1, f);
-     * fclose(f);
-     *
-     */
-    print_configuration(stderr, buffer, size);
 
+#ifdef DEBUG_NESTED_HYPERCALLS
+    hexdump_kafl(buffer, size);
+    FILE *f = fopen("/tmp/htos_configuration", "w");
+    fwrite(buffer, size, 1, f);
+    fclose(f);
+#endif
+
+    print_configuration(stderr, buffer, size);
     FILE *f = fopen("/tmp/hypertrash_configration", "w");
     print_configuration(f, buffer, size);
     fclose(f);
 
     free(buffer);
-    /*
-     * hexdump_virtual_memory()
-     * _memory(0x38d31000, 0x2000, cpu);
-     */
 }
-
-#define ANSI_COLOR_YELLOW "\x1b[33m"
-#define ANSI_COLOR_RESET  "\x1b[0m"
 
 void handle_hypercall_kafl_nested_hprintf(struct kvm_run *run,
                                           CPUState       *cpu,
                                           uint64_t        hypercall_arg)
 {
+    nyx_trace();
     char hprintf_buffer[0x1000];
-#ifdef DEBUG_NESTED_HYPERCALLS
-    printf("============> %s\n", __func__);
-#endif
+
     read_physical_memory((uint64_t)run->hypercall.args[0], (uint8_t *)hprintf_buffer,
                          0x1000, cpu);
 
-    // fprintf(stderr, ANSI_COLOR_YELLOW "%s" ANSI_COLOR_RESET, hprintf_buffer);
-
+    // fprintf(stderr, "%s\n", hprintf_buffer);
     set_hprintf_auxiliary_buffer(GET_GLOBAL_STATE()->auxilary_buffer, hprintf_buffer,
                                  strnlen(hprintf_buffer, 0x1000) + 1);
     synchronization_lock_hprintf();
-    // hexdump_kafl(hprintf_buffer, 0x200);
 }
 
 void handle_hypercall_kafl_nested_prepare(struct kvm_run *run,
                                           CPUState       *cpu,
                                           uint64_t        hypercall_arg)
 {
-    // cpu->fast_reload_snapshot = (void*)fast_reload_new();
-#ifdef DEBUG_NESTED_HYPERCALLS
-    printf("============> %s\n", __func__);
-#endif
+    nyx_trace();
     kvm_arch_get_registers(cpu);
 
     if ((uint64_t)run->hypercall.args[0]) {
@@ -103,6 +88,7 @@ void handle_hypercall_kafl_nested_prepare(struct kvm_run *run,
     } else {
         abort();
     }
+
     size_t buffer_size = (size_t)((uint64_t)run->hypercall.args[0] * sizeof(uint64_t));
     uint64_t *buffer = malloc(buffer_size);
     memset(buffer, 0x0, buffer_size);
@@ -135,12 +121,12 @@ void handle_hypercall_kafl_nested_early_release(struct kvm_run *run,
                                                 CPUState       *cpu,
                                                 uint64_t        hypercall_arg)
 {
+    nyx_trace();
+
     if (!hypercalls_enabled) {
         return;
     }
-#ifdef DEBUG_NESTED_HYPERCALLS
-    printf("============> %s\n", __func__);
-#endif
+
     bool state = GET_GLOBAL_STATE()->in_reload_mode;
     if (!state) {
         GET_GLOBAL_STATE()->in_reload_mode = true;
@@ -155,88 +141,16 @@ void handle_hypercall_kafl_nested_release(struct kvm_run *run,
                                           CPUState       *cpu,
                                           uint64_t        hypercall_arg)
 {
-    hypercalls_enabled = true;
-    static int rcount  = 0;
-#ifdef DEBUG_NESTED_HYPERCALLS
-    printf("============> %s\n", __func__);
-#endif
-
-    if ((rcount % 100) == 0) {
-        kvm_arch_get_registers(cpu);
-        // printf("TRY %s %lx %lx %lx (%d)\n", __func__, get_rip(cpu),
-        // get_nested_guest_rip(cpu), get_nested_host_rip(cpu), rcount);
-
-        //		sleep(rand()%4);
-    }
-    rcount++;
-    synchronization_disable_pt(cpu);
-    /*
-     * //vm_stop(RUN_STATE_RESTORE_VM);
-     * qemu_mutex_lock_iothread();
-     * //load_snapshot("kafl", NULL);
-     * //vm_start();
-     * fast_reload_restore(get_fast_reload_snapshot());
-     * qemu_mutex_unlock_iothread();
-     */
-    // kvm_vm_ioctl(kvm_state, KVM_SET_CLOCK, &data);
-
-    //	printf("DONE %s\n", __func__);
-
-    /*
-     * kvm_arch_get_registers(cpu);
-     * fprintf(stderr, "RELOADING DUDE %d!\n", rcount);
-     * qemu_mutex_lock_iothread();
-     * fast_reload_restore(get_fast_reload_snapshot());
-     * qemu_mutex_unlock_iothread();
-     */
-    //}
-    // sleep(1);
-
-    return;
-    // assert(false);
-    nyx_debug_p(CORE_PREFIX, "%s %d", __func__, init_state);
-    // sleep(10);
-
-    /* magic */
-
-    // X86CPU *x86_cpu = X86_CPU(cpu);
-    // CPUX86State *env = &x86_cpu->env;
-
-    if (init_state) {
-        printf("INIT STATE\n");
-        init_state = false;
-
-        // synchronization_disable_pt(cpu);
-
-		nyx_debug_p(CORE_PREFIX, "Protocol - SEND: KAFL_PROTO_RELEASE");
-    } else {
-        // if(reload_mode || reload_mode_temp){
-
-        //}
-
-        // synchronization_disable_pt(cpu);
-
-        nyx_debug_p("%s UNLOCKED", __func__);
-
-        //		printf("INTEL PT is disabled!\n");
-    }
-
-    qemu_mutex_lock_iothread();
-    // fast_reload_restore(get_fast_reload_snapshot());
-    qemu_mutex_unlock_iothread();
-
-    nyx_debug_p(CORE_PREFIX, "%s UNLOCKED 2", __func__);
-
-    // kvm_cpu_synchronize_state(cpu);
-
-    acquired = false;
+    nyx_trace();
+    // TODO not implemented - see git history for scraps
+    nyx_error("Not implemented.\n");
+    abort();
 }
 
 static inline void set_page_dump_bp_nested(CPUState *cpu, uint64_t cr3, uint64_t addr)
 {
-#ifdef DEBUG_NESTED_HYPERCALLS
-    printf("============> %s\n", __func__);
-#endif
+    nyx_trace();
+
     kvm_remove_all_breakpoints(cpu);
     kvm_insert_breakpoint(cpu, addr, 1, 1);
     kvm_update_guest_debug(cpu, 0);
@@ -249,9 +163,8 @@ void handle_hypercall_kafl_nested_acquire(struct kvm_run *run,
                                           CPUState       *cpu,
                                           uint64_t        hypercall_arg)
 {
-#ifdef DEBUG_NESTED_HYPERCALLS
-    printf("============> %s\n", __func__);
-#endif
+    nyx_trace();
+
     if (!acquired) {
         printf("TRY %s\n", __func__);
 
@@ -282,18 +195,9 @@ void handle_hypercall_kafl_nested_acquire(struct kvm_run *run,
         printf("IN FUZZING LOOP! %lx\n", env->eip);
         GET_GLOBAL_STATE()->in_fuzzing_mode = true;
         set_state_auxiliary_result_buffer(GET_GLOBAL_STATE()->auxilary_buffer, 3);
-
-        /*
-         * if(GET_GLOBAL_STATE()->protect_payload_buffer){
-         *  for(int i = 0; i < GET_GLOBAL_STATE()->nested_payload_pages_num; i++){
-         *      remap_payload_slot_protected(GET_GLOBAL_STATE()->nested_payload_pages[i], i, cpu);
-         *  }
-         * }
-         */
     }
 
     synchronization_lock();
-
     kvm_arch_get_registers(cpu);
 
     uint64_t cr3 = get_nested_host_cr3(cpu) & 0xFFFFFFFFFFFFF000ULL;
@@ -306,7 +210,6 @@ void handle_hypercall_kafl_nested_acquire(struct kvm_run *run,
     }
 
     kvm_nested_get_info(cpu);
-
     synchronization_enter_fuzzing_loop(cpu);
 
     return;

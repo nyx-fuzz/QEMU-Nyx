@@ -1,13 +1,13 @@
+#pragma once
+
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "qemu/osdep.h"
-
-#pragma once
-#include "khash.h"
 #include <libxdc.h>
+
+#include "khash.h"
 
 typedef unsigned __int128 uint128_t;
 typedef uint128_t         khint128_t;
@@ -19,13 +19,14 @@ typedef uint128_t         khint128_t;
  * @param  key   The integer [khint64_t]
  * @return       The hash value [khint_t]
  */
-#define kh_int128_hash_func(key)                     \
-    (khint32_t)((key) >> 33 ^ (key) ^ (key) << 11) ^ \
-        (((key >> 64)) >> 33 ^ ((key >> 64)) ^ ((key >> 64)) << 11)
+#define kh_int128_hash_func(key) \
+    (khint32_t)((key) >> 33 ^ (key) ^ (key) << 11) ^ (((key >> 64)) >> 33 ^ ((key >> 64)) ^ ((key >> 64)) << 11)
+
 /*! @function
  * @abstract     64-bit integer comparison function
  */
 #define kh_int128_hash_equal(a, b) ((a) == (b))
+
 /*! @function
  * @abstract     Instantiate a hash map containing 64-bit integer keys
  * @param  name  Name of the hash table [symbol]

@@ -1,10 +1,12 @@
-
 #include "qemu/osdep.h"
-#include "qemu/main-loop.h"
-#include "sysemu/sysemu.h"
-#include "nyx/snapshot/devices/vm_change_state_handlers.h"
-#include "cpu.h"
+
 #include <assert.h>
+
+#include "qemu/main-loop.h"
+#include "sysemu/runstate.h"
+#include "sysemu/sysemu.h"
+
+#include "nyx/snapshot/devices/vm_change_state_handlers.h"
 
 VMChangeStateHandler *change_kvm_clock_handler = NULL;
 VMChangeStateHandler *change_kvm_pit_handler   = NULL;
@@ -26,7 +28,8 @@ void call_fast_change_handlers(void)
     change_cpu_handler(change_cpu_opaque, 1, RUN_STATE_RUNNING);
 
     return;
-    /* check if necessary */
+
+    /* TODO check if necessary */
     if (change_ide_core_handler) {
         for (uint8_t i = 0; i < change_ide_core_opaque_num; i++) {
             change_ide_core_handler(change_ide_core_opaque[i], 1, RUN_STATE_RUNNING);

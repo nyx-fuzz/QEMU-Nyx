@@ -1,8 +1,9 @@
 #pragma once
 
-#include "nyx/snapshot/devices/state_reallocation.h"
 #include <stdbool.h>
 #include <stdint.h>
+
+#include "nyx/snapshot/devices/state_reallocation.h"
 
 typedef struct nyx_device_state_s {
     state_reallocation_t *qemu_state;
