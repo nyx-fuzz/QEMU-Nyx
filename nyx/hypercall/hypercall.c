@@ -607,7 +607,7 @@ static void handle_hypercall_kafl_kasan(struct kvm_run *run, CPUState *cpu, uint
 		} else{
 			nyx_debug_p(CORE_PREFIX, "KASAN detected during initialization of stage 1 or stage 2 loader");
 			//hypercall_snd_char(KAFL_PROTO_KASAN);
-			nyx_debug_p("Protocol - SEND: KAFL_PROTO_KASAN");
+			nyx_debug_p(CORE_PREFIX, "Protocol - SEND: KAFL_PROTO_KASAN");
 
 		}
 	}

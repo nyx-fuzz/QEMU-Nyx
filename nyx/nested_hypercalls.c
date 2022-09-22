@@ -178,7 +178,7 @@ void handle_hypercall_kafl_nested_release(struct kvm_run *run, CPUState *cpu, ui
 	
 	return;
 	//assert(false);
-	nyx_debug_p("%s %d", __func__, init_state);
+	nyx_debug_p(CORE_PREFIX, "%s %d", __func__, init_state);
 	//sleep(10);
 
 	/* magic */
@@ -193,7 +193,7 @@ void handle_hypercall_kafl_nested_release(struct kvm_run *run, CPUState *cpu, ui
 
 		//synchronization_disable_pt(cpu);
 
-		nyx_debug_p("Protocol - SEND: KAFL_PROTO_RELEASE");
+		nyx_debug_p(CORE_PREFIX, "Protocol - SEND: KAFL_PROTO_RELEASE");
 
 	} else {
 		
@@ -206,7 +206,7 @@ void handle_hypercall_kafl_nested_release(struct kvm_run *run, CPUState *cpu, ui
 		//synchronization_disable_pt(cpu);
 
 
-		nyx_debug_p("%s UNLOCKED", __func__);
+		nyx_debug_p(CORE_PREFIX, "%s UNLOCKED", __func__);
 
 		//		printf("INTEL PT is disabled!\n");
 
@@ -217,7 +217,7 @@ void handle_hypercall_kafl_nested_release(struct kvm_run *run, CPUState *cpu, ui
 		//fast_reload_restore(get_fast_reload_snapshot());
 		qemu_mutex_unlock_iothread();
 
-		nyx_debug_p("%s UNLOCKED 2", __func__);
+		nyx_debug_p(CORE_PREFIX, "%s UNLOCKED 2", __func__);
 
 
 		//kvm_cpu_synchronize_state(cpu);
