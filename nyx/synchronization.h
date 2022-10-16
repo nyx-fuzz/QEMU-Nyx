@@ -6,19 +6,19 @@
 #include <sys/time.h>
 
 typedef struct timeout_detector_s {
-	int kvm_tid;
-	volatile bool detection_enabled; 
+    int           kvm_tid;
+    volatile bool detection_enabled;
 
-	struct timeval config;
-	struct itimerval alarm;
+    struct timeval   config;
+    struct itimerval alarm;
 } timeout_detector_t;
 
-void init_timeout_detector(timeout_detector_t* timeout_detector);
-void install_timeout_detector(timeout_detector_t* timeout_detector);
-void reset_timeout_detector(timeout_detector_t* timeout_detector);
-void arm_sigprof_timer(timeout_detector_t* timeout_detector);
-bool disarm_sigprof_timer(timeout_detector_t* timeout_detector);
-void update_itimer(timeout_detector_t* timeout_detector, uint8_t sec, uint32_t usec);
+void init_timeout_detector(timeout_detector_t *timeout_detector);
+void install_timeout_detector(timeout_detector_t *timeout_detector);
+void reset_timeout_detector(timeout_detector_t *timeout_detector);
+void arm_sigprof_timer(timeout_detector_t *timeout_detector);
+bool disarm_sigprof_timer(timeout_detector_t *timeout_detector);
+void update_itimer(timeout_detector_t *timeout_detector, uint8_t sec, uint32_t usec);
 
 void block_signals(void);
 void unblock_signals(void);

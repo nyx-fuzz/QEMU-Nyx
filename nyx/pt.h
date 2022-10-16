@@ -38,4 +38,3 @@ void pt_handle_overflow(CPUState *cpu);
 void pt_dump(CPUState *cpu, int bytes);
 
 #endif
-
