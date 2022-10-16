@@ -22,6 +22,8 @@
  * THE SOFTWARE.
  */
 
+// clang-format off
+
 #include "qemu/osdep.h"
 #include "qemu-common.h"
 #include "qemu/units.h"
@@ -133,6 +135,7 @@ int main(int argc, char **argv)
 #include "qemu/guest-random.h"
 
 #ifdef QEMU_NYX
+// clang-format on
 #include "nyx/debug.h"
 #include "nyx/pt.h"
 #include "nyx/hypercall/hypercall.h"
@@ -140,6 +143,7 @@ int main(int argc, char **argv)
 #include "nyx/fast_vm_reload.h"
 #include "nyx/state/state.h"
 #include "nyx/fast_vm_reload_sync.h"
+// clang-format off
 #endif
 
 #define MAX_VIRTIO_CONSOLES 1
@@ -251,6 +255,7 @@ static struct {
 };
 
 #ifdef QEMU_NYX
+// clang-format on
 static QemuOptsList qemu_fast_vm_reloads_opts = {
     .name = "fast_vm_reload-opts",
     .implied_opt_name = "order",
@@ -273,6 +278,7 @@ static QemuOptsList qemu_fast_vm_reloads_opts = {
         {  }
     },
 };
+// clang-format off
 #endif
 
 
@@ -1474,7 +1480,9 @@ void vm_state_notify(int running, RunState state)
 }
 
 #ifdef QEMU_NYX
+// clang-format on
 char* loadvm_global = NULL;
+// clang-format off
 #endif
 
 static ShutdownCause reset_requested;
@@ -1652,11 +1660,13 @@ void qemu_system_guest_panicked(GuestPanicInformation *info)
 void qemu_system_reset_request(ShutdownCause reason)
 {
 #ifdef QEMU_NYX
+// clang-format on
    if(GET_GLOBAL_STATE()->in_fuzzing_mode){
         nyx_trace();
         GET_GLOBAL_STATE()->shutdown_requested = true;
         return;
     }
+// clang-format off
 #endif
     if (no_reboot && reason != SHUTDOWN_CAUSE_SUBSYSTEM_RESET) {
         shutdown_requested = reason;
@@ -1862,9 +1872,11 @@ static bool main_loop_should_exit(void)
     }
     if (qemu_vmstop_requested(&r)) {
 #ifdef QEMU_NYX
+// clang-format on
         if(check_if_relood_request_exists_post(GET_GLOBAL_STATE()->reload_state)){
             return false;
         }
+// clang-format off
 #endif
         vm_stop(r);
     }
@@ -1890,8 +1902,10 @@ static void main_loop(void)
 static void version(void)
 {
 #ifdef QEMU_NYX
+// clang-format on
     printf("QEMU-PT emulator version " QEMU_VERSION QEMU_PKGVERSION "  (kAFL)\n"
            QEMU_COPYRIGHT "\n");
+// clang-format off
 #else
     printf("QEMU emulator version " QEMU_FULL_VERSION "\n"
            QEMU_COPYRIGHT "\n");
@@ -2794,6 +2808,7 @@ static bool object_create_delayed(const char *type, QemuOpts *opts)
 }
 
 #ifdef QEMU_NYX
+// clang-format on
 static bool verifiy_snapshot_folder(const char* folder){
     struct stat s;
 
@@ -2812,6 +2827,7 @@ static bool verifiy_snapshot_folder(const char* folder){
     error_report("fast_vm_reload: path does not exist");
     exit(1);
 }
+// clang-format off
 #endif
 
 static void set_memory_options(uint64_t *ram_slots, ram_addr_t *maxram_size,
@@ -2927,9 +2943,11 @@ int main(int argc, char **argv, char **envp)
 {
 
 #ifdef QEMU_NYX
+// clang-format on
     bool fast_vm_reload = false;
     state_init_global();
     const char *fast_vm_reload_opt_arg = NULL;
+// clang-format off
 #endif
 
     int i;
@@ -2993,7 +3011,9 @@ int main(int argc, char **argv, char **envp)
     qemu_add_opts(&qemu_nic_opts);
     qemu_add_opts(&qemu_net_opts);
 #ifdef QEMU_NYX
+// clang-format on
     qemu_add_opts(&qemu_fast_vm_reloads_opts);
+// clang-format off
 #endif
     qemu_add_opts(&qemu_rtc_opts);
     qemu_add_opts(&qemu_global_opts);
@@ -3083,6 +3103,7 @@ int main(int argc, char **argv, char **envp)
             }
             switch(popt->index) {
 #ifdef QEMU_NYX
+// clang-format on
             case QEMU_OPTION_fast_vm_reload:
                 opts = qemu_opts_parse_noisily(qemu_find_opts("fast_vm_reload-opts"),
                                                optarg, true);
@@ -3092,6 +3113,7 @@ int main(int argc, char **argv, char **envp)
                 fast_vm_reload_opt_arg = optarg;
                 fast_vm_reload = true;
                 break;
+// clang-format off
 #endif
             case QEMU_OPTION_cpu:
                 /* hw initialization will check this */
@@ -3549,7 +3571,9 @@ int main(int argc, char **argv, char **envp)
             case QEMU_OPTION_loadvm:
                 loadvm = optarg;
 #ifdef QEMU_NYX
+// clang-format on
                 loadvm_global = (char*)optarg;
+// clang-format off
 #endif
                 break;
             case QEMU_OPTION_full_screen:
@@ -3991,7 +4015,9 @@ int main(int argc, char **argv, char **envp)
     }
 
 #ifdef QEMU_NYX
+// clang-format on
     block_signals();
+// clang-format off
 #endif
 
 
@@ -4564,6 +4590,7 @@ int main(int argc, char **argv, char **envp)
     register_global_state();
 
 #ifdef QEMU_NYX
+// clang-format on
     fast_reload_init(GET_GLOBAL_STATE()->fast_reload_snapshot);
 
     if (fast_vm_reload){
@@ -4662,6 +4689,7 @@ int main(int argc, char **argv, char **envp)
             }
         }
     }
+// clang-format off
 #endif
 
     if (loadvm) {
