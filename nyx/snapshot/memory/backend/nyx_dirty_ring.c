@@ -1,10 +1,13 @@
+
+#include "qemu/osdep.h"
+#include <sys/ioctl.h>
+
 #include "nyx/snapshot/memory/backend/nyx_dirty_ring.h"
 #include "nyx/snapshot/helper.h"
 
 #include "sysemu/kvm.h"
 #include "sysemu/kvm_int.h"
 
-#include <sys/ioctl.h>
 #include <linux/kvm.h>
 
 #define FAST_IN_RANGE(address, start, end) (address < end && address >= start)
@@ -221,7 +224,7 @@ nyx_dirty_ring_t* nyx_dirty_ring_init(shadow_memory_t* shadow_memory){
 		}
 	}
 
-	/*
+#ifdef DEBUG__PRINT_DIRTY_RING
 	for(int i = 0; i < self->kvm_region_slots_num; i++){
 		printf("[%d].enabled       = %d\n", i, self->kvm_region_slots[i].enabled);
 		printf("[%d].bitmap        = %p\n", i, self->kvm_region_slots[i].bitmap);
@@ -236,7 +239,7 @@ nyx_dirty_ring_t* nyx_dirty_ring_init(shadow_memory_t* shadow_memory){
 			printf("[%d].region_offset = -\n", i);
 		}
 	}
-	*/
+#endif
 
 	dirty_ring_flush(kvm_get_vm_fd(kvm_state));
   return self;
@@ -318,20 +321,7 @@ static void save_root_pages(nyx_dirty_ring_t* self, shadow_memory_t* shadow_memo
 	}
 }
 
-//entry = &ring->dirty_gfns[ring->reset_index & (ring->size - 1)];
-
-
 uint32_t nyx_snapshot_nyx_dirty_ring_restore(nyx_dirty_ring_t* self, shadow_memory_t* shadow_memory_state, snapshot_page_blocklist_t* blocklist){
-/*
-	static int perf_counter = 0;
-
-	if((perf_counter%1000) == 0){
-		fprintf(stderr, "perf_counter -> %d\n", perf_counter); //, self->test_total, self->test);
-	}
-
-	perf_counter++;
-*/
-
   	dirty_ring_flush_and_collect(self, shadow_memory_state, blocklist, kvm_get_vm_fd(kvm_state));
 	return restore_memory(self, shadow_memory_state, blocklist);
 }
@@ -341,11 +331,6 @@ void nyx_snapshot_nyx_dirty_ring_save_root_pages(nyx_dirty_ring_t* self, shadow_
   dirty_ring_flush_and_collect(self, shadow_memory_state, blocklist, kvm_get_vm_fd(kvm_state));
 	save_root_pages(self, shadow_memory_state, blocklist);
 }
-
-/* enable operation */
-
-/* restore operation */
-
 
 void nyx_snapshot_nyx_dirty_ring_flush(void){
 		dirty_ring_flush(kvm_get_vm_fd(kvm_state));

@@ -1,6 +1,5 @@
 #include "qemu/osdep.h"
 #include "sysemu/sysemu.h"
-#include "cpu.h"
 #include "qemu/main-loop.h"
 
 #include "exec/ram_addr.h"

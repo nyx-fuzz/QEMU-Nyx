@@ -1,11 +1,14 @@
+#include "qemu/osdep.h"
+#include <linux/kvm.h>
+#include "sysemu/kvm.h"
+
+#include "qemu-common.h"
 #include "nyx/kvm_nested.h"
 #include "cpu.h"
-#include <linux/kvm.h>
 #include "nyx/debug.h"
 #include "exec/ram_addr.h"
 #include "qemu/rcu_queue.h"
 #include "nyx/state/state.h"
-#include "sysemu/kvm.h"
 #include "pt.h"
 
 #define PPAGE_SIZE 0x1000
@@ -284,30 +287,12 @@ void print_48_paging(uint64_t cr3){
 	write_address(0, 0x1000, 0);
 }
 
-/*
-static bool change_page_permissions(uint64_t phys_addr, CPUState *cpu){
-    RAMBlock *block;
-
-    //MemTxAttrs attrs = MEMTXATTRS_UNSPECIFIED;
-
-    QLIST_FOREACH_RCU(block, &ram_list.blocks, next) {
-        if(!memcmp(block->idstr, "pc.ram", 6)){
-        	printf("FOUND AND MODIFIED! %lx\n", mprotect((void*)(((uint64_t)block->host) + phys_addr), 0x1000, PROT_NONE));
-            break;
-        }
-    }
-    
-    return true;
-}
-*/
-
 uint64_t get_nested_guest_rip(CPUState *cpu){
 
 	X86CPU *cpux86 = X86_CPU(cpu);
 	CPUX86State *env = &cpux86->env;
 
 	kvm_vcpu_ioctl(cpu, KVM_GET_NESTED_STATE, env->nested_state);
-	
 	struct vmcs12* saved_vmcs = (struct vmcs12*)&(env->nested_state->data);
 
 	return saved_vmcs->guest_rip;
@@ -319,7 +304,6 @@ uint64_t get_nested_host_rip(CPUState *cpu){
 	CPUX86State *env = &cpux86->env;
 
 	kvm_vcpu_ioctl(cpu, KVM_GET_NESTED_STATE, env->nested_state);
-	
 	struct vmcs12* saved_vmcs = (struct vmcs12*)&(env->nested_state->data);
 
 	return saved_vmcs->host_rip;
@@ -331,7 +315,6 @@ uint64_t get_nested_host_cr3(CPUState *cpu){
 	CPUX86State *env = &cpux86->env;
 
 	kvm_vcpu_ioctl(cpu, KVM_GET_NESTED_STATE, env->nested_state);
-	
 	struct vmcs12* saved_vmcs = (struct vmcs12*)&(env->nested_state->data);
 
 	return saved_vmcs->host_cr3;
@@ -342,13 +325,9 @@ void set_nested_rip(CPUState *cpu, uint64_t rip){
 	X86CPU *cpux86 = X86_CPU(cpu);
 	CPUX86State *env = &cpux86->env;
 
-	//kvm_vcpu_ioctl(cpu, KVM_GET_NESTED_STATE, env->nested_state);
-	
 	struct vmcs12* saved_vmcs = (struct vmcs12*)&(env->nested_state->data);
 
 	saved_vmcs->guest_rip = rip;
-
-	//return saved_vmcs->guest_rip;
 }
 
 void kvm_nested_get_info(CPUState *cpu){
@@ -358,57 +337,13 @@ void kvm_nested_get_info(CPUState *cpu){
 
 	kvm_vcpu_ioctl(cpu, KVM_GET_NESTED_STATE, env->nested_state);
 	
-	struct vmcs12* saved_vmcs = (struct vmcs12*)&(env->nested_state->data);
+	__attribute__((unused)) struct vmcs12* saved_vmcs = (struct vmcs12*)&(env->nested_state->data);
 	nyx_debug_p(NESTED_VM_PREFIX, "VMCS host_cr3:\t%lx", saved_vmcs->host_cr3);
 	nyx_debug_p(NESTED_VM_PREFIX, "VMCS host_cr4:\t%lx", saved_vmcs->host_cr4);
 	nyx_debug_p(NESTED_VM_PREFIX, "VMCS host_ia32_efer:\t%lx", saved_vmcs->host_ia32_efer);
 	nyx_debug_p(NESTED_VM_PREFIX, "VMCS host_cr0:\t%lx", saved_vmcs->host_cr0);
 
 	return;
-
-	//cpu->parent_cr3 = saved_vmcs->host_cr3+0x1000;
-	GET_GLOBAL_STATE()->parent_cr3 = saved_vmcs->host_cr3+0x1000;
-	fprintf(stderr, "saved_vmcs->guest_cr3: %lx %lx %lx\n", saved_vmcs->guest_cr3, saved_vmcs->host_cr3, env->cr[3]);
-	pt_set_cr3(cpu, saved_vmcs->host_cr3+0x1000, false); /* USERSPACE */
-	//pt_set_cr3(cpu, saved_vmcs->host_cr3+0x1000, false); /* KERNELSPACE QEMU fuzzing fix...fucking kpti (https://gruss.cc/files/kaiser.pdf)!!! */
-
-	/* let's modify page permissions of our CR3 referencing PTs */
-	//change_page_permissions(cpu->parent_cr3, cpu);
-
-
-    if (!(saved_vmcs->host_cr0 & CR0_PG_MASK)) {
-        printf("PG disabled\n");
-    }
-    else{
-    	if (saved_vmcs->host_cr4 & CR4_PAE_MASK) {
-	        if (saved_vmcs->host_ia32_efer & (1 << 10)) {
-	            if (saved_vmcs->host_cr0 & CR4_LA57_MASK) {
-	            	nyx_debug_p(NESTED_VM_PREFIX, "mem_info_la57");
-	            	abort();
-	                //mem_info_la57(mon, env);
-	            } else {
-	            	nyx_debug_p(NESTED_VM_PREFIX, " ==== L1 Page Tables ====");
-	            	print_48_paging(saved_vmcs->host_cr3);
-
-	            	if(saved_vmcs->ept_pointer){
-		            	nyx_debug_p(NESTED_VM_PREFIX, " ==== L2 Page Tables ====");
-		            	print_48_paging(saved_vmcs->ept_pointer);
-		            }
-	                //mem_info_la48(mon, env);
-	            }
-	        } 
-	        else{
-	        	nyx_debug_p(NESTED_VM_PREFIX, "mem_info_pae32");
-	        	abort();
-	            //mem_info_pae32(mon, env);
-	        }
-	    } 
-	    else {
-	    	nyx_debug_p(NESTED_VM_PREFIX, "mem_info_32");
-	    	abort();
-	        //mem_info_32(mon, env);
-	    }
-    }
 }
 
 #define AREA_DESC_LEN                   256
@@ -430,8 +365,6 @@ typedef struct {
 }config_t;
 
 void print_configuration(FILE *stream, void* configuration, size_t size){
-//void print_configuration(void* configuration, size_t size){
-
 	fprintf(stream, "%s: size: %lx\n", __func__, size);
 	assert((size-sizeof(config_t))%sizeof(area_t_export_t) == 0);
 

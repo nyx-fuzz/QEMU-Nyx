@@ -1,10 +1,8 @@
 #include "qemu/osdep.h"
 #include "sysemu/sysemu.h"
-#include "target/i386/cpu.h"
 #include "qemu/main-loop.h"
 
 #include "exec/ram_addr.h"
-#include "qemu/rcu_queue.h"
 #include "migration/migration.h"
 
 #include "nyx/memory_access.h"
@@ -32,7 +30,6 @@ nyx_fdl_user_t* nyx_fdl_user_init(shadow_memory_t* shadow_memory_state){
         self->entry[i].stack = malloc(DIRTY_STACK_SIZE(shadow_memory_state->ram_regions[i].size));
         self->entry[i].bitmap = malloc(BITMAP_SIZE(shadow_memory_state->ram_regions[i].size));
     }
-    //printf("%s -> %p\n", __func__, self);
     return self;
 }
 
@@ -132,8 +129,6 @@ void nyx_fdl_user_set(nyx_fdl_user_t* self, shadow_memory_t* shadow_memory_state
 				break;
 		}
 
-	    //ram_area = FAST_IN_RANGE(addr, fdl_data2.entry[0].base, fdl_data2.entry[0].base+(fdl_data2.entry[0].size-1)) ? 0 : ram_area;
-
 		if(ram_area == 0xff){
 			printf("ERROR: %s %lx [%d]\n", __func__, addr, ram_area);
             abort();
@@ -149,7 +144,7 @@ void nyx_fdl_user_set(nyx_fdl_user_t* self, shadow_memory_t* shadow_memory_state
 
             assert(self->entry[ram_area].bitmap);
 
-            /* todo -> better handling of nyx_fdl_state */
+            /* TODO -> better handling of nyx_fdl_state */
             if(!test_bit(pfn, (const unsigned long*)self->entry[ram_area].bitmap)){
                 set_bit(pfn, (unsigned long*)self->entry[ram_area].bitmap);
 
@@ -185,7 +180,6 @@ void nyx_snapshot_nyx_fdl_user_save_root_pages(nyx_fdl_user_t* self, shadow_memo
 #ifdef DEBUG_USER_FDL
             printf("%s -> %p <-- %p\n", __func__, incremental_addr, host_addr);
 #endif
-            //printf("%s -> %p <-- %p\n", __func__, incremental_addr, host_addr);
 
           	clear_bit(entry_offset_addr>>12, (void*)self->entry[i].bitmap);
             shadow_memory_track_dirty_root_pages(shadow_memory_state, entry_offset_addr, i);

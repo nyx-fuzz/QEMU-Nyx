@@ -20,6 +20,7 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #pragma once
+
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -49,7 +50,7 @@ enum nyx_result_codes {
 };
 
 typedef struct auxilary_buffer_header_s{
-  uint64_t magic;   /* 0x54502d554d4551 */
+  uint64_t magic;
   uint16_t version; 
   uint16_t hash; 
   /* more to come */

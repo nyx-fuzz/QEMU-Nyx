@@ -1,12 +1,15 @@
-#include "sharedir.h"
+#include "qemu/osdep.h"
+
 #include <assert.h>
-#include <stdio.h>
 #include <dirent.h>
 #include <stdbool.h>
-#include <sys/types.h>
+#include <stdio.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 #include <unistd.h>
+
 #include "nyx/debug.h"
+#include "sharedir.h"
 
 //#define SHAREDIR_DEBUG
 
@@ -98,7 +101,6 @@ static sharedir_file_t* sharedir_get_object(sharedir_t* self, const char* file){
       obj->mod_time = get_file_mod_time(obj->path);
 
       /* put into hash_list */
-
       char* new_file = NULL;
       assert(asprintf(&new_file, "%s", file) != -1);
       k = kh_put(SHAREDIR_LOOKUP, self->lookup, new_file, &ret);

@@ -1,16 +1,14 @@
-
 #include "qemu/osdep.h"
-#include "sysemu/sysemu.h"
-#include "cpu.h"
-#include "qemu/main-loop.h"
 
-#include "sysemu/block-backend.h"
 #include "block/qapi.h"
-#include "sysemu/runstate.h"
 #include "migration/vmstate.h"
+#include "qemu/main-loop.h"
+#include "sysemu/block-backend.h"
+#include "sysemu/runstate.h"
+#include "sysemu/sysemu.h"
 
-#include "nyx/snapshot/block/nyx_block_snapshot.h"
 #include "nyx/debug.h"
+#include "nyx/snapshot/block/nyx_block_snapshot.h"
 #include "nyx/state/state.h"
 
 typedef struct fast_reload_cow_entry_s{
@@ -109,39 +107,6 @@ nyx_block_t* nyx_block_snapshot_init(void){
     return self;
 }
 
-/*
-
-
-static void fast_reload_serialize_cow(fast_reload_t* self, const char* folder){
-    fast_reload_cow_entry_t entry;
-
-    char* tmp1;
-    char* tmp2;
-
-    assert(asprintf(&tmp1, "%s/fs_cache.meta", folder) != -1);
-    assert(asprintf(&tmp2, "%s/fs_drv", folder) != -1);
-
-
-    FILE* f = fopen (tmp1, "w");
-
-    fwrite(&(self->cow_cache_array_size), sizeof(uint32_t), 1, f);
-
-    for(uint32_t i = 0; i < self->cow_cache_array_size; i++){
-        entry.id = i;
-        printf("%d -> %s\n", i, (const char*)self->cow_cache_array[i]->filename);
-        strncpy((char*)&entry.idstr, (const char*)self->cow_cache_array[i]->filename, 256);
-        fwrite(&entry, sizeof(fast_reload_cow_entry_t), 1, f);
-
-        dump_primary_buffer(self->cow_cache_array[i], tmp2);
-    }
-    fclose(f);
-
-    free(tmp1);
-    free(tmp2);
-}
-
-*/
-
 void nyx_block_snapshot_flush(nyx_block_t* self){
     GET_GLOBAL_STATE()->cow_cache_full = false;
 }
@@ -181,7 +146,6 @@ void nyx_block_snapshot_serialize(nyx_block_t* self, const char* snapshot_folder
 
     for(uint32_t i = 0; i < self->cow_cache_array_size; i++){
         entry.id = i;
-        //printf("%d -> %s\n", i, (const char*)self->cow_cache_array[i]->filename);
         strncpy((char*)&entry.idstr, (const char*)self->cow_cache_array[i]->filename, 255);
         fwrite(&entry, sizeof(fast_reload_cow_entry_t), 1, f);
 

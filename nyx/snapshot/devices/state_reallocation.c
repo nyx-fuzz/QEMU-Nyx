@@ -19,21 +19,22 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 
 */
 #include "qemu/osdep.h"
-#include "sysemu/sysemu.h"
-#include "target/i386/cpu.h"
-#include "qemu/main-loop.h"
 
-#include "sysemu/kvm_int.h"
-#include "migration/vmstate.h"
+#include "qemu/main-loop.h"
+#include "sysemu/sysemu.h"
+
+#include "migration/qemu-file.h"
 #include "migration/register.h"
 #include "migration/savevm.h"
-#include "migration/qemu-file.h"
+#include "migration/vmstate.h"
+#include "sysemu/kvm_int.h"
+
 #include "nyx/debug.h"
-#include "nyx/snapshot/devices/state_reallocation.h"
 #include "nyx/snapshot/devices/nyx_device_state.h"
+#include "nyx/snapshot/devices/state_reallocation.h"
 
+//#define VERBOSE_DEBUG
 
-//uint32_t fpos = 0;
 #define QEMU_VM_SUBSECTION           0x05
 
 typedef struct CompatEntry {
@@ -85,19 +86,12 @@ static void fast_timer_get(void* data, size_t size, void* opaque)
 {
     QEMUTimer *ts = (QEMUTimer*) opaque;
     uint64_t expire_time = *((uint64_t*)data); 
-    //fprintf(stderr, "%s: VALUE IS: %lx\n", __func__, expire_time);
-
     if (expire_time != -1) {
         timer_mod_ns(ts, expire_time);
     } else {
         timer_del(ts);
     }
-    //fprintf(stderr, "%s: DONE!\n", __func__);
-
 }
-
-
-
 
 static SaveStateEntry *fdl_find_se(const char *idstr, int instance_id)
 {
@@ -107,7 +101,6 @@ static SaveStateEntry *fdl_find_se(const char *idstr, int instance_id)
         if (!strcmp(se->idstr, idstr) &&
             (instance_id == se->instance_id ||
              instance_id == se->alias_id)){
-             //printf("FOUND 1\n");
             return se;
         }
         /* Migrating from an older version? */
@@ -115,12 +108,10 @@ static SaveStateEntry *fdl_find_se(const char *idstr, int instance_id)
             if (!strcmp(se->compat->idstr, idstr) &&
                 (instance_id == se->compat->instance_id ||
                  instance_id == se->alias_id)){
-                //printf("FOUND 2\n");
                 return se;
             }
         }
     }
-    printf("NOPE\n");
     return NULL;
 }
 
@@ -131,9 +122,7 @@ static inline VMStateDescription* fdl_vmstate_get_subsection(VMStateDescription 
 {
     while (sub && *sub && (*sub)->needed) {
         if (strcmp(idstr, (*sub)->name) == 0) {
-            //printf("SUB %p\n", &sub);
-            //sub_vmsd_ptr = &sub;
-            return *sub; /* don't dereference...return ptr */
+            return *sub;
         }
         sub++;
     }
@@ -150,9 +139,7 @@ static int fdl_vmstate_subsection_load(state_reallocation_t* self, QEMUFile *f, 
 
         len = qemu_peek_byte(f, 1);
         if (len < strlen(vmsd->name) + 1) {
-            /* subsection name has be be "section_name/a" */
-        //fprintf(stderr, "%s: exit\n", __func__);
-
+            /* subsection name has to be "section_name/a" */
             return 0;
         }
         size = qemu_peek_buffer(f, (uint8_t **)&idstr_ret, len, 2);
@@ -164,7 +151,6 @@ static int fdl_vmstate_subsection_load(state_reallocation_t* self, QEMUFile *f, 
 
         if (strncmp(vmsd->name, idstr, strlen(vmsd->name)) != 0) {
             /* it doesn't have a valid subsection name */
-            //fprintf(stderr, "%s: exit\n", __func__);
             return 0;
         }
         sub_vmsd = fdl_vmstate_get_subsection((VMStateDescription **)vmsd->subsections, idstr);
@@ -199,8 +185,6 @@ static void add_post_fptr(state_reallocation_t* self, void* fptr, uint32_t versi
     if(!self){
         return;
     }
-    //printf("%s: %s\n", __func__, name);
-
 
     if(!strcmp("I440FX", name)){
         return;
@@ -271,7 +255,7 @@ static void add_post_fptr(state_reallocation_t* self, void* fptr, uint32_t versi
         self->fast_state_fptr_pos++;
 
         if(self->fast_state_fptr_pos >= self->fast_state_fptr_size){
-            printf("RESIZE %s\n", __func__);
+            nyx_debug("RESIZE %s\n", __func__);
             self->fast_state_fptr_size += REALLOC_SIZE;
             self->fptr = realloc(self->fptr, self->fast_state_fptr_size * sizeof(void*));
             self->opaque = realloc(self->opaque, self->fast_state_fptr_size * sizeof(void*));
@@ -482,36 +466,26 @@ static inline int get_handler(state_reallocation_t* self, QEMUFile* f, void* cur
         add_mblock(self, vmsd_name, field->name, field->offset, (uint64_t)curr_elem, 8);
     }
     else if(!strcmp(field->info->name, "CPU_Double_U")){
-        //fprintf(stderr, "type: %s (size: %x)\n", field->info->name, size);
         assert(0);
         add_mblock(self, vmsd_name, field->name, field->offset, (uint64_t)curr_elem, 8);
     }
     else if(!strcmp(field->info->name, "buffer")){
-        //fprintf(stderr, "type: %s (size: %x)\n", field->info->name, size);
         add_mblock(self, vmsd_name, field->name, field->offset, (uint64_t)curr_elem, size);
     }
     else if(!strcmp(field->info->name, "unused_buffer")){
-        //fprintf(stderr, "type: %s (size: %x)\n", field->info->name, size);
         /* save nothing */
     }
     else if(!strcmp(field->info->name, "tmp")){
-        //fprintf(stderr, "type: %s (size: %x)\n", field->info->name, size);
         add_mblock(self, vmsd_name, field->name, field->offset, (uint64_t)curr_elem, size);
-
         /* save nothing */
     }
     else if(!strcmp(field->info->name, "bitmap")){
-        //fprintf(stderr, "type: %s (size: %x)\n", field->info->name, size);
         assert(0);
     }
     else if(!strcmp(field->info->name, "qtailq")){
-        //fprintf(stderr, "type: %s (size: %x)\n", field->info->name, size);
         assert(0);
     }
     else if(!strcmp(field->info->name, "timer")){
-        //fprintf(stderr, "type: %s (size: %x)\n", field->info->name, size);
-        //printf("%s time\n", vmsd_name);
-        //add_mblock(self, vmsd_name, field->name, field->offset, (uint64_t)curr_elem, sizeof(QEMUTimer));
         add_get(self, (void*) field->info->get, curr_elem, size, (void*) field, f, field->info->name);
     }
     else if(!strcmp(field->info->name, "fpreg")){
@@ -520,55 +494,31 @@ static inline int get_handler(state_reallocation_t* self, QEMUFile* f, void* cur
         add_get(self, (void*) field->info->get, curr_elem, size, (void*) field, f, field->info->name);
     }
     else if(!strcmp(field->info->name, "pci config")){
-        //fprintf(stderr, "type: %s (size: %lx)\n", field->info->name, size);
         add_get(self, (void*) field->info->get, curr_elem, size, (void*) field, f, field->info->name);
     }
     else if(!strcmp(field->info->name, "pci irq state")){
-        //fprintf(stderr, "type: %s (size: %lx)\n", field->info->name, size);
         add_get(self, (void*) field->info->get, curr_elem, size, (void*) field, f, field->info->name);
     }
     else if(!strcmp(field->info->name, "virtio")){
         add_get(self, (void*) field->info->get, curr_elem, size, (void*) field, f, field->info->name);
-		//fprintf(stderr, "[QEMU-PT] %s: WARNING no handler for %s, type %s, size %lx!\n",
-		//	   	__func__, vmsd_name, field->info->name, size);
     }
     else{
 		fprintf(stderr, "[QEMU-PT] %s: WARNING no handler for %s, type %s, size %lx!\n",
 			   	__func__, vmsd_name, field->info->name, size);
         assert(0);
     }
-
     return ret; 
 }
 
-
-
-//migration_obj_t* obj;
-//void* base_opaque;
-
-//#define VERBOSE_DEBUG
-
-/* todo: modify opaque_ptr */
+/* TODO: modify opaque_ptr */
 static int fdl_vmstate_load_state(state_reallocation_t* self, QEMUFile *f, const VMStateDescription *vmsd, void *opaque, int version_id, uintptr_t* opaque_ptr)
 {
 #ifdef VERBOSE_DEBUG
     printf("---------------------------------\nVMSD: %p\t%s\n", opaque, vmsd->name);
 #endif
 
-    //fprintf(stderr, "---------------------------------\nVMSD: %p\t%s\n", opaque, vmsd->name);
-
     VMStateField *field = (VMStateField *)vmsd->fields;
     int ret = 0;
-
-    /*
-    bool alloc_later = false;
-    if(alloc_block){
-        base_opaque = opaque;
-        alloc_block = false;
-        alloc_later = true;
-        obj = alloc_migration_obj();
-    }
-    */
 
     uint64_t total_size = 0;
 
@@ -594,31 +544,14 @@ static int fdl_vmstate_load_state(state_reallocation_t* self, QEMUFile *f, const
         printf("\tPRELOAD Function\n"); 
 #endif
         /* TODO ADD PRE FPTR FOR SERIAL */
-        //add_pre_fptr(self, vmsd->pre_load, opaque, vmsd->name);
         //fprintf(stderr, "PRELOAD RUN: %s\n", vmsd->name);
         //add_pre_fptr(self, vmsd->pre_load, opaque, vmsd->name);
         add_post_fptr(self, vmsd->pre_load, 1337, opaque, vmsd->name);
-        //int ret = 0;
-        //return;
-
-
-
-        /*
-        int ret = vmsd->pre_load(opaque);
-        if (ret) {
-            return ret;
-        }
-        */
-        
-        
     }
     while (field->name) {
 #ifdef VERBOSE_DEBUG
         printf("Field: %s %s %s\n", __func__, vmsd->name, field->name);
 #endif
-        //fprintf(stderr, "Field: %s %s %s\n", __func__, vmsd->name, field->name);
-
-        //printf("Field: %s %s %s\n", __func__, vmsd->name, field->name);
         if ((field->field_exists &&
              field->field_exists(opaque, version_id)) ||
             (!field->field_exists &&
@@ -626,8 +559,6 @@ static int fdl_vmstate_load_state(state_reallocation_t* self, QEMUFile *f, const
             void *first_elem = opaque + field->offset;
             int i, n_elems = vmstate_n_elems(opaque, field);
             int size = vmstate_size(opaque, field);
-
-            //printf("\t\t%s %d\n", field->name, size);
 
 #ifdef VERBOSE_DEBUG
             printf("----------------->          vmstate_handle_alloc\n");
@@ -640,33 +571,16 @@ static int fdl_vmstate_load_state(state_reallocation_t* self, QEMUFile *f, const
 #endif
                 //            printf("Field-Offset 0x%lx-0x%lx\n", opaque+field->offset, opaque+field->offset+(size*n_elems));
 
-                /* fix me */
-                /* broken af */
-                //printf("add_translatable_block: %lx %lx %ld\n", *(void **)first_elem, first_elem, n_elems*size);
-                /*
-                if((n_elems*size)){
-                    add_translatable_block((void*)(*(void **)first_elem), (void*)first_elem, (uint64_t)(n_elems*size), field->name, 0, (void*) NULL, (void*) NULL);
-                }
-                */
-                
-                //fprintf(stderr, "FIX ME VMS_POINTER\n");
                 first_elem = *(void **)first_elem;
                 assert(first_elem || !n_elems || !size);
             }
+
             for (i = 0; i < n_elems; i++) {
                 uint64_t* tmp_opaque_ptr = 0;
                 total_size += size;
                 void *curr_elem = first_elem + size * i;
 
-                //if (!(field->flags & VMS_POINTER)) {
-                //  tmp_opaque_ptr = 0;
-                //}
-                //assert(!(field->flags & VMS_POINTER) || n_elems == 1);
-
                 if (field->flags & VMS_ARRAY_OF_POINTER) {
-                    //printf("VMS_ARRAY_OF_POINTER\n");
-                    //add_mblock((uint64_t)(curr_elem), (uint64_t)(size));
-                    //add_mblock((uint64_t)(field->offset + (opaque)), (uint64_t)(size*n_elems));
 #ifdef VERBOSE_DEBUG
                     printf("Field-Offset 1 0x%lx-0x%lx\n", (uint64_t)(field->offset + (opaque)), (uint64_t)(field->offset+(size*n_elems) + (opaque)));
                     printf("=VMS_ARRAY_OF_POINTER 1= %lx %x\n", *((uint64_t*)curr_elem), size);
@@ -684,9 +598,6 @@ static int fdl_vmstate_load_state(state_reallocation_t* self, QEMUFile *f, const
                 if (!curr_elem && size) {
                     // if null pointer check placeholder and do not follow 
                     assert(field->flags & VMS_ARRAY_OF_POINTER);
-                    //printf("=================vmstate_info_nullptr\n");#
-                    //add_mblock((uint64_t)(curr_elem), (uint64_t)(size));
-                    //add_mblock((uint64_t)(field->offset + (opaque)), (uint64_t)(size*n_elems));
 #ifdef VERBOSE_DEBUG
                     printf("Field-Offset 2 0x%lx-0x%lx\n", (uint64_t)(field->offset + (opaque)), (uint64_t)(field->offset+(size*n_elems) + (opaque)));
                     printf("=VMS_ARRAY_OF_POINTER 2= %lx %x\n", *((uint64_t*)curr_elem), size);
@@ -706,8 +617,7 @@ static int fdl_vmstate_load_state(state_reallocation_t* self, QEMUFile *f, const
                     printf("=VMS_STRUCT= %lx %x\n", *((uint64_t*)curr_elem), size);
                     //hexDump((void*)field->name, curr_elem, size);
 #endif
-                    /* fix me */
-                    //ret = vmstate_load_state(f, field->vmsd, curr_elem, field->vmsd->version_id);
+                    /* FIXME */
                     ret = fdl_vmstate_load_state(self, f, field->vmsd, curr_elem, field->vmsd->version_id, tmp_opaque_ptr);
 #ifdef VERBOSE_DEBUG
                     //hexDump((void*)field->name, curr_elem, size);
@@ -719,9 +629,6 @@ static int fdl_vmstate_load_state(state_reallocation_t* self, QEMUFile *f, const
                     ret = get_handler(self, f, curr_elem, size, field, (char*)vmsd->name);
                 }
                 if (ret >= 0) {
-                    //printf("FILE ERROR\n");
-                    //fprintf(stderr, "FILE ERROR\n");
-                    //assert(0);
                     ret = qemu_file_get_error(f);
                 }
                 if (ret < 0) {
@@ -739,28 +646,18 @@ static int fdl_vmstate_load_state(state_reallocation_t* self, QEMUFile *f, const
         field++;
     }
 
-    /* fix me */
+    /* FIXME */
     ret = fdl_vmstate_subsection_load(self, f, vmsd, opaque);
-    //ret = fdl_vmstate_subsection_load(f, vmsd, opaque, opaque_ptr);
 
     if (ret != 0) {
         return ret;
     }
-
-    /*
-    if(alloc_later){
-        add_opaque_block(obj, opaque, total_size);
-    }
-    */
-
-    //printf("------\n");
 
     if (vmsd->post_load) {
 #ifdef VERBOSE_DEBUG
         printf("\tPOSTLOAD Function\n");
 #endif
         add_post_fptr(self, vmsd->post_load, version_id, opaque, vmsd->name);
-        //ret = 0;
         ret = vmsd->post_load(opaque, version_id);
     }
 #ifdef VERBOSE_DEBUG
@@ -772,24 +669,17 @@ static int fdl_vmstate_load_state(state_reallocation_t* self, QEMUFile *f, const
 
 static int fdl_vmstate_load(state_reallocation_t* self, QEMUFile *f, SaveStateEntry *se, int version_id)
 {
-    //trace_vmstate_load(se->idstr, se->vmsd ? se->vmsd->name : "(old)");
     if (!se->vmsd) {         /* Old style */
-        //fprintf(stderr, "\t<<<OLD Style>>>\n");
         return se->ops->load_state(f, se->opaque, version_id);
     }
-    //fprintf(stderr, "NEW Style\n");
-    uintptr_t* t = (uintptr_t*)&(se->opaque);
-    //printf("------>\n");
-    //printf("VMSD1: %s\n", (VMStateDescription *)(se->vmsd)->name);
-
-    //printf("SE:\t%p %p %p %p\n", se, se->opaque, &(se->opaque) ,t);
-    return fdl_vmstate_load_state(self, f, se->vmsd, se->opaque, version_id, (uintptr_t*)t);
+    
+    uintptr_t *t = (uintptr_t *)&(se->opaque);
+    return fdl_vmstate_load_state(self, f, se->vmsd, se->opaque, version_id, (uintptr_t *)t);
 }
 
 static int fdl_enumerate_section(state_reallocation_t* self, QEMUFile *f, MigrationIncomingState *mis){
     uint32_t instance_id, version_id, section_id;
     SaveStateEntry *se;
-    //LoadStateEntry *le = NULL;
 
     char idstr[256];
     int ret;
@@ -803,11 +693,8 @@ static int fdl_enumerate_section(state_reallocation_t* self, QEMUFile *f, Migrat
     instance_id = qemu_get_be32(f);
     version_id = qemu_get_be32(f);
 
-    //printf("%s %s %d\n", __func__, idstr, instance_id);
-
     /* Find savevm section */
     se = fdl_find_se(idstr, instance_id);
-    //printf("se %p\n", se);
     if (se == NULL) {
         printf("Unknown savevm section or instance '%s' %d", idstr, instance_id);
         return -EINVAL;
@@ -818,15 +705,6 @@ static int fdl_enumerate_section(state_reallocation_t* self, QEMUFile *f, Migrat
         printf("savevm: unsupported version %d for '%s' v%d", version_id, idstr, se->version_id);
         return -EINVAL;
     }
-    /* Add entry */
-    /*
-    le = g_malloc0(sizeof(*le));
-    le->se = se;
-    //printf("\tSE:%s\n", se);
-    le->section_id = section_id;
-    le->version_id = version_id;
-    QLIST_INSERT_HEAD(&mis->loadvm_handlers, le, entry);
-    */
 
     se->load_version_id = version_id;
     se->load_section_id = section_id;
@@ -878,12 +756,9 @@ static int fdl_enumerate_section(state_reallocation_t* self, QEMUFile *f, Migrat
     }
     else{
         nyx_debug("---------------------------------\nVMSD2: %p\n", (void*)se->vmsd);
-        //abort();
-        //fprintf(stderr, "---------------------------------\nVMSD2: %s\n", (VMStateDescription *)(se->vmsd)->name);
         ret = vmstate_load(f, se);
     }
     
-    //ret = vmstate_load(f, se);
     if (ret < 0) {
         printf("error while loading state for instance 0x%x of device '%s'", instance_id, idstr);
         return ret;
@@ -915,9 +790,6 @@ static void fdl_enumerate_global_states(state_reallocation_t* self, QEMUFile *f)
         switch (section_type) {
             case QEMU_VM_SECTION_START:
             case QEMU_VM_SECTION_FULL:
-                //if(!fpos){
-                //    fpos = qemu_ftell(f);
-                //}
                 fdl_enumerate_section(self, f, mis);
                 break;
             default:
@@ -971,15 +843,7 @@ state_reallocation_t* state_reallocation_new(QEMUFile *f){
     return self;
 }
 
-/*
-void state_reallocation_new_no_fdl(QEMUFile *f){
-    fdl_enumerate_global_states(NULL, f);
-}
-*/
-
 void fdl_fast_reload(state_reallocation_t* self){
-    //uint64_t count = 0;
-
 
     for(uint32_t i = 0; i < self->fast_state_fptr_pos; i++){
         if((self->version[i]) == 1337){
@@ -989,14 +853,11 @@ void fdl_fast_reload(state_reallocation_t* self){
 
     if(!self->tmp_snapshot.enabled){
         for(uint32_t i = 0; i < self->fast_state_pos; i++){
-            //count += self->size[i];
             memcpy(self->ptr[i], self->copy[i], self->size[i]);
         }
     }
     else{
-        //fprintf(stderr, "====== %s TMP MODE ====== \n", __func__);
         for(uint32_t i = 0; i < self->fast_state_pos; i++){
-            //count += self->size[i];
             memcpy(self->ptr[i], self->tmp_snapshot.copy[i], self->size[i]);
         }
     }

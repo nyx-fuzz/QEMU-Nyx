@@ -21,9 +21,12 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 
 #pragma once 
 
+#include <stdint.h>
+
 #define PAYLOAD_BUFFER_SIZE_64		26
 #define PAYLOAD_BUFFER_SIZE_32		20
 
+// FIXME: move to common nyx.h
 #define KAFL_MODE_64	0
 #define KAFL_MODE_32	1
 #define KAFL_MODE_16	2
@@ -82,13 +85,6 @@ bool check_bitmap_byte(uint32_t value);
  */
 #define KASAN_PAYLOAD_32 "\xFA\xB8\x1F\x00\x00\x00\xBB\x09\x00\x00\x00\xB9\x00\x00\x00\x00\x0F\x01\xC1\xF4"
 
-/*
- * printk Notifier Payload (x86-64)
- * 0f 01 c1                vmcall
- * c3                      retn
- */
-#define PRINTK_PAYLOAD "\x0F\x01\xC1\xC3"
-
 void pt_setup_program(void* ptr);
 void pt_setup_snd_handler(void (*tmp)(char, void*), void* tmp_s);
 void pt_setup_ip_filters(uint8_t filter_id, uint64_t start, uint64_t end);
@@ -98,8 +94,6 @@ void pt_disable_wrapper(CPUState *cpu);
 
 void hypercall_submit_address(uint64_t address);
 bool hypercall_check_tuple(uint64_t current_addr, uint64_t prev_addr);
-//void hypercall_check_in_range(uint64_t* addr);
-
 
 bool hypercall_check_transition(uint64_t value);
 void hypercall_submit_transition(uint32_t value);

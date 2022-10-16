@@ -1,5 +1,6 @@
 #pragma once 
 
+#include <stdint.h>
 #include "nyx/fast_vm_reload.h"
 
 void nyx_snapshot_debug_pre_init(void);

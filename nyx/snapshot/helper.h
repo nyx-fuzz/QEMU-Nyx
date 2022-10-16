@@ -2,11 +2,8 @@
 
 #include <stdint.h>
 
-/* don't! */
-#define MAX_REGIONS 8
-
 #ifndef PAGE_SIZE
-#define PAGE_SIZE 0x1000
+#define PAGE_SIZE qemu_real_host_page_size
 #endif
 
 #define BITMAP_SIZE(x) ((x/PAGE_SIZE)/8)
