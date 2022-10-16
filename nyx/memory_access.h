@@ -22,7 +22,6 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 #ifndef MEMORY_ACCESS_H
 #define MEMORY_ACCESS_H
 
-#include "qemu/osdep.h"
 #include <linux/kvm.h>
 #include "qemu-common.h"
 #include "sysemu/kvm_int.h"

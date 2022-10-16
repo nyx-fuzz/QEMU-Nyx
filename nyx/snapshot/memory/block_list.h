@@ -22,9 +22,6 @@ typedef struct snapshot_page_blocklist_s{
   uint64_t phys_area_size;
 }snapshot_page_blocklist_t;
 
-
-//snapshot_page_blocklist_t* snapshot_page_blocklist_init(shadow_memory_t* snapshot);
-
 void snapshot_page_blocklist_add(snapshot_page_blocklist_t* self, uint64_t phys_addr);
 
 /* returns true if phys_addr is on the blocklis */

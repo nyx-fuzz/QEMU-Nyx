@@ -19,10 +19,11 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 
 */
 
-#include "nyx/auxiliary_buffer.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include "qemu/osdep.h"
+#include "nyx/auxiliary_buffer.h"
 #include "nyx/state/state.h"
 #include "nyx/debug.h"
 #include "nyx/trace_dump.h"
@@ -234,7 +235,7 @@ void reset_page_not_found_result_buffer(auxilary_buffer_t* auxilary_buffer){
 }
 
 void set_success_auxiliary_result_buffer(auxilary_buffer_t* auxilary_buffer, uint8_t success){
-  //should refactor to let caller directly set the result codes
+  //TODO refactor to let caller directly set the result codes
   if (success == 2) {
 	  VOLATILE_WRITE_8(auxilary_buffer->result.exec_result_code, rc_starved);
   } else {

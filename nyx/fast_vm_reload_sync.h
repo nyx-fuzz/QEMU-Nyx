@@ -44,12 +44,9 @@ typedef struct fast_vm_reload_sync_s{
 
   bool request_exists;
   bool request_exists_pre;
-  FastReloadRequest current_request;
-
   bool debug_mode;
-
   FastReloadMode mode;
-
+  FastReloadRequest current_request;
 } fast_vm_reload_sync_t;
 
 

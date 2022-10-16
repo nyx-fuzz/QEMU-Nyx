@@ -7,10 +7,9 @@
 uint8_t cmp_patch_data[] = { 0x38, 0xC0, [2 ... MAX_INSTRUCTION_SIZE]=0x90 }; // CMP AL,AL; NOP, NOP ... 
 const uint8_t *cmp_patch = &cmp_patch_data[0];
 
-///////////////////////////////////////////////////////////////////////////////////
-// Private Helper Functions Declarations
-///////////////////////////////////////////////////////////////////////////////////
-//
+/*
+ * Private Helper Functions Declarations
+ */
 static void _patcher_apply_patch(patcher_t *self, size_t index);
 
 static void _patcher_restore_patch(patcher_t *self, size_t index);
@@ -26,9 +25,9 @@ static void _patcher_free_patch_infos(patcher_t *self);
 static redqueen_t* _redq_ptr(patcher_t *self);
 
 
-///////////////////////////////////////////////////////////////////////////////////
-// Public Functions
-///////////////////////////////////////////////////////////////////////////////////
+/*
+ * Public Functions
+ */
 
 patcher_t* patcher_new(CPUState *cpu){
     patcher_t *res = malloc(sizeof(patcher_t));
@@ -118,10 +117,9 @@ bool patcher_validate_patches(patcher_t *self){
 }
 
 
-///////////////////////////////////////////////////////////////////////////////////
-// Private Helper Functions Definitions
-///////////////////////////////////////////////////////////////////////////////////
-
+/*
+ * Private Helper Functions Definitions
+ */
 
 static void _patcher_apply_patch(patcher_t *self, size_t index) {
   abort(); // deprecated function -> remove this code later

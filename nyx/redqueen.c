@@ -19,18 +19,21 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 
 */
 
+#include "qemu/osdep.h"
+
 #include <assert.h>
-#include "nyx/redqueen.h"
-#include "nyx/memory_access.h"
-#include "nyx/interface.h"
-#include <inttypes.h>
-#include "file_helper.h"
-#include "patcher.h"
-#include "debug.h"
-#include "redqueen_trace.h"
-#include "nyx/state/state.h"
 #include <capstone/capstone.h>
 #include <capstone/x86.h>
+#include <inttypes.h>
+
+#include "nyx/redqueen.h"
+#include "debug.h"
+#include "file_helper.h"
+#include "nyx/interface.h"
+#include "nyx/memory_access.h"
+#include "nyx/state/state.h"
+#include "patcher.h"
+#include "redqueen_trace.h"
 
 redqueen_workdir_t redqueen_workdir = {0};
 
@@ -61,11 +64,6 @@ redqueen_t* new_rq_state(CPUState *cpu,  page_cache_t* page_cache){
 
 	res->trace_state=redqueen_trace_new();
 
-	//FILE* pt_file = fopen("/tmp/redqueen_vm.img", "wb");
-	//delete_redqueen_files();
-  //fwrite(&start_range, sizeof(uint64_t), 1, pt_file);
-	//fwrite(code, sizeof(uint8_t), end_range-start_range, pt_file);
-	//fclose(pt_file);
 	return res;
 }
 
@@ -232,7 +230,7 @@ void destroy_rq_state(redqueen_t* self){
 
 static void redqueen_set_addr_flags(redqueen_t* self, uint64_t addr, uint32_t flags){
 	int unused = 0;
-	//fprintf(stderr, "%s\n", __func__);
+
 	khiter_t k = kh_get(RQ, self->lookup, addr); 
 	if(k == kh_end(self->lookup)){
 		k = kh_put(RQ, self->lookup, addr, &unused); 
@@ -276,17 +274,8 @@ static uint32_t redqueen_update_addr_count(redqueen_t* self, uint64_t addr){
 	return value & 0xFF000000UL;
 }
 
-/*
-static void set_rq_trace_enabled_bp(redqueen_t* self, uint64_t addr){
-	redqueen_set_addr_flags(self, addr, CMP_BITMAP_TRACE_ENABLED);
-}
-*/
-
 void set_rq_instruction(redqueen_t* self, uint64_t addr){
-	//fprintf(stderr, "%s\n", __func__);
 	if( !redqueen_check_addr_flags(self, addr, CMP_BITMAP_BLACKLISTED)){
-		//fprintf(stderr, "%s +2\n", __func__);
-
 		redqueen_set_addr_flags(self, addr, CMP_BITMAP_RQ_INSTRUCTION);
 	}
 }
@@ -296,7 +285,6 @@ void set_rq_blacklist(redqueen_t* self, uint64_t addr){
 }
 
 static void insert_hooks_whitelist(redqueen_t* self){
-	fprintf(stderr, "%s\n", __func__);
   for(size_t i = 0; i < self->num_breakpoint_whitelist; i++){
 		insert_breakpoint(self->cpu, self->breakpoint_whitelist[i], 1);
   }
@@ -304,17 +292,13 @@ static void insert_hooks_whitelist(redqueen_t* self){
 
 static void insert_hooks_bitmap(redqueen_t* self){
 	uint64_t c = 0;
-	//fprintf(stderr, "%s\n", __func__);
-
 	uint64_t addr;
 	uint32_t value __attribute__((unused));
   uint32_t mode = GET_GLOBAL_STATE()->redqueen_instrumentation_mode;
-	//uint32_t mode = self->cpu->redqueen_instrumentation_mode;
+
 	kh_foreach(self->lookup, addr, value, {
-		//fprintf(stderr, "%s %lx %x\n", __func__, addr, value);
 		if(redqueen_check_addr_flags(self, addr, CMP_BITMAP_BLACKLISTED)){ continue; }
 
-		//bool should_hook_se = (mode == REDQUEEN_SE_INSTRUMENTATION) && redqueen_check_addr_flags(self, addr, CMP_BITMAP_SHOULD_HOOK_SE);
 		bool should_hook_rq = (mode == REDQUEEN_LIGHT_INSTRUMENTATION ) && redqueen_check_addr_flags(self, addr, CMP_BITMAP_SHOULD_HOOK_RQ);
 
 		if( should_hook_rq ){
@@ -325,11 +309,9 @@ static void insert_hooks_bitmap(redqueen_t* self){
 }
 
 void redqueen_insert_hooks(redqueen_t* self){
- // 	fprintf(stderr, "%s %x\n", __func__, self->cpu->redqueen_instrumentation_mode);
 
   nyx_debug_p(REDQUEEN_PREFIX, "insert hooks");
   assert(!self->hooks_applied);
-  //switch(self->cpu->redqueen_instrumentation_mode){
   switch(GET_GLOBAL_STATE()->redqueen_instrumentation_mode){
     case(REDQUEEN_LIGHT_INSTRUMENTATION):
       insert_hooks_bitmap(self);
@@ -347,7 +329,6 @@ void redqueen_insert_hooks(redqueen_t* self){
 
 void redqueen_remove_hooks(redqueen_t* self){
   nyx_debug_p(REDQUEEN_PREFIX, "remove hooks");
- // fprintf(stderr, "remove hooks\n");
   assert(self->hooks_applied);
 	remove_all_breakpoints(self->cpu);
 
@@ -361,6 +342,7 @@ void redqueen_remove_hooks(redqueen_t* self){
 static uint64_t get_segment_register(x86_reg reg) {
   X86CPU *cpu = X86_CPU(qemu_get_cpu(0));
   CPUX86State *env = &cpu->env;
+
   switch(reg){
     case X86_REG_GS: return env->segs[R_GS].base;
     case X86_REG_FS: return env->segs[R_FS].base;
@@ -524,6 +506,7 @@ static void print_comp_result(uint64_t addr, const char* type, uint64_t val1, ui
 
 	char result_buf[256]; 
   const char *format = NULL;
+
 	uint8_t pos = 0;
 			pos += snprintf(result_buf+pos, 256-pos, "%lx\t\t %s", addr, type);
 	    //nyx_debug_p(REDQUEEN_PREFIX, "got size: %ld", size);
@@ -650,7 +633,7 @@ static uint64_t read_stack(uint64_t word_index){
 	rsp = limit_to_word_width(rsp);
 	uint64_t res = 0;
 	uint64_t stack_ptr = rsp + word_index * word_width_to_bytes();
-  /* todo @ sergej */
+  /* TODO @ sergej */
 	assert(read_virtual_memory(stack_ptr, (uint8_t*)(&res), 8, qemu_get_cpu(0)));
 	return limit_to_word_width(res);
 }
@@ -676,14 +659,14 @@ static void format_strcmp(uint8_t* buf1, uint8_t* buf2){
 static bool test_strchr(uint64_t arg1, uint64_t arg2){
   CPUState *cpu = qemu_get_cpu(0);
 
-  /* todo @ sergej */
+  /* TODO @ sergej */
 	if(!is_addr_mapped(arg1, cpu) || arg2 & (~0xff)){
     return false;
   }
 	uint8_t buf1[REDQUEEN_MAX_STRCMP_LEN];
 	uint8_t buf2[REDQUEEN_MAX_STRCMP_LEN];
 
-  /* todo @ sergej */
+  /* TODO @ sergej */
 	assert(read_virtual_memory(arg1, &buf1[0], REDQUEEN_MAX_STRCMP_LEN, cpu));
   if(!memchr(buf1,'\0',REDQUEEN_MAX_STRCMP_LEN) ){return false;}
   memset(buf2,'\0',REDQUEEN_MAX_STRCMP_LEN);
@@ -700,7 +683,7 @@ static bool test_strcmp(uint64_t arg1, uint64_t arg2){
 	//nyx_debug_p(REDQUEEN_PREFIX,"valid ptrs");
 	uint8_t buf1[REDQUEEN_MAX_STRCMP_LEN];
 	uint8_t buf2[REDQUEEN_MAX_STRCMP_LEN];
-  /* todo @ sergej */
+  /* TODO @ sergej */
 	assert(read_virtual_memory(arg1, &buf1[0], REDQUEEN_MAX_STRCMP_LEN, cpu));
 	assert(read_virtual_memory(arg2, &buf2[0], REDQUEEN_MAX_STRCMP_LEN, cpu));
   format_strcmp(buf1,buf2);
@@ -742,19 +725,6 @@ static void extract_call_params(void){
 	test_strcmp_sys_v();
 }
 
-/*
-static bool is_memory_access(redqueen_t* self, cs_insn* insn){
-  return insn->id != X86_INS_LEA && strstr(insn->op_str,"[");
-}
-
-static bool is_trace_entry_point(redqueen_t* self, uint64_t addr){
-	//if(addr >= self->address_range_start && addr <= self->address_range_end){
-		return redqueen_check_addr_flags(self, addr, CMP_BITMAP_TRACE_ENABLED);
-  //}
-  return false;
-}
-*/
-
 static void handle_hook_redqueen_light(redqueen_t* self, uint64_t ip, cs_insn *insn){
 	if(insn->id == X86_INS_CMP || insn->id == X86_INS_XOR){ //handle original redqueen case
 		get_cmp_value(insn, "CMP");
@@ -770,9 +740,6 @@ static void handle_hook_redqueen_light(redqueen_t* self, uint64_t ip, cs_insn *i
 }
 
 static uint8_t handle_hook_breakpoint(redqueen_t* self, bool write_data){
-  //fprintf(stderr, "%s\n", __func__);
-  //printf("%s\n", __func__);
-
   X86CPU *cpu = X86_CPU(self->cpu);
   CPUX86State *env = &cpu->env;
 
@@ -821,112 +788,12 @@ static uint8_t handle_hook_breakpoint(redqueen_t* self, bool write_data){
     return ins_size;
 }
 
-/*
-static void debug_print_disasm(char* desc, uint64_t ip, CPUState* cpu_state){
-  //uint64_t cs_address = ip;
-  uint8_t code[64];
-  csh handle;
-  cs_insn *insn;
-  read_virtual_memory(ip, &code[0], 64, cpu_state);
-  if (cs_open(CS_ARCH_X86, get_capstone_mode(cpu_state->disassembler_word_width), &handle) == CS_ERR_OK){
-    cs_option(handle, CS_OPT_DETAIL, CS_OPT_ON);
-    size_t count = cs_disasm(handle, &code[0], 64, ip, 1, &insn);
-    if(count > 0){
-      nyx_debug_p(REDQUEEN_PREFIX,"%s\t %lx: %s %s",desc, ip,  insn->mnemonic, insn->op_str);
-    } else {
-      nyx_debug_p(REDQUEEN_PREFIX,"%s\t Failed to disassemble at: %lx",desc, ip);
-    }
-    cs_close(&handle);
-    cs_free(insn, count);
-  } else {
-      nyx_debug_p(REDQUEEN_PREFIX,"%s\t Failed to create capstone instance at: %lx",desc, ip);
-  }
-}
-*/
-
-/*
-static void debug_print_state(char* desc, CPUState* cpu_state){
-  X86CPU *cpu = X86_CPU(cpu_state);
-  CPUX86State *env = &cpu->env;
-  debug_print_disasm(desc, env->eip, cpu_state);
-  nyx_debug_p(REDQUEEN_PREFIX,"ECX: %lx", get_reg_cpu(cpu_state, (char*)"rcx"));
-}
-*/
-
-/*
-int trace_debug = false;
-
-void handle_hook(redqueen_t* self){
-  X86CPU *cpu = X86_CPU(self->cpu);
-  CPUX86State *env = &cpu->env;
-
-  uint8_t ins; 
-
-  read_virtual_memory(env->eip, (uint8_t*)&ins, 1, self->cpu);
-
-  if(ins == 0xcc && self->cpu->singlestep_enabled){
-  	fprintf(stderr, "fix... %lx\n", env->eip);
-  	self->cpu->singlestep_enabled = false;
-  	self->singlestep_enabled = false;
-  	//kvm_insert_breakpoint(self->cpu, self->last_rip, 1, 0);
-  	kvm_update_guest_debug(self->cpu, 0);
-  	self->last_rip  = 0;
-  	return;
-  }
-
-  if(!self->cpu->singlestep_enabled){
-	fprintf(stderr, "HOOK %lx\n", env->eip);
-
-	if(self->last_rip != 0) abort();
-    self->last_rip = env->eip;
-
-    read_virtual_memory(env->eip, (uint8_t*)&ins, 1, self->cpu);
-    if(ins != 0xcc) abort();
-    kvm_remove_breakpoint(self->cpu, env->eip, 1, 0);
-    self->cpu->singlestep_enabled = true;
-    self->singlestep_enabled = true;
-    if(self->cpu->pt_enabled && self->cpu->pt_c3_filter == env->cr[3]){
-      handle_hook_breakpoint(self);
-    }
-    kvm_update_guest_debug(self->cpu, 0);
-
-  } else{
-	fprintf(stderr, "HOOK %lx SINGLETEP\n", env->eip);
-
-
-  	if(self->last_rip == 0) abort();
-
-  	 
-  	
-
-
-    self->cpu->singlestep_enabled = false;
-    self->singlestep_enabled = false;
-    if(self->counter_bitmap[self->last_rip-self->address_range_start]++ < REDQUEEN_TRAP_LIMIT){
-    	fprintf(stderr, "TRAP INSTALLED\n");
-	    read_virtual_memory(env->eip, (uint8_t*)&ins, 1, self->cpu);
-	    if(ins == 0xcc) abort();
-
-	    if(ins != 0xcc)
-			kvm_insert_breakpoint(self->cpu, self->last_rip, 1, 0);
-    }
-    else {
-    	fprintf(stderr, "TRAP INSTALLED nOPE %lx %lx\n", self->counter_bitmap[self->last_rip-self->address_range_start], self->counter_bitmap);
-    }
-    kvm_update_guest_debug(self->cpu, 0);
-    self->last_rip  = 0;
-  }
-}
-*/
-
-
 void handle_hook(redqueen_t* self){
   X86CPU *cpu = X86_CPU(self->cpu);
   CPUX86State *env = &cpu->env;
 
   if (self->next_rip){
 
-  	//fprintf(stderr, "REMOVE %lx at %lx\n", self->next_rip, env->eip);
   	remove_breakpoint(self->cpu, self->next_rip, 1);
 
   	if(self->last_rip && redqueen_update_addr_count(self, self->last_rip) < REDQUEEN_TRAP_LIMIT){
@@ -941,11 +808,9 @@ void handle_hook(redqueen_t* self){
 
   if(redqueen_check_addr(self, env->eip)){
 
-  	//fprintf(stderr, "INSERT %lx\n", env->eip);
   	self->last_rip = env->eip;
     remove_breakpoint(self->cpu, env->eip, 1);
 
-    //if(self->cpu->pt_enabled && self->cpu->pt_c3_filter == env->cr[3]){
     if(self->cpu->pt_enabled && GET_GLOBAL_STATE()->pt_c3_filter == env->cr[3]){
     	self->next_rip = handle_hook_breakpoint(self, true);
     }
@@ -953,25 +818,18 @@ void handle_hook(redqueen_t* self){
     	self->next_rip = handle_hook_breakpoint(self, true);
     }
   }
-  else {
-  	//fprintf(stderr, "NOPE %lx\n", env->eip);
-  }
 }
 
 
 
 static void _redqueen_update_whitelist(redqueen_t* self){
-  //if(self->cpu->redqueen_instrumentation_mode == REDQUEEN_WHITELIST_INSTRUMENTATION){
-  if(GET_GLOBAL_STATE()->redqueen_instrumentation_mode == REDQUEEN_WHITELIST_INSTRUMENTATION){
-    //size_t num_addrs = 0;
-    //uint64_t *addrs;
+  if(GET_GLOBAL_STATE()->redqueen_instrumentation_mode == REDQUEEN_WHITELIST_INSTRUMENTATION){ 
     free(self->breakpoint_whitelist);
     parse_address_file(redqueen_workdir.breakpoint_white, &self->num_breakpoint_whitelist, &self->breakpoint_whitelist);
   }
 }
 
 static void _redqueen_update_blacklist(redqueen_t* self){
-  //if(self->cpu->redqueen_update_blacklist){
   if(GET_GLOBAL_STATE()->redqueen_update_blacklist){
     size_t num_addrs = 0;
     uint64_t *addrs;
@@ -986,7 +844,6 @@ static void _redqueen_update_blacklist(redqueen_t* self){
 void enable_rq_intercept_mode(redqueen_t* self){
 	if(!self->intercept_mode){
 		delete_redqueen_files();
-		//unlink("/tmp/redqueen_result.txt");
     _redqueen_update_whitelist(self);
     _redqueen_update_blacklist(self);
 		redqueen_insert_hooks(self);

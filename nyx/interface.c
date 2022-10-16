@@ -20,6 +20,12 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "qemu/osdep.h"
+
+#include <sys/ioctl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <time.h>
+
 #include "qapi/error.h"
 #include "qemu/cutils.h"
 #include "hw/qdev-properties.h"
@@ -38,8 +44,6 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 #include "sysemu/qtest.h"
 #include "qapi/visitor.h"
 #include "exec/ram_addr.h"
-#include <sys/mman.h>
-#include <sys/stat.h>
 #include "pt.h"
 #include "nyx/hypercall/hypercall.h"
 #include "nyx/interface.h"
@@ -47,13 +51,10 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 #include "nyx/synchronization.h"
 #include "nyx/snapshot/devices/state_reallocation.h"
 #include "nyx/memory_access.h"
-#include <sys/ioctl.h>
 #include "nyx/state/state.h"
 #include "nyx/sharedir.h"
 #include "nyx/helpers.h"
 #include "nyx/trace_dump.h"
-
-#include <time.h>
 
 #include "redqueen.h"
 
@@ -314,16 +315,6 @@ static bool verify_workdir_state(nyx_interface_state *s, Error **errp){
 
 
 	assert(asprintf(&tmp, "%s/aux_buffer_%d", workdir, id) != -1);
-	/*
-	if (file_exits(tmp)){
-		nyx_debug_p(INTERFACE_PREFIX, "%s does not already exists...", tmp);
-		free(tmp);
-		return false;
-	}
-	else {
-		init_aux_buffer(tmp);
-	}
-	*/
 	init_aux_buffer(tmp);
 	free(tmp);
 
@@ -406,13 +397,12 @@ static void nyx_realize(DeviceState *dev, Error **errp){
 	GET_GLOBAL_STATE()->worker_id = s->worker_id;
 
 	if (!s->workdir || !verify_workdir_state(s, errp)){
-		nyx_error("Error: work dir...\n");
+		nyx_error("Error: Invalid work dir...\n");
 		exit(1);
 	}
 
 	if (!s->sharedir || !verify_sharedir_state(s, errp)){
 		nyx_error("Warning: Invalid sharedir...\n");
-		//abort();
 	}
 	else{
 		sharedir_set_dir(GET_GLOBAL_STATE()->sharedir, s->sharedir);
@@ -432,11 +422,8 @@ static Property nyx_interface_properties[] = {
 	DEFINE_PROP_CHR("chardev", nyx_interface_state, chr),
 
 	DEFINE_PROP_STRING("sharedir", nyx_interface_state, sharedir),
-
-
 	DEFINE_PROP_STRING("workdir", nyx_interface_state, workdir),
 	DEFINE_PROP_UINT32("worker_id", nyx_interface_state, worker_id, 0xFFFF),
-
 	DEFINE_PROP_UINT64("cow_primary_size", nyx_interface_state, cow_primary_size, 0),
 	/* 
 	 * Since DEFINE_PROP_UINT64 is somehow broken (signed/unsigned madness),
@@ -463,9 +450,7 @@ static Property nyx_interface_properties[] = {
 
 static void nyx_interface_class_init(ObjectClass *klass, void *data){
 	DeviceClass *dc = DEVICE_CLASS(klass);
-	//PCIDeviceClass *k = PCI_DEVICE_CLASS(klass);
 	dc->realize = nyx_realize;
-	//k->class_id = PCI_CLASS_MEMORY_RAM;
 	dc->props = nyx_interface_properties;
 	set_bit(DEVICE_CATEGORY_MISC, dc->categories);
 	dc->desc = "Nyx Interface";

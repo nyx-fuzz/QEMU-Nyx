@@ -73,8 +73,6 @@ void shadow_memory_switch_snapshot(shadow_memory_t* self, bool incremental);
 
 void shadow_memory_restore_memory(shadow_memory_t* self);
 
-//void shadow_memory_prepare_incremental_snapshot(shadow_memory_t* self);
-
 static inline void shadow_memory_track_dirty_root_pages(shadow_memory_t* self, uint64_t address, uint8_t slot){
     if(unlikely(self->root_track_pages_num >= self->root_track_pages_size)){
         self->root_track_pages_size <<= 2; 

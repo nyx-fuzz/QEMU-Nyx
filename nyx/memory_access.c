@@ -18,8 +18,11 @@ You should have received a copy of the GNU General Public License
 along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 
 */
-#include <errno.h>
 #include "qemu/osdep.h"
+
+#include <errno.h>
+#include "exec/gdbstub.h"
+
 #include "sysemu/sysemu.h"
 #include "cpu.h"
 #include "exec/ram_addr.h"
@@ -29,9 +32,7 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 #include "nyx/hypercall/hypercall.h"
 #include "debug.h"
 #include "nyx/fast_vm_reload.h"
-#include "exec/gdbstub.h"
 #include "nyx/state/state.h"
-#include "sysemu/kvm.h"
 #include "nyx/helpers.h"
 
 #define INVALID_ADDRESS 0xFFFFFFFFFFFFFFFFULL
@@ -141,31 +142,23 @@ bool write_physical_memory(uint64_t address, uint8_t* data, uint32_t size, CPUSt
 }
 
 static void refresh_kvm(CPUState *cpu){
-    //int ret = 0;
     if (!cpu->vcpu_dirty) {
-        //kvm_arch_get_registers_fast(cpu);
         kvm_arch_get_registers(cpu);
-
-        //cpu->vcpu_dirty = true;
     }
 }
 
 static void refresh_kvm_non_dirty(CPUState *cpu){
     if (!cpu->vcpu_dirty) {
         kvm_arch_get_registers_fast(cpu);
-        //kvm_arch_get_registers(cpu);
     }
 }
 
 bool remap_payload_slot(uint64_t phys_addr, uint32_t slot, CPUState *cpu){
-    //assert(0); /* nested code -> test me later */ 
-
     assert(GET_GLOBAL_STATE()->shared_payload_buffer_fd && GET_GLOBAL_STATE()->shared_payload_buffer_size);
     RAMBlock *block;
     refresh_kvm_non_dirty(cpu);
 
     uint32_t i = slot;
-
     uint64_t phys_addr_ram_offset = address_to_ram_offset(phys_addr);
 
     QLIST_FOREACH_RCU(block, &ram_list.blocks, next) {
@@ -173,9 +166,6 @@ bool remap_payload_slot(uint64_t phys_addr, uint32_t slot, CPUState *cpu){
             /* TODO: put assert calls here */ 
             munmap((void*)(((uint64_t)block->host) + phys_addr_ram_offset), x86_64_PAGE_SIZE);
             mmap((void*)(((uint64_t)block->host) + phys_addr_ram_offset), 0x1000, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, GET_GLOBAL_STATE()->shared_payload_buffer_fd, (i*x86_64_PAGE_SIZE));
-
-            //printf("MMUNMAP: %d\n", munmap((void*)(((uint64_t)block->host) + phys_addr), x86_64_PAGE_SIZE));
-            //printf("MMAP: %p\n", mmap((void*)(((uint64_t)block->host) + phys_addr), 0x1000, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, GET_GLOBAL_STATE()->shared_payload_buffer_fd, (i*x86_64_PAGE_SIZE)));
 
             fast_reload_blacklist_page(get_fast_reload_snapshot(), phys_addr);
             break;
@@ -186,7 +176,6 @@ bool remap_payload_slot(uint64_t phys_addr, uint32_t slot, CPUState *cpu){
 }
 
 bool remap_slot(uint64_t addr, uint32_t slot, CPUState *cpu, int fd, uint64_t shm_size, bool virtual, uint64_t cr3){
-    //printf("%s ---> \n", __func__);
     assert(fd && shm_size);
     assert((slot*x86_64_PAGE_SIZE) < shm_size);
 
@@ -206,8 +195,6 @@ bool remap_slot(uint64_t addr, uint32_t slot, CPUState *cpu, int fd, uint64_t sh
         }
     }
     uint64_t phys_addr_ram_offset = address_to_ram_offset(phys_addr);
-
-    //printf("phys_addr -> %lx\n", phys_addr);
         
     nyx_debug("%s: addr => %lx phys_addr => %lx\n", __func__, addr, phys_addr);
 
@@ -223,9 +210,6 @@ bool remap_slot(uint64_t addr, uint32_t slot, CPUState *cpu, int fd, uint64_t sh
 				assert(false);
 			}
 
-            //printf("MMUNMAP: %d\n", munmap((void*)(((uint64_t)block->host) + phys_addr), x86_64_PAGE_SIZE));
-            //printf("MMAP: %p\n", mmap((void*)(((uint64_t)block->host) + phys_addr), 0x1000, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, fd, (i*x86_64_PAGE_SIZE)));
-
             fast_reload_blacklist_page(get_fast_reload_snapshot(), phys_addr);
             break;
         }
@@ -235,8 +219,6 @@ bool remap_slot(uint64_t addr, uint32_t slot, CPUState *cpu, int fd, uint64_t sh
 }
 
 bool remap_payload_slot_protected(uint64_t phys_addr, uint32_t slot, CPUState *cpu){
-    //assert(0); /* nested code -> test me later */ 
-
     assert(GET_GLOBAL_STATE()->shared_payload_buffer_fd && GET_GLOBAL_STATE()->shared_payload_buffer_size);
     RAMBlock *block;
     refresh_kvm_non_dirty(cpu);
@@ -251,9 +233,6 @@ bool remap_payload_slot_protected(uint64_t phys_addr, uint32_t slot, CPUState *c
             /* TODO: put assert calls here */ 
             munmap((void*)(((uint64_t)block->host) + phys_addr_ram_offset), x86_64_PAGE_SIZE);
             mmap((void*)(((uint64_t)block->host) + phys_addr_ram_offset), 0x1000, PROT_READ , MAP_SHARED | MAP_FIXED, GET_GLOBAL_STATE()->shared_payload_buffer_fd, (i*x86_64_PAGE_SIZE));
-
-            //printf("MMUNMAP: %d\n", munmap((void*)(((uint64_t)block->host) + phys_addr), x86_64_PAGE_SIZE));
-            //printf("MMAP: %p\n", mmap((void*)(((uint64_t)block->host) + phys_addr), 0x1000, PROT_READ , MAP_SHARED | MAP_FIXED, GET_GLOBAL_STATE()->shared_payload_buffer_fd, (i*x86_64_PAGE_SIZE)));
 
             fast_reload_blacklist_page(get_fast_reload_snapshot(), phys_addr);
             break;
@@ -295,8 +274,6 @@ bool remap_payload_buffer(uint64_t virt_guest_addr, CPUState *cpu){
     refresh_kvm_non_dirty(cpu);
 
     for(uint32_t i = 0; i < (GET_GLOBAL_STATE()->shared_payload_buffer_size/x86_64_PAGE_SIZE); i++){
-        //MemTxAttrs attrs = MEMTXATTRS_UNSPECIFIED;
-        //hwaddr phys_addr = cpu_get_phys_page_attrs_debug(cpu, ((virt_guest_addr+(i*x86_64_PAGE_SIZE)) & x86_64_PAGE_MASK), &attrs);
         uint64_t phys_addr = get_paging_phys_addr(cpu, GET_GLOBAL_STATE()->parent_cr3, ((virt_guest_addr+(i*x86_64_PAGE_SIZE)) & x86_64_PAGE_MASK));
 
         assert(phys_addr != INVALID_ADDRESS);
@@ -305,17 +282,12 @@ bool remap_payload_buffer(uint64_t virt_guest_addr, CPUState *cpu){
 
         QLIST_FOREACH_RCU(block, &ram_list.blocks, next) {
             if(!memcmp(block->idstr, "pc.ram", 6)){
-                //printf("MMUNMAP: %d\n", munmap((void*)(((uint64_t)block->host) + phys_addr), x86_64_PAGE_SIZE));
                 if(munmap((void*)(((uint64_t)block->host) + phys_addr_ram_offset), x86_64_PAGE_SIZE) == -1){
                     nyx_error("munmap failed!\n");
-                    //exit(1);
                     assert(false);
                 }
-                //printf("MMAP: %lx\n", mmap((void*)(((uint64_t)block->host) + phys_addr), 0x1000, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, shared_payload_buffer_fd, (i*x86_64_PAGE_SIZE)));
-
                 if(mmap((void*)(((uint64_t)block->host) + phys_addr_ram_offset), 0x1000, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, GET_GLOBAL_STATE()->shared_payload_buffer_fd, (i*x86_64_PAGE_SIZE)) == MAP_FAILED){
                     nyx_error("mmap failed!\n");
-                    //exit(1);
                     assert(false);
                 }
 
@@ -335,7 +307,7 @@ bool remap_payload_buffer(uint64_t virt_guest_addr, CPUState *cpu){
 
 bool write_virtual_memory(uint64_t address, uint8_t* data, uint32_t size, CPUState *cpu)
 {
-    /* Todo: later &address_space_memory + phys_addr -> mmap SHARED */
+    /* TODO: later &address_space_memory + phys_addr -> mmap SHARED */
     int asidx;
     MemTxAttrs attrs;
     hwaddr phys_addr;
@@ -350,7 +322,6 @@ bool write_virtual_memory(uint64_t address, uint8_t* data, uint32_t size, CPUSta
             l = counter;
 
         refresh_kvm(cpu);
-        //cpu_synchronize_state(cpu);
         asidx = cpu_asidx_from_attrs(cpu, MEMTXATTRS_UNSPECIFIED);
         attrs = MEMTXATTRS_UNSPECIFIED;
         phys_addr = cpu_get_phys_page_attrs_debug(cpu, (address & x86_64_PAGE_MASK), &attrs);
@@ -474,8 +445,6 @@ static int redqueen_update_guest_debug(CPUState *cpu) {
     }
 
     return kvm_vcpu_ioctl(cpu, KVM_SET_GUEST_DEBUG, &data.dbg);
-
-    return 0;
 }
 
 static void redqueen_remove_all_breakpoints(CPUState *cpu) {
@@ -558,7 +527,6 @@ int insert_breakpoint(CPUState *cpu, uint64_t addr, uint64_t len){
 
 
 int remove_breakpoint(CPUState *cpu, uint64_t addr, uint64_t len){
-    //fprintf(stderr, "%s %lx\n", __func__, addr);
     redqueen_remove_breakpoint(cpu, addr, len);
     redqueen_update_guest_debug(cpu);
     return 0;
@@ -809,7 +777,6 @@ static uint64_t get_48_paging_phys_addr(uint64_t cr3, uint64_t addr, bool read_f
 
 bool read_virtual_memory(uint64_t address, uint8_t* data, uint32_t size, CPUState *cpu){
     uint8_t tmp_buf[x86_64_PAGE_SIZE];
-    //MemTxAttrs attrs;
     hwaddr phys_addr;
     int asidx;
     
@@ -825,12 +792,10 @@ bool read_virtual_memory(uint64_t address, uint8_t* data, uint32_t size, CPUStat
             len_to_copy = x86_64_PAGE_SIZE;
 
         asidx = cpu_asidx_from_attrs(cpu, MEMTXATTRS_UNSPECIFIED);
-        //MemTxAttrs attrs = MEMTXATTRS_UNSPECIFIED;
 #ifdef DEBUG_48BIT_WALK
         phys_addr_2 = cpu_get_phys_page_attrs_debug(cpu, (address & x86_64_PAGE_MASK), &attrs);
 #endif
         phys_addr = (hwaddr)get_paging_phys_addr(cpu, env->cr[3], address) & 0xFFFFFFFFFFFFF000ULL;// != 0xFFFFFFFFFFFFFFFFULL)
-        //nyx_debug_p(MEM_PREFIX, "TRANSLATE: %lx -> %lx == %lx", address, phys_addr, phys_addr_2);
 
 #ifdef DEBUG_48BIT_WALK
         assert(phys_addr == phys_addr_2);

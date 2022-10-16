@@ -19,16 +19,11 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 
 */
 
-#ifndef STATE_REALLOCATION
-#define STATE_REALLOCATION
-
+#pragma once
 #include "qemu/osdep.h"
 #include "monitor/monitor.h"
-//#include "qemu-common.h"
 #include "migration/migration.h"
 #include "nyx/khash.h"
-
-
 
 #define IO_BUF_SIZE 32768
 
@@ -40,10 +35,9 @@ struct QEMUFile_tmp {
     int64_t bytes_xfer;
     int64_t xfer_limit;
 
-    int64_t pos; /* start of buffer when writing, end of buffer
-                    when reading */
+    int64_t pos; // buffer start on write, end on read
     volatile int buf_index;
-    int buf_size; /* 0 when writing */
+    int buf_size; // 0 when writing
     uint8_t buf[IO_BUF_SIZE];
 };
 
@@ -88,8 +82,6 @@ typedef struct state_reallocation_s{
     size_t *get_size;
     void **get_data;
 
-    //QEMUFile** file; 
-    
     uint32_t fast_state_get_fptr_size; 
     uint32_t fast_state_get_fptr_pos;
 
@@ -103,11 +95,8 @@ typedef struct state_reallocation_s{
 
 state_reallocation_t* state_reallocation_new(QEMUFile *f);
 
-//void fdl_enumerate_global_states(QEMUFile *f);
 void fdl_fast_reload(state_reallocation_t* self);
 
 void fdl_fast_create_tmp(state_reallocation_t* self);
 void fdl_fast_enable_tmp(state_reallocation_t* self);
 void fdl_fast_disable_tmp(state_reallocation_t* self);
-
-#endif

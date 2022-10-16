@@ -1,43 +1,33 @@
-
 #include "qemu/osdep.h"
-#include "sysemu/sysemu.h"
-#include "cpu.h"
-#include "qemu/main-loop.h"
 
-#include "exec/ram_addr.h"
-#include "qemu/rcu_queue.h"
-#include "migration/migration.h"
-#include "migration/register.h"
-#include "migration/savevm.h"
-#include "migration/qemu-file.h"
-#include "migration/qjson.h"
-#include "migration/global_state.h"
-
-#include "nyx/snapshot/devices/nyx_device_state.h"
-#include "nyx/debug.h"
-
-#include "sysemu/block-backend.h"
-#include "block/qapi.h"
-#include "sysemu/runstate.h"
-#include "migration/vmstate.h"
-
-#include "nyx/snapshot/devices/state_reallocation.h"
-
-#include <linux/kvm.h>
-#include <sys/ioctl.h>
-#include <sys/mman.h>
-#include <sys/stat.h>
-#include <sys/types.h>
 #include <immintrin.h>
 #include <stdint.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
-#include "sysemu/kvm_int.h"
+#include "qemu/main-loop.h"
+#include "qemu/rcu_queue.h"
+
+#include "block/qapi.h"
+#include "exec/ram_addr.h"
+#include "migration/global_state.h"
+#include "migration/migration.h"
+#include "migration/qemu-file.h"
+#include "migration/qjson.h"
+#include "migration/register.h"
+#include "migration/savevm.h"
+#include "migration/vmstate.h"
+#include "sysemu/block-backend.h"
 #include "sysemu/cpus.h"
+#include "sysemu/kvm.h"
 #include "sysemu/reset.h"
+#include "sysemu/runstate.h"
+#include "sysemu/sysemu.h"
 
+#include "nyx/debug.h"
+#include "nyx/snapshot/devices/nyx_device_state.h"
+#include "nyx/snapshot/devices/state_reallocation.h"
 #include "nyx/snapshot/devices/vm_change_state_handlers.h"
-
-
 
 #define STATE_BUFFER    0x8000000  /* up to 128MB */
 
@@ -67,7 +57,7 @@ static void save_tsc_value(nyx_device_state_t* self, bool incremental_mode){
     CPUX86State *env = &cpu->env;
 
     if(incremental_mode){
-        self->tsc_value_incremental = env->tsc; // - 0x200000; /* fml */
+        self->tsc_value_incremental = env->tsc;
     }
     else{
         self->tsc_value = env->tsc;
@@ -342,7 +332,6 @@ nyx_device_state_t* nyx_device_state_init_from_snapshot(const char* snapshot_fol
     uint8_t ret = global_state_store();
     assert(!ret);
 
-    /* Testing Stuff */
     struct stat buffer;   
     assert(stat (qemu_state_file, &buffer) == 0);
 
@@ -353,7 +342,7 @@ nyx_device_state_t* nyx_device_state_init_from_snapshot(const char* snapshot_fol
     fclose(f);
 
     fast_savevm_opaque.buf = state_buf2;
-    fast_savevm_opaque.f = NULL;//fopen("/tmp/qemu_state", "w");
+    fast_savevm_opaque.f = NULL;
     fast_savevm_opaque.pos = 0;
     QEMUFile* file_dump = qemu_fopen_ops(&fast_savevm_opaque, &fast_loadvm_ops);
 
@@ -390,16 +379,14 @@ nyx_device_state_t* nyx_device_state_init(void){
 
     Error *local_err = NULL;
     struct fast_savevm_opaque_t fast_savevm_opaque, fast_loadvm_opaque;
-    //state_reallocation_t* qemu_state;
 
     void* tmp_buf = malloc(1024*1024*16);
-    //memset(self->state_buf, 0, STATE_BUFFER);
 
     fast_savevm_opaque.output_buffer = self->state_buf;
     fast_savevm_opaque.output_buffer_size = &self->state_buf_size;
 
-    fast_savevm_opaque.buf = tmp_buf;//self->state_buf;
-    fast_savevm_opaque.f = NULL; //fopen("/tmp/delta", "w");
+    fast_savevm_opaque.buf = tmp_buf;
+    fast_savevm_opaque.f = NULL;
     fast_savevm_opaque.pos = 0;
 
     uint8_t ret = global_state_store();
@@ -407,31 +394,21 @@ nyx_device_state_t* nyx_device_state_init(void){
 
     QEMUFile* f = qemu_fopen_ops(&fast_savevm_opaque, &fast_savevm_ops_to_buffer);
     ret = fast_qemu_savevm_state(f, &local_err);
-    //qemu_fflush(f);
 
-
-    fast_loadvm_opaque.buf = tmp_buf; //self->state_buf;
+    fast_loadvm_opaque.buf = tmp_buf;
     fast_loadvm_opaque.f = NULL;
     fast_loadvm_opaque.pos = 0;
     QEMUFile* file_dump = qemu_fopen_ops(&fast_loadvm_opaque, &fast_loadvm_ops);
 
-    //qemu_mutex_lock_iothread();
-    //qemu_devices_reset();
     self->qemu_state = state_reallocation_new(file_dump);
-    //qemu_mutex_unlock_iothread();
     qemu_fclose(file_dump);
 
-
-    //sleep(1);
     qemu_fclose(f);
     free(tmp_buf);
-
 
     enable_fast_snapshot_mode();
     save_tsc_value(self, false);
     return self;
-
-    //return qemu_state;
 }
 
 void nyx_device_state_switch_incremental(nyx_device_state_t* self){

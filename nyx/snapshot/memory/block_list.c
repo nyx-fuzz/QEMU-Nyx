@@ -1,6 +1,5 @@
 #include "qemu/osdep.h"
 #include "sysemu/sysemu.h"
-#include "cpu.h"
 #include "qemu/main-loop.h"
 
 #include "exec/ram_addr.h"
@@ -23,11 +22,7 @@ snapshot_page_blocklist_t* snapshot_page_blocklist_init(void){
   snapshot_page_blocklist_t* self = malloc(sizeof(snapshot_page_blocklist_t));
 
   uint64_t ram_size = get_ram_size();
-  //printf("%s: ram_size: 0x%lx\n", __func__, ram_size);
-
   self->phys_area_size = ram_size <= MEM_SPLIT_START ? ram_size : ram_size + (MEM_SPLIT_END-MEM_SPLIT_START);
-
-  //printf("%s: phys_area_size: 0x%lx\n", __func__, self->phys_area_size);
 
   self->phys_bitmap = malloc(BITMAP_SIZE(self->phys_area_size));
   memset(self->phys_bitmap, 0x0, BITMAP_SIZE(self->phys_area_size));

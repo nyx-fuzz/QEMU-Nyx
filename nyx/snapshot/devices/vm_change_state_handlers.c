@@ -2,7 +2,6 @@
 #include <assert.h>
 #include "qemu/osdep.h"
 #include "sysemu/sysemu.h"
-#include "cpu.h"
 #include "qemu/main-loop.h"
 #include "nyx/snapshot/devices/vm_change_state_handlers.h"
 
@@ -26,7 +25,8 @@ void call_fast_change_handlers(void){
     change_cpu_handler(change_cpu_opaque, 1, RUN_STATE_RUNNING);
 
     return;
-    /* check if necessary */
+    
+    /* TODO: check if necessary */
     if(change_ide_core_handler){
         for(uint8_t i = 0; i < change_ide_core_opaque_num; i++){
             change_ide_core_handler(change_ide_core_opaque[i], 1, RUN_STATE_RUNNING);

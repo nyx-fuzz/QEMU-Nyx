@@ -19,21 +19,20 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 
 */
 
-#ifndef REDQUEEN_H
-#define REDQUEEN_H
+#pragma once
+#include "qemu/osdep.h"
 
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include "qemu/osdep.h"
 #include <linux/kvm.h>
 #include <capstone/capstone.h>
 #include <capstone/x86.h>
-#include "redqueen_trace.h"
-#include "khash.h"
-#include "page_cache.h"
+#include "nyx/redqueen_trace.h"
+#include "nyx/khash.h"
+#include "nyx/page_cache.h"
 
 //#define RQ_DEBUG
 
@@ -120,4 +119,3 @@ void redqueen_remove_hooks(redqueen_t* self);
 
 void redqueen_callback(void* opaque, disassembler_mode_t mode, uint64_t start_addr, uint64_t end_addr);
 
-#endif
