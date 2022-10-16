@@ -6,9 +6,9 @@
 #include <unistd.h>
 #include <errno.h>
 
-#include "redqueen.h"
-#include "debug.h"
-#include "file_helper.h"
+#include "nyx/redqueen.h"
+//#include "debug.h"
+#include "nyx/file_helper.h"
 
 
 /*
