@@ -19,27 +19,27 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 
 */
 
-#pragma once 
+#pragma once
 
 #include <stdint.h>
 
-#define PAYLOAD_BUFFER_SIZE_64		26
-#define PAYLOAD_BUFFER_SIZE_32		20
+#define PAYLOAD_BUFFER_SIZE_64 26
+#define PAYLOAD_BUFFER_SIZE_32 20
 
 // FIXME: move to common nyx.h
-#define KAFL_MODE_64	0
-#define KAFL_MODE_32	1
-#define KAFL_MODE_16	2
+#define KAFL_MODE_64 0
+#define KAFL_MODE_32 1
+#define KAFL_MODE_16 2
 
-typedef struct{
-	uint64_t ip[4];
-	uint64_t size[4];
-	uint8_t enabled[4];
-} kAFL_ranges; 
+typedef struct {
+    uint64_t ip[4];
+    uint64_t size[4];
+    uint8_t  enabled[4];
+} kAFL_ranges;
 
 bool check_bitmap_byte(uint32_t value);
 
-//#define PANIC_DEBUG
+// #define PANIC_DEBUG
 
 /*
  * Panic Notifier Payload (x86-64)
@@ -50,7 +50,9 @@ bool check_bitmap_byte(uint32_t value);
  * 0f 01 c1                vmcall
  * f4                      hlt
  */
-#define PANIC_PAYLOAD_64 "\xFA\x48\xC7\xC0\x1F\x00\x00\x00\x48\xC7\xC3\x08\x00\x00\x00\x48\xC7\xC1\x00\x00\x00\x00\x0F\x01\xC1\xF4"
+#define PANIC_PAYLOAD_64                                                           \
+    "\xFA\x48\xC7\xC0\x1F\x00\x00\x00\x48\xC7\xC3\x08\x00\x00\x00\x48\xC7\xC1\x00" \
+    "\x00\x00\x00\x0F\x01\xC1\xF4"
 
 /*
  * Panic Notifier Payload (x86-32)
@@ -61,7 +63,9 @@ bool check_bitmap_byte(uint32_t value);
  * 0f 01 c1                vmcall
  * f4                      hlt
  */
-#define PANIC_PAYLOAD_32 "\xFA\xB8\x1F\x00\x00\x00\xBB\x08\x00\x00\x00\xB9\x00\x00\x00\x00\x0F\x01\xC1\xF4"
+#define PANIC_PAYLOAD_32                                                           \
+    "\xFA\xB8\x1F\x00\x00\x00\xBB\x08\x00\x00\x00\xB9\x00\x00\x00\x00\x0F\x01\xC1" \
+    "\xF4"
 
 /*
  * KASAN Notifier Payload (x86-64)
@@ -72,7 +76,9 @@ bool check_bitmap_byte(uint32_t value);
  * 0f 01 c1                vmcall
  * f4                      hlt
  */
-#define KASAN_PAYLOAD_64 "\xFA\x48\xC7\xC0\x1F\x00\x00\x00\x48\xC7\xC3\x09\x00\x00\x00\x48\xC7\xC1\x00\x00\x00\x00\x0F\x01\xC1\xF4"
+#define KASAN_PAYLOAD_64                                                           \
+    "\xFA\x48\xC7\xC0\x1F\x00\x00\x00\x48\xC7\xC3\x09\x00\x00\x00\x48\xC7\xC1\x00" \
+    "\x00\x00\x00\x0F\x01\xC1\xF4"
 
 /*
  * KASAN Notifier Payload (x86-32)
@@ -83,10 +89,12 @@ bool check_bitmap_byte(uint32_t value);
  * 0f 01 c1                vmcall
  * f4                      hlt
  */
-#define KASAN_PAYLOAD_32 "\xFA\xB8\x1F\x00\x00\x00\xBB\x09\x00\x00\x00\xB9\x00\x00\x00\x00\x0F\x01\xC1\xF4"
+#define KASAN_PAYLOAD_32                                                           \
+    "\xFA\xB8\x1F\x00\x00\x00\xBB\x09\x00\x00\x00\xB9\x00\x00\x00\x00\x0F\x01\xC1" \
+    "\xF4"
 
-void pt_setup_program(void* ptr);
-void pt_setup_snd_handler(void (*tmp)(char, void*), void* tmp_s);
+void pt_setup_program(void *ptr);
+void pt_setup_snd_handler(void (*tmp)(char, void *), void *tmp_s);
 void pt_setup_ip_filters(uint8_t filter_id, uint64_t start, uint64_t end);
 void pt_setup_enable_hypercalls(void);
 
@@ -107,38 +115,56 @@ bool pt_hypercalls_enabled(void);
 void hypercall_unlock(void);
 void hypercall_reload(void);
 
-void handle_hypercall_kafl_acquire(struct kvm_run *run, CPUState *cpu, uint64_t hypercall_arg);
-void handle_hypercall_kafl_release(struct kvm_run *run, CPUState *cpu, uint64_t hypercall_arg);
-void handle_hypercall_kafl_panic(struct kvm_run *run, CPUState *cpu, uint64_t hypercall_arg);
+void handle_hypercall_kafl_acquire(struct kvm_run *run,
+                                   CPUState       *cpu,
+                                   uint64_t        hypercall_arg);
+void handle_hypercall_kafl_release(struct kvm_run *run,
+                                   CPUState       *cpu,
+                                   uint64_t        hypercall_arg);
+void handle_hypercall_kafl_panic(struct kvm_run *run,
+                                 CPUState       *cpu,
+                                 uint64_t        hypercall_arg);
 
-void handle_hypercall_kafl_page_dump_bp(struct kvm_run *run, CPUState *cpu, uint64_t hypercall_arg, uint64_t page);
+void handle_hypercall_kafl_page_dump_bp(struct kvm_run *run,
+                                        CPUState       *cpu,
+                                        uint64_t        hypercall_arg,
+                                        uint64_t        page);
 
 
-void hprintf(char* msg);
+void hprintf(char *msg);
 
-bool handle_hypercall_kafl_next_payload(struct kvm_run *run, CPUState *cpu, uint64_t hypercall_arg);
+bool handle_hypercall_kafl_next_payload(struct kvm_run *run,
+                                        CPUState       *cpu,
+                                        uint64_t        hypercall_arg);
 void hypercall_reset_hprintf_counter(void);
 
-bool handle_hypercall_kafl_hook(struct kvm_run *run, CPUState *cpu, uint64_t hypercall_arg);
-void handle_hypercall_kafl_mtf(struct kvm_run *run, CPUState *cpu, uint64_t hypercall_arg);
+bool handle_hypercall_kafl_hook(struct kvm_run *run,
+                                CPUState       *cpu,
+                                uint64_t        hypercall_arg);
+void handle_hypercall_kafl_mtf(struct kvm_run *run,
+                               CPUState       *cpu,
+                               uint64_t        hypercall_arg);
 void pt_enable_rqo(CPUState *cpu);
 void pt_disable_rqo(CPUState *cpu);
 void pt_enable_rqi(CPUState *cpu);
 void pt_disable_rqi(CPUState *cpu);
-void pt_set_redqueen_instrumentation_mode(CPUState *cpu, int redqueen_instruction_mode);
+void pt_set_redqueen_instrumentation_mode(CPUState *cpu,
+                                          int       redqueen_instruction_mode);
 void pt_set_redqueen_update_blacklist(CPUState *cpu, bool newval);
 void pt_set_enable_patches_pending(CPUState *cpu);
 void pt_set_disable_patches_pending(CPUState *cpu);
 
 void create_fast_snapshot(CPUState *cpu, bool nested);
-int handle_kafl_hypercall(struct kvm_run *run, CPUState *cpu, uint64_t hypercall, uint64_t arg);
+int  handle_kafl_hypercall(struct kvm_run *run,
+                           CPUState       *cpu,
+                           uint64_t        hypercall,
+                           uint64_t        arg);
 
 void skip_init(void);
 
-typedef struct kafl_dump_file_s{
-  uint64_t file_name_str_ptr;
-  uint64_t data_ptr;
-  uint64_t bytes;
-  uint8_t append;
+typedef struct kafl_dump_file_s {
+    uint64_t file_name_str_ptr;
+    uint64_t data_ptr;
+    uint64_t bytes;
+    uint8_t  append;
 } __attribute__((packed)) kafl_dump_file_t;
-
