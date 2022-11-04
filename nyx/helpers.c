@@ -1,6 +1,7 @@
 #include "qemu/osdep.h"
 
 #include <linux/kvm.h>
+#include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <sys/ioctl.h>
@@ -17,10 +18,19 @@
 #include "nyx/memory_access.h"
 #include "nyx/state/state.h"
 
-void nyx_abort(char *msg)
+void nyx_abort(const char *fmt, ...)
 {
+    static char msg[512];
+    uint32_t    msglen = 0;
+    va_list     ap;
+
+    va_start(ap, fmt);
+    msglen = vsnprintf(msg, sizeof(msg), fmt, ap);
+    va_end(ap);
+
+    nyx_error("%s\n", msg);
     set_abort_reason_auxiliary_buffer(GET_GLOBAL_STATE()->auxilary_buffer, msg,
-                                      strlen(msg));
+                                      msglen);
     synchronization_lock();
     exit(1);
 }
@@ -28,11 +38,7 @@ void nyx_abort(char *msg)
 bool is_called_in_fuzzing_mode(const char *hypercall)
 {
     if (GET_GLOBAL_STATE()->in_fuzzing_mode) {
-        char *tmp = NULL;
-        assert(asprintf(&tmp, "Hypercall <%s> called during fuzzing...", hypercall) !=
-               -1);
-        nyx_abort((char *)tmp);
-        free(tmp);
+        nyx_abort("Hypercall <%s> not allowed during fuzzing!", hypercall);
         return true;
     }
     return false;

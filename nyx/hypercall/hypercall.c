@@ -105,8 +105,7 @@ bool handle_hypercall_kafl_next_payload(struct kvm_run *run,
 
         } else {
             if (GET_GLOBAL_STATE()->set_agent_config_done == false) {
-                nyx_abort(
-                    (char *)"KVM_EXIT_KAFL_SET_AGENT_CONFIG was not called...");
+                nyx_abort("KVM_EXIT_KAFL_SET_AGENT_CONFIG was not called.");
                 return false;
             }
 
@@ -175,7 +174,7 @@ static void handle_hypercall_get_payload(struct kvm_run *run,
     }
 
     if (GET_GLOBAL_STATE()->get_host_config_done == false) {
-        nyx_abort((char *)"KVM_EXIT_KAFL_GET_HOST_CONFIG was not called...");
+        nyx_abort("KVM_EXIT_KAFL_GET_HOST_CONFIG was not called...");
         return;
     }
 
@@ -189,9 +188,7 @@ static void handle_hypercall_get_payload(struct kvm_run *run,
         // print_48_pagetables(GET_GLOBAL_STATE()->parent_cr3);
 
         if (hypercall_arg & 0xFFF) {
-            fprintf(stderr, "[QEMU-Nyx] Error: Payload buffer is not page-aligned! (0x%lx)\n",
-                    hypercall_arg);
-            abort();
+            nyx_abort("Payload buffer at 0x%lx is not page-aligned!", hypercall_arg);
         }
 
         remap_payload_buffer(hypercall_arg, cpu);
@@ -518,8 +515,7 @@ void handle_hypercall_kafl_panic(struct kvm_run *run,
             }
             synchronization_lock_crash_found();
         } else {
-            nyx_abort(
-                (char *)"Agent has crashed before initializing the fuzzing loop...");
+            nyx_abort("Agent has crashed before initializing the fuzzing loop...");
         }
     }
 }
@@ -545,22 +541,17 @@ static void handle_hypercall_kafl_panic_extended(struct kvm_run *run,
                                                  CPUState       *cpu,
                                                  uint64_t        hypercall_arg)
 {
+    read_virtual_memory(hypercall_arg, (uint8_t *)hprintf_buffer, HPRINTF_SIZE, cpu);
+
     if (fast_reload_snapshot_exists(get_fast_reload_snapshot()) &&
         GET_GLOBAL_STATE()->in_fuzzing_mode)
     {
-        read_virtual_memory(hypercall_arg, (uint8_t *)hprintf_buffer, HPRINTF_SIZE,
-                            cpu);
         set_crash_reason_auxiliary_buffer(GET_GLOBAL_STATE()->auxilary_buffer,
                                           hprintf_buffer, strlen(hprintf_buffer));
         synchronization_lock_crash_found();
     } else {
-        read_virtual_memory(hypercall_arg, (uint8_t *)hprintf_buffer, HPRINTF_SIZE,
-                            cpu);
-        char *report = NULL;
-        assert(asprintf(&report,
-                        "Agent has crashed before initializing the fuzzing loop: %s",
-                        hprintf_buffer) != -1);
-        nyx_abort(report);
+        nyx_abort("Agent has crashed before initializing the fuzzing loop: %s",
+                  hprintf_buffer);
     }
 }
 
@@ -870,13 +861,11 @@ int handle_kafl_hypercall(struct kvm_run *run,
         ret = 0;
         break;
     case KVM_EXIT_KAFL_GET_PROGRAM:
-        nyx_abort(
-            (char *)"Deprecated hypercall called (HYPERCALL_KAFL_GET_PROGRAM)...");
+        nyx_abort("Hypercall is deprecated: HYPERCALL_KAFL_GET_PROGRAM");
         ret = 0;
         break;
     case KVM_EXIT_KAFL_GET_ARGV:
-        nyx_abort(
-            (char *)"Deprecated hypercall called (HYPERCALL_KAFL_GET_ARGV)...");
+        nyx_abort("Hypercall is deprecated: HYPERCALL_KAFL_GET_ARGV");
         ret = 0;
         break;
     case KVM_EXIT_KAFL_RELEASE:
@@ -908,7 +897,7 @@ int handle_kafl_hypercall(struct kvm_run *run,
         ret = 0;
         break;
     case KVM_EXIT_KAFL_INFO:
-        nyx_abort((char *)"Deprecated hypercall called (HYPERCALL_KAFL_INFO)...");
+        nyx_abort("Hypercall is deprecated: HYPERCALL_KAFL_INFO");
         ret = 0;
         break;
     case KVM_EXIT_KAFL_NEXT_PAYLOAD:
@@ -920,12 +909,11 @@ int handle_kafl_hypercall(struct kvm_run *run,
         ret = 0;
         break;
     case KVM_EXIT_KAFL_PRINTK_ADDR:
-        nyx_abort(
-            (char *)"Deprecated hypercall called (KVM_EXIT_KAFL_PRINTK_ADDR)...");
+        nyx_abort("Hypercall is deprecated: KVM_EXIT_KAFL_PRINTK_ADDR");
         ret = 0;
         break;
     case KVM_EXIT_KAFL_PRINTK:
-        nyx_abort((char *)"Deprecated hypercall called (KVM_EXIT_KAFL_PRINTK)...");
+        nyx_abort("Hypercall is deprecated: KVM_EXIT_KAFL_PRINTK");
         ret = 0;
         break;
     case KVM_EXIT_KAFL_USER_RANGE_ADVISE:
