@@ -162,7 +162,7 @@ static int nyx_create_payload_buffer(nyx_interface_state *s,
     fd = open(file, O_CREAT | O_RDWR, S_IRWXU | S_IRWXG | S_IRWXO);
     assert(ftruncate(fd, buffer_size) == 0);
     stat(file, &st);
-    nyx_debug_p(INTERFACE_PREFIX, "new shm file: (max size: %lx) %lx", buffer_size,
+    nyx_debug_p(INTERFACE_PREFIX, "new shm file: (max size: %lx) %lx\n", buffer_size,
                 st.st_size);
 
     assert(buffer_size == st.st_size);
@@ -419,7 +419,7 @@ static void nyx_realize(DeviceState *dev, Error **errp)
     }
 
     if (!s->sharedir || !verify_sharedir_state(s, errp)) {
-        nyx_error("Warning: Invalid sharedir...\n");
+        nyx_warn("Invalid sharedir...\n");
     } else {
         sharedir_set_dir(GET_GLOBAL_STATE()->sharedir, s->sharedir);
     }

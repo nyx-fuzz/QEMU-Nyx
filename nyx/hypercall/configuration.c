@@ -1,5 +1,6 @@
 #include "qemu/osdep.h"
 
+#include "nyx/debug.h"
 #include "nyx/helpers.h"
 #include "nyx/hypercall/configuration.h"
 #include "nyx/memory_access.h"
@@ -55,18 +56,16 @@ void handle_hypercall_kafl_set_agent_config(struct kvm_run *run,
 
     if (read_virtual_memory(vaddr, (uint8_t *)&config, sizeof(agent_config_t), cpu)) {
         if (config.agent_magic != NYX_AGENT_MAGIC) {
-            fprintf(stderr,
-                    "[QEMU-Nyx] Error: NYX_AGENT_MAGIC not found in agent "
-                    "configuration - You are probably using an outdated agent...\n");
+            nyx_error("Error: NYX_AGENT_MAGIC not found in agent configuration"
+                      " - You are probably using an outdated agent...\n");
             exit(1);
         }
 
         if (config.agent_version != NYX_AGENT_VERSION) {
-            fprintf(stderr,
-                    "[QEMU-Nyx] Error: NYX_AGENT_VERSION does not match in agent "
-                    "configuration (%d != %d) - "
-                    "You are probably using an outdated agent...\n",
-                    config.agent_version, NYX_AGENT_VERSION);
+            nyx_error("Error: NYX_AGENT_VERSION does not match in agent "
+                      "configuration (%d != %d) - "
+                      "You are probably using an outdated agent...\n",
+                      config.agent_version, NYX_AGENT_VERSION);
             exit(1);
         }
 
@@ -78,10 +77,8 @@ void handle_hypercall_kafl_set_agent_config(struct kvm_run *run,
         if (!GET_GLOBAL_STATE()->cap_compile_time_tracing &&
             !GET_GLOBAL_STATE()->nyx_fdl)
         {
-            fprintf(
-                stderr,
-                "[QEMU-Nyx] Error: Attempt to fuzz target without compile-time "
-                "instrumentation - Intel PT is not supported on this KVM build!\n");
+            nyx_error("Error: No Intel PT support on this KVM build and no "
+                      "compile-time instrumentation enabled in the target\n");
             exit(1);
         }
 
@@ -117,8 +114,7 @@ void handle_hypercall_kafl_set_agent_config(struct kvm_run *run,
         }
 
     } else {
-        fprintf(stderr, "[QEMU-Nyx] Error: %s - failed (vaddr: 0x%lx)!\n", __func__,
-                vaddr);
+        nyx_error("Error: %s - failed (vaddr: 0x%lx)!\n", __func__, vaddr);
         exit(1);
     }
     GET_GLOBAL_STATE()->set_agent_config_done = true;

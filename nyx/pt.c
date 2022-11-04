@@ -62,8 +62,8 @@ static inline int pt_cmd_hmp_context(CPUState *cpu, uint64_t cmd)
 {
     cpu->pt_ret = -1;
     if (pt_hypercalls_enabled()) {
-        nyx_debug_p(PT_PREFIX, "Error: HMP commands are ignored if kafl tracing "
-                               "mode is enabled (-kafl)!");
+        nyx_error("HMP commands are ignored if kafl tracing "
+                  "mode is enabled (-kafl)!\n");
     } else {
         cpu->pt_cmd = cmd;
         run_on_cpu(cpu, pt_set, RUN_ON_CPU_NULL);
@@ -110,16 +110,16 @@ void pt_dump(CPUState *cpu, int bytes)
                 cpu->intel_pt_run_trashed = true;
                 break;
             case decoder_page_fault:
-                // fprintf(stderr, "Page not found => 0x%lx\n", libxdc_get_page_fault_addr(GET_GLOBAL_STATE()->decoder));
+                // nyx_warn("Page not found => 0x%lx\n", libxdc_get_page_fault_addr(GET_GLOBAL_STATE()->decoder));
                 GET_GLOBAL_STATE()->decoder_page_fault = true;
                 GET_GLOBAL_STATE()->decoder_page_fault_addr =
                     libxdc_get_page_fault_addr(GET_GLOBAL_STATE()->decoder);
                 break;
             case decoder_unkown_packet:
-                fprintf(stderr, "WARNING: libxdc_decode returned unknown_packet\n");
+                nyx_warn("WARNING: libxdc_decode returned unknown_packet\n");
                 break;
             case decoder_error:
-                fprintf(stderr, "WARNING: libxdc_decode returned decoder_error\n");
+                nyx_warn("WARNING: libxdc_decode returned decoder_error\n");
                 break;
             }
         }
@@ -158,7 +158,7 @@ int pt_set_cr3(CPUState *cpu, uint64_t val, bool hmp_mode)
         return -EINVAL;
     }
     if (GET_GLOBAL_STATE()->pt_c3_filter && GET_GLOBAL_STATE()->pt_c3_filter != val) {
-        // nyx_debug_p(PT_PREFIX, "Reconfigure CR3-Filtering!");
+        // nyx_debug_p(PT_PREFIX, "Reconfigure CR3-Filtering!\n");
         GET_GLOBAL_STATE()->pt_c3_filter = val;
         r += pt_cmd(cpu, KVM_VMX_PT_CONFIGURE_CR3, hmp_mode);
         r += pt_cmd(cpu, KVM_VMX_PT_ENABLE_CR3, hmp_mode);
@@ -185,7 +185,7 @@ int pt_enable_ip_filtering(CPUState *cpu, uint8_t addrn, bool redqueen, bool hmp
     if (GET_GLOBAL_STATE()->pt_ip_filter_a[addrn] >
         GET_GLOBAL_STATE()->pt_ip_filter_b[addrn])
     {
-        nyx_debug_p(PT_PREFIX, "Error (ip_a > ip_b) 0x%lx-0x%lx",
+        nyx_debug_p(PT_PREFIX, "Error (ip_a > ip_b) 0x%lx-0x%lx\n",
                     GET_GLOBAL_STATE()->pt_ip_filter_a[addrn],
                     GET_GLOBAL_STATE()->pt_ip_filter_b[addrn]);
         return -EINVAL;
@@ -195,7 +195,7 @@ int pt_enable_ip_filtering(CPUState *cpu, uint8_t addrn, bool redqueen, bool hmp
         pt_disable_ip_filtering(cpu, addrn, hmp_mode);
     }
 
-    nyx_debug_p(PT_PREFIX, "Configuring new trace region (addr%d, 0x%lx-0x%lx)",
+    nyx_debug_p(PT_PREFIX, "Configuring new trace region (addr%d, 0x%lx-0x%lx)\n",
                 addrn, GET_GLOBAL_STATE()->pt_ip_filter_a[addrn],
                 GET_GLOBAL_STATE()->pt_ip_filter_b[addrn]);
 
@@ -287,20 +287,20 @@ void pt_pre_kvm_run(CPUState *cpu)
     struct vmx_pt_filter_iprs filter_iprs;
 
     if (GET_GLOBAL_STATE()->patches_disable_pending) {
-        // nyx_debug_p(REDQUEEN_PREFIX, "patches disable");
+        // nyx_debug_p(REDQUEEN_PREFIX, "patches disable\n");
         assert(false); /* remove this branch */
         GET_GLOBAL_STATE()->patches_disable_pending = false;
     }
 
     if (GET_GLOBAL_STATE()->patches_enable_pending) {
-        // nyx_debug_p(REDQUEEN_PREFIX, "patches enable");
+        // nyx_debug_p(REDQUEEN_PREFIX, "patches enable\n");
         assert(false); /* remove this branch */
         GET_GLOBAL_STATE()->patches_enable_pending = false;
     }
 
 
     if (GET_GLOBAL_STATE()->redqueen_enable_pending) {
-        // nyx_debug_p(REDQUEEN_PREFIX, "rq enable");
+        // nyx_debug_p(REDQUEEN_PREFIX, "rq enable\n");
         if (GET_GLOBAL_STATE()->redqueen_state) {
             enable_rq_intercept_mode(GET_GLOBAL_STATE()->redqueen_state);
         }
@@ -308,7 +308,7 @@ void pt_pre_kvm_run(CPUState *cpu)
     }
 
     if (GET_GLOBAL_STATE()->redqueen_disable_pending) {
-        // nyx_debug_p(REDQUEEN_PREFIX, "rq disable");
+        // nyx_debug_p(REDQUEEN_PREFIX, "rq disable\n");
         if (GET_GLOBAL_STATE()->redqueen_state) {
             disable_rq_intercept_mode(GET_GLOBAL_STATE()->redqueen_state);
         }
@@ -352,7 +352,7 @@ void pt_pre_kvm_run(CPUState *cpu)
                 if (cpu->pt_fd) {
                     ret = ioctl(cpu->pt_fd, cpu->pt_cmd, 0);
                     if (ret > 0) {
-                        // nyx_debug_p(PT_PREFIX, "KVM_VMX_PT_DISABLE %d", ret);
+                        // nyx_debug_p(PT_PREFIX, "KVM_VMX_PT_DISABLE %d\n", ret);
                         pt_dump(cpu, ret);
                         cpu->pt_enabled = false;
                     }

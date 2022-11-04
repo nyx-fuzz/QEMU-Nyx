@@ -135,7 +135,7 @@ void check_auxiliary_config_buffer(auxilary_buffer_t        *auxilary_buffer,
             uint64_t data;
             VOLATILE_READ_64(data, auxilary_buffer->configuration.page_addr);
             GET_GLOBAL_STATE()->dump_page_addr = data;
-            // fprintf(stderr, "%s dump_page_addr => 0x%lx\n", __func__, GET_GLOBAL_STATE()->dump_page_addr);
+            // nyx_debug("%s dump_page_addr => 0x%lx\n", __func__, GET_GLOBAL_STATE()->dump_page_addr);
             VOLATILE_WRITE_8(auxilary_buffer->configuration.page_dump_mode, 0);
             VOLATILE_WRITE_64(auxilary_buffer->configuration.page_addr, 0);
         }

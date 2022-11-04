@@ -72,7 +72,7 @@ void handle_hypercall_kafl_nested_prepare(struct kvm_run *run,
     if ((uint64_t)run->hypercall.args[0]) {
         nyx_debug_p(CORE_PREFIX,
                     "handle_hypercall_kafl_nested_prepare:\t NUM:\t%lx\t "
-                    "ADDRESS:\t%lx\t CR3:\t%lx",
+                    "ADDRESS:\t%lx\t CR3:\t%lx\n",
                     (uint64_t)run->hypercall.args[0], (uint64_t)run->hypercall.args[1],
                     (uint64_t)run->hypercall.args[2]);
     } else {
@@ -91,7 +91,7 @@ void handle_hypercall_kafl_nested_prepare(struct kvm_run *run,
         if (i == 0) {
             htos_config = buffer[i];
         }
-        nyx_debug_p(CORE_PREFIX, "ADDRESS: %lx", buffer[i]);
+        nyx_debug_p(CORE_PREFIX, "ADDRESS: %lx\n", buffer[i]);
         remap_payload_slot(buffer[i], i, cpu);
     }
 

@@ -202,13 +202,13 @@ static void write_address(uint64_t address, uint64_t size, uint64_t prot)
         /* do not print guard pages or empty pages without any permissions */
         if (last_address && (CHECK_BIT(last_prot, 1) || !CHECK_BIT(last_prot, 63))) {
             if (CHECK_BIT(last_prot, 1) && !CHECK_BIT(last_prot, 63)) {
-                nyx_debug_p(NESTED_VM_PREFIX, "%016lx - %016lx %c%c%c [WARNING]",
+                nyx_debug_p(NESTED_VM_PREFIX, "%016lx - %016lx %c%c%c [WARNING]\n",
                             last_address, next_address,
                             CHECK_BIT(last_prot, 1) ? 'W' : '-',
                             CHECK_BIT(last_prot, 2) ? 'U' : 'K',
                             !CHECK_BIT(last_prot, 63) ? 'X' : '-');
             } else {
-                nyx_debug_p(NESTED_VM_PREFIX, "%016lx - %016lx %c%c%c", last_address,
+                nyx_debug_p(NESTED_VM_PREFIX, "%016lx - %016lx %c%c%c\n", last_address,
                             next_address, CHECK_BIT(last_prot, 1) ? 'W' : '-',
                             CHECK_BIT(last_prot, 2) ? 'U' : 'K',
                             !CHECK_BIT(last_prot, 63) ? 'X' : '-');
@@ -376,11 +376,11 @@ void kvm_nested_get_info(CPUState *cpu)
 
     __attribute__((unused)) struct vmcs12 *saved_vmcs =
         (struct vmcs12 *)&(env->nested_state->data);
-    nyx_debug_p(NESTED_VM_PREFIX, "VMCS host_cr3:\t%lx", saved_vmcs->host_cr3);
-    nyx_debug_p(NESTED_VM_PREFIX, "VMCS host_cr4:\t%lx", saved_vmcs->host_cr4);
-    nyx_debug_p(NESTED_VM_PREFIX, "VMCS host_ia32_efer:\t%lx",
+    nyx_debug_p(NESTED_VM_PREFIX, "VMCS host_cr3:\t%lx\n", saved_vmcs->host_cr3);
+    nyx_debug_p(NESTED_VM_PREFIX, "VMCS host_cr4:\t%lx\n", saved_vmcs->host_cr4);
+    nyx_debug_p(NESTED_VM_PREFIX, "VMCS host_ia32_efer:\t%lx\n",
                 saved_vmcs->host_ia32_efer);
-    nyx_debug_p(NESTED_VM_PREFIX, "VMCS host_cr0:\t%lx", saved_vmcs->host_cr0);
+    nyx_debug_p(NESTED_VM_PREFIX, "VMCS host_cr0:\t%lx\n", saved_vmcs->host_cr0);
 
     return;
 }

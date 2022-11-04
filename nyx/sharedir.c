@@ -142,8 +142,7 @@ static FILE *get_file_ptr(sharedir_t *self, sharedir_file_t *obj)
 uint64_t sharedir_request_file(sharedir_t *self, const char *file, uint8_t *page_buffer)
 {
     if (!self->dir) {
-        fprintf(stderr, "WARNING: New file request received, but no share dir configured! [FILE: %s]\n",
-                file);
+        nyx_error("Guest requests file <%s> but no sharedir configured!\n", file);
         return 0xFFFFFFFFFFFFFFFFUL;
     }
 
@@ -152,10 +151,10 @@ uint64_t sharedir_request_file(sharedir_t *self, const char *file, uint8_t *page
     sharedir_file_t *obj = sharedir_get_object(self, file);
     if (obj != NULL) {
 #ifdef SHAREDIR_DEBUG
-        printf("sharedir_get_object->file: %s\n", obj->file);
-        printf("sharedir_get_object->path: %s\n", obj->path);
-        printf("sharedir_get_object->size: %ld\n", obj->size);
-        printf("sharedir_get_object->bytes_left: %ld\n", obj->bytes_left);
+        nyx_debug("sharedir_get_object->file: %s\n", obj->file);
+        nyx_debug("sharedir_get_object->path: %s\n", obj->path);
+        nyx_debug("sharedir_get_object->size: %ld\n", obj->size);
+        nyx_debug("sharedir_get_object->bytes_left: %ld\n", obj->bytes_left);
 #endif
         if (obj->bytes_left >= 0x1000) {
             f = get_file_ptr(self, obj);
@@ -179,7 +178,7 @@ uint64_t sharedir_request_file(sharedir_t *self, const char *file, uint8_t *page
             }
         }
     } else {
-        nyx_error("Warning: No such file in sharedir: %s\n", file);
+        nyx_error("No such file in sharedir: %s\n", file);
         return 0xFFFFFFFFFFFFFFFFUL;
     }
 }

@@ -247,7 +247,7 @@ page_cache_t *page_cache_new(CPUState *cpu, const char *cache_file)
     self->last_page = 0xFFFFFFFFFFFFFFFF;
     self->last_addr = 0xFFFFFFFFFFFFFFFF;
 
-    nyx_debug_p(PAGE_CACHE_PREFIX, "%s (%s - %s)", __func__, tmp1, tmp2);
+    nyx_debug_p(PAGE_CACHE_PREFIX, "%s (%s - %s)\n", __func__, tmp1, tmp2);
 
     free(tmp3);
     free(tmp2);

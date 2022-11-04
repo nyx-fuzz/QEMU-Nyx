@@ -99,7 +99,7 @@ static bool is_interessting_lea_at(redqueen_t *self, cs_insn *ins)
         if (reg == X86_REG_EIP || reg == X86_REG_RIP || reg == X86_REG_EBP ||
             reg == X86_REG_RBP)
         {
-            // nyx_debug_p(REDQUEEN_PREFIX, "got boring index");
+            // nyx_debug_p(REDQUEEN_PREFIX, "got boring index\n");
             res = false;
         } // don't instrument local stack offset computations
     }
@@ -198,26 +198,26 @@ static void opcode_analyzer(redqueen_t *self, cs_insn *ins)
     // printf("INS %lx\n", ins->address);
     if (ins->id == X86_INS_CMP) {
         set_rq_instruction(self, ins->address);
-        // nyx_debug_p(REDQUEEN_PREFIX, "hooking cmp %lx %s %s", ins->address, ins->mnemonic, ins->op_str);
+        // nyx_debug_p(REDQUEEN_PREFIX, "hooking cmp %lx %s %s\n", ins->address, ins->mnemonic, ins->op_str);
     }
     if (ins->id == X86_INS_LEA && is_interessting_lea_at(self, ins)) {
-        // nyx_debug_p(REDQUEEN_PREFIX, "hooking lea %lx", ins->address);
+        // nyx_debug_p(REDQUEEN_PREFIX, "hooking lea %lx\n", ins->address);
         set_rq_instruction(self, ins->address);
     }
     if (ins->id == X86_INS_SUB && is_interessting_sub_at(self, ins)) {
-        // nyx_debug_p(REDQUEEN_PREFIX, "hooking sub %lx", ins->address);
+        // nyx_debug_p(REDQUEEN_PREFIX, "hooking sub %lx\n", ins->address);
         set_rq_instruction(self, ins->address);
     }
     if (ins->id == X86_INS_ADD && is_interessting_add_at(self, ins)) {
-        // nyx_debug_p(REDQUEEN_PREFIX, "hooking add %lx", ins->address);
+        // nyx_debug_p(REDQUEEN_PREFIX, "hooking add %lx\n", ins->address);
         set_rq_instruction(self, ins->address);
     }
     if (ins->id == X86_INS_XOR && is_interessting_xor_at(self, ins)) {
-        // nyx_debug_p(REDQUEEN_PREFIX, "hooking xor %lx %s %s", ins->address, ins->mnemonic, ins->op_str);
+        // nyx_debug_p(REDQUEEN_PREFIX, "hooking xor %lx %s %s\n", ins->address, ins->mnemonic, ins->op_str);
         set_rq_instruction(self, ins->address);
     }
     if (ins->id == X86_INS_CALL || ins->id == X86_INS_LCALL) {
-        // nyx_debug_p(REDQUEEN_PREFIX, "hooking call %lx %s %s", ins->address, ins->mnemonic, ins->op_str);
+        // nyx_debug_p(REDQUEEN_PREFIX, "hooking call %lx %s %s\n", ins->address, ins->mnemonic, ins->op_str);
         set_rq_instruction(self, ins->address);
     }
 }
@@ -346,7 +346,7 @@ static void insert_hooks_bitmap(redqueen_t *self)
 
 void redqueen_insert_hooks(redqueen_t *self)
 {
-    nyx_debug_p(REDQUEEN_PREFIX, "insert hooks");
+    nyx_debug_p(REDQUEEN_PREFIX, "insert hooks\n");
     assert(!self->hooks_applied);
     switch (GET_GLOBAL_STATE()->redqueen_instrumentation_mode) {
     case (REDQUEEN_LIGHT_INSTRUMENTATION):
@@ -365,7 +365,7 @@ void redqueen_insert_hooks(redqueen_t *self)
 
 void redqueen_remove_hooks(redqueen_t *self)
 {
-    nyx_debug_p(REDQUEEN_PREFIX, "remove hooks");
+    nyx_debug_p(REDQUEEN_PREFIX, "remove hooks\n");
     assert(self->hooks_applied);
     remove_all_breakpoints(self->cpu);
 
@@ -738,7 +738,7 @@ static uint64_t eval_mem(cs_x86_op *op)
 {
     uint64_t val = 0;
     assert(op->size == 1 || op->size == 2 || op->size == 4 || op->size == 8);
-    // nyx_debug_p(REDQUEEN_PREFIX, "EVAL MEM FOR OP:");
+    // nyx_debug_p(REDQUEEN_PREFIX, "EVAL MEM FOR OP:\n");
 
     /* TODO @ sergej: replace me later */
     read_virtual_memory(eval_addr(op), (uint8_t *)&val, op->size, qemu_get_cpu(0));
@@ -787,7 +787,7 @@ static void print_comp_result(uint64_t    addr,
 
     uint8_t pos = 0;
     pos += snprintf(result_buf + pos, 256 - pos, "%lx\t\t %s", addr, type);
-    // nyx_debug_p(REDQUEEN_PREFIX, "got size: %ld", size);
+    // nyx_debug_p(REDQUEEN_PREFIX, "got size: %ld\n", size);
     uint64_t mask = 0;
     switch (size) {
     case 64:
@@ -993,7 +993,7 @@ static bool test_strcmp(uint64_t arg1, uint64_t arg2)
     if (!is_addr_mapped(arg1, cpu) || !is_addr_mapped(arg2, cpu)) {
         return false;
     }
-    // nyx_debug_p(REDQUEEN_PREFIX,"valid ptrs");
+    // nyx_debug_p(REDQUEEN_PREFIX,"valid ptrs\n");
     uint8_t buf1[REDQUEEN_MAX_STRCMP_LEN];
     uint8_t buf2[REDQUEEN_MAX_STRCMP_LEN];
     /* TODO @ sergej */
@@ -1007,7 +1007,7 @@ static bool test_strcmp_cdecl(void)
 {
     uint64_t arg1 = read_stack(0);
     uint64_t arg2 = read_stack(1);
-    // nyx_debug_p(REDQUEEN_PREFIX, "extract call params cdecl %lx %lx", arg1, arg2);
+    // nyx_debug_p(REDQUEEN_PREFIX, "extract call params cdecl %lx %lx\n", arg1, arg2);
     test_strchr(arg1, arg2);
     return test_strcmp(arg1, arg2);
 }
@@ -1017,7 +1017,7 @@ static bool test_strcmp_fastcall(void)
     CPUX86State *env  = &(X86_CPU(qemu_get_cpu(0)))->env;
     uint64_t     arg1 = env->regs[RCX]; // rcx
     uint64_t     arg2 = env->regs[RDX]; // rdx
-    // nyx_debug_p(REDQUEEN_PREFIX, "extract call params fastcall %lx %lx", arg1, arg2);
+    // nyx_debug_p(REDQUEEN_PREFIX, "extract call params fastcall %lx %lx\n", arg1, arg2);
     test_strchr(arg1, arg2);
     return test_strcmp(arg1, arg2);
 }
@@ -1030,14 +1030,14 @@ static bool test_strcmp_sys_v(void)
     CPUX86State *env  = &(X86_CPU(qemu_get_cpu(0)))->env;
     uint64_t     arg1 = env->regs[RDI]; // rdx
     uint64_t     arg2 = env->regs[RSI]; // rsi
-    // nyx_debug_p(REDQUEEN_PREFIX, "extract call params sysv %lx %lx", arg1, arg2);
+    // nyx_debug_p(REDQUEEN_PREFIX, "extract call params sysv %lx %lx\n", arg1, arg2);
     test_strchr(arg1, arg2);
     return test_strcmp(arg1, arg2);
 }
 
 static void extract_call_params(void)
 {
-    // nyx_debug_p(REDQUEEN_PREFIX, "extract call at %lx", ip);
+    // nyx_debug_p(REDQUEEN_PREFIX, "extract call at %lx\n", ip);
     test_strcmp_cdecl();
     test_strcmp_fastcall();
     test_strcmp_sys_v();

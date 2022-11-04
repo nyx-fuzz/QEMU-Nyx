@@ -25,7 +25,7 @@ void pt_trace_dump_init(char *filename)
 {
     int test_fd;
 
-    nyx_debug("Enable pt trace dump at %s", filename);
+    nyx_debug("Enable pt trace dump at %s\n", filename);
     pt_dump_initialized = true;
 
     test_fd = open(filename, O_CREAT | O_TRUNC | O_WRONLY, 0644);
