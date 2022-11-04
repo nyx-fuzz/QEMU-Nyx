@@ -30,9 +30,8 @@ void pt_trace_dump_init(char *filename)
 
     test_fd = open(filename, O_CREAT | O_TRUNC | O_WRONLY, 0644);
     if (test_fd < 0)
-        fprintf(stderr, "Error accessing pt_dump output path %s: %s",
-                pt_trace_dump_filename, strerror(errno));
-    assert(test_fd >= 0);
+        nyx_abort("Error accessing pt_dump output path %s: %s",
+                  pt_trace_dump_filename, strerror(errno));
 
     pt_trace_dump_filename = strdup(filename);
     assert(pt_trace_dump_filename);
@@ -47,9 +46,8 @@ void pt_truncate_pt_dump_file(void)
 
     fd = open(pt_trace_dump_filename, O_CREAT | O_TRUNC | O_WRONLY, 0644);
     if (fd < 0) {
-        fprintf(stderr, "Error truncating %s: %s\n", pt_trace_dump_filename,
-                strerror(errno));
-        assert(0);
+        nyx_abort("Error truncating %s: %s\n", pt_trace_dump_filename,
+                  strerror(errno));
     }
     close(fd);
 }
@@ -63,9 +61,8 @@ void pt_write_pt_dump_file(uint8_t *data, size_t bytes)
 
     fd = open(pt_trace_dump_filename, O_APPEND | O_WRONLY, 0644);
     if (fd < 0) {
-        fprintf(stderr, "Error writing pt_trace_dump to %s: %s\n",
-                pt_trace_dump_filename, strerror(errno));
-        assert(0);
+        nyx_abort("Error writing pt_trace_dump to %s: %s\n", pt_trace_dump_filename,
+                  strerror(errno));
     }
     assert(bytes == write(fd, data, bytes));
     close(fd);

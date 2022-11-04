@@ -7,7 +7,7 @@ typedef struct nyx_coverage_bitmap_copy_s {
     void *ijon_bitmap_buffer;
 } nyx_coverage_bitmap_copy_t;
 
-void nyx_abort(char *msg);
+void nyx_abort(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 bool is_called_in_fuzzing_mode(const char *hypercall);
 
 nyx_coverage_bitmap_copy_t *new_coverage_bitmaps(void);
