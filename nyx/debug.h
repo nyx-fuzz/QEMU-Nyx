@@ -24,11 +24,9 @@
 
 #ifdef NYX_DEBUG
 /*
- * qemu_log() is the standard logging enabled with -D
+ * qemu_log() is the standard logging, forward to file with -D
  * qemu_log_mask() is activated with additional -t nyx option
  */
-// #define nyx_debug(format, ...)         qemu_log_mask(LOG_NYX, NYX_LOG_PREFIX
-// "(%s#:%d)\t"format, __BASE_FILE__, __LINE__, ##__VA_ARGS__)
 #define nyx_debug(format, ...) \
     qemu_log_mask(LOG_NYX, NYX_LOG_PREFIX format, ##__VA_ARGS__)
 #define nyx_debug_p(PREFIX, format, ...) \
@@ -38,8 +36,9 @@
 #define nyx_debug_p(...)
 #endif
 
-#define nyx_printf(format, ...) qemu_log(format, ##__VA_ARGS__)
-#define nyx_error(format, ...)  error_printf(format, ##__VA_ARGS__)
+#define nyx_printf(format, ...) qemu_log(NYX_LOG_PREFIX format, ##__VA_ARGS__)
+#define nyx_error(format, ...)  qemu_log(NYX_LOG_PREFIX "Error: " format, ##__VA_ARGS__)
+#define nyx_warn(format, ...)   qemu_log(NYX_LOG_PREFIX "Warning: " format, ##__VA_ARGS__)
 #define nyx_trace(format, ...)  nyx_debug("=> %s\n", __func__)
 
 
