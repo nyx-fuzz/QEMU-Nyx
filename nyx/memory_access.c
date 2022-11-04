@@ -373,7 +373,7 @@ bool write_virtual_memory(uint64_t address, uint8_t *data, uint32_t size, CPUSta
             cpu_get_phys_page_attrs_debug(cpu, (address & x86_64_PAGE_MASK), &attrs);
 
         if (phys_addr == INVALID_ADDRESS) {
-            nyx_debug_p(MEM_PREFIX, "phys_addr == -1:\t%lx", address);
+            nyx_debug_p(MEM_PREFIX, "phys_addr == -1:\t%lx\n", address);
             return false;
         }
 
@@ -381,7 +381,7 @@ bool write_virtual_memory(uint64_t address, uint8_t *data, uint32_t size, CPUSta
         res = address_space_rw(cpu_get_address_space(cpu, asidx), phys_addr,
                                MEMTXATTRS_UNSPECIFIED, data, l, true);
         if (res != MEMTX_OK) {
-            nyx_debug_p(MEM_PREFIX, "!MEMTX_OK:\t%lx", address);
+            nyx_debug_p(MEM_PREFIX, "!MEMTX_OK:\t%lx\n", address);
             return false;
         }
 
@@ -908,11 +908,8 @@ bool read_virtual_memory(uint64_t address, uint8_t *data, uint32_t size, CPUStat
                 len_skipped = size - amount_copied;
             }
 
-            nyx_error("Warning, read from unmapped memory:\t%lx, skipping to %lx",
-                      address, next_page);
-            nyx_debug_p(MEM_PREFIX,
-                        "Warning, read from unmapped memory:\t%lx, skipping to %lx",
-                        address, next_page);
+            nyx_warn("Read from unmapped memory addr %lx, skipping to %lx\n",
+                     address, next_page);
             memset(data + amount_copied, ' ', len_skipped);
             address += len_skipped;
             amount_copied += len_skipped;
@@ -929,8 +926,9 @@ bool read_virtual_memory(uint64_t address, uint8_t *data, uint32_t size, CPUStat
                                            phys_addr, MEMTXATTRS_UNSPECIFIED,
                                            tmp_buf, len_to_copy, 0);
         if (txt) {
-            nyx_debug_p(MEM_PREFIX, "Warning, read failed:\t%lx (%lx)", address,
-                        phys_addr);
+            nyx_debug_p(MEM_PREFIX,
+                        "Warning, read failed for virt addr %lx (phys: %lx)\n",
+                        address, phys_addr);
         }
 
         memcpy(data + amount_copied, tmp_buf, len_to_copy);
@@ -980,8 +978,8 @@ bool dump_page_cr3_ht(uint64_t address, uint8_t *data, CPUState *cpu, uint64_t c
                          MEMTXATTRS_UNSPECIFIED, data, 0x1000, 0))
     {
         if (phys_addr != INVALID_ADDRESS) {
-            nyx_error("%s: Warning, read failed:\t%lx (%lx)\n", __func__, address,
-                      phys_addr);
+            nyx_warn("%s: Read failed for virt addr %lx (phys: %lx)\n", __func__,
+                     address, phys_addr);
         }
         return false;
     }
@@ -999,8 +997,8 @@ bool dump_page_ht(uint64_t address, uint8_t *data, CPUState *cpu)
                          MEMTXATTRS_UNSPECIFIED, data, 0x1000, 0))
     {
         if (phys_addr != 0xffffffffffffffffULL) {
-            nyx_error("%s: Warning, read failed:\t%lx (%lx)\n", __func__, address,
-                      phys_addr);
+            nyx_warn("%s: Read failed for virt addr %lx (phys: %lx)\n", __func__,
+                     address, phys_addr);
         }
     }
     return true;

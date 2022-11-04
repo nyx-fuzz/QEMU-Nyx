@@ -220,13 +220,13 @@ static void *alloc_auxiliary_buffer(const char *file)
     assert(ftruncate(fd, AUX_BUFFER_SIZE) == 0);
     stat(file, &st);
 
-    nyx_debug_p(INTERFACE_PREFIX, "new aux buffer file: (max size: %x) %lx",
+    nyx_debug_p(INTERFACE_PREFIX, "new aux buffer file: (max size: %x) %lx\n",
                 AUX_BUFFER_SIZE, st.st_size);
 
     assert(AUX_BUFFER_SIZE == st.st_size);
     ptr = mmap(0, AUX_BUFFER_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     if (ptr == MAP_FAILED) {
-        fprintf(stderr, "aux buffer allocation failed!\n");
+        nyx_error("aux buffer allocation failed!\n");
         return (void *)-1;
     }
     return ptr;

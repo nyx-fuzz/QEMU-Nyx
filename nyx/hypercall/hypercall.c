@@ -52,7 +52,6 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 #include "nyx/state/state.h"
 #include "nyx/synchronization.h"
 
-// #define DEBUG_HPRINTF
 #define HPRINTF_SIZE 0x1000 /* FIXME: take from nyx.h */
 
 bool hypercall_enabled = false;
@@ -147,7 +146,7 @@ static void acquire_print_once(CPUState *cpu)
     if (acquire_print_once_bool) {
         acquire_print_once_bool = false;
         kvm_arch_get_registers(cpu);
-        nyx_debug("handle_hypercall_kafl_acquire at:%lx\n", get_rip(cpu));
+        nyx_debug("handle_hypercall_kafl_acquire at IP: %lx\n", get_rip(cpu));
     }
 }
 
@@ -179,11 +178,11 @@ static void handle_hypercall_get_payload(struct kvm_run *run,
     }
 
     if (hypercall_enabled && !setup_snapshot_once) {
-        nyx_debug_p(CORE_PREFIX, "Payload Address:\t%lx", hypercall_arg);
+        nyx_debug_p(CORE_PREFIX, "Payload Address: 0x%lx\n", hypercall_arg);
         kvm_arch_get_registers(cpu);
         CPUX86State *env               = &(X86_CPU(cpu))->env;
         GET_GLOBAL_STATE()->parent_cr3 = env->cr[3] & 0xFFFFFFFFFFFFF000ULL;
-        nyx_debug_p(CORE_PREFIX, "Payload CR3:\t%lx",
+        nyx_debug_p(CORE_PREFIX, "Payload CR3: 0x%lx\n",
                     (uint64_t)GET_GLOBAL_STATE()->parent_cr3);
         // print_48_pagetables(GET_GLOBAL_STATE()->parent_cr3);
 
@@ -216,7 +215,7 @@ static void handle_hypercall_kafl_req_stream_data(struct kvm_run *run,
     kvm_arch_get_registers(cpu);
     /* address has to be page aligned */
     if ((hypercall_arg & 0xFFF) != 0) {
-        nyx_debug("%s: ERROR -> address is not page aligned!\n", __func__);
+        nyx_error("REQ_STREAM_DATA: Provided address is not page aligned!\n");
         set_return_value(cpu, 0xFFFFFFFFFFFFFFFFULL);
     } else {
         read_virtual_memory(hypercall_arg, (uint8_t *)req_stream_buffer, 0x100, cpu);
@@ -252,7 +251,7 @@ static void handle_hypercall_kafl_req_stream_data_bulk(struct kvm_run *run,
     kvm_arch_get_registers(cpu);
     /* address has to be page aligned */
     if ((hypercall_arg & 0xFFF) != 0) {
-        nyx_debug("%s: ERROR -> address is not page aligned!\n", __func__);
+        nyx_error("REQ_STREAM_DATA_BULK: Provided address is not page aligned!\n");
         set_return_value(cpu, 0xFFFFFFFFFFFFFFFFUL);
     } else {
         uint64_t bytes = 0;
@@ -295,14 +294,12 @@ static void handle_hypercall_kafl_range_submit(struct kvm_run *run,
     read_virtual_memory(hypercall_arg, (uint8_t *)&buffer, sizeof(buffer), cpu);
 
     if (buffer[2] >= 2) {
-        nyx_debug_p(CORE_PREFIX, "%s: illegal range=%ld\n", __func__, buffer[2]);
+        nyx_warn("ignoring invalid range register %ld\n", buffer[2]);
         return;
     }
 
     if (GET_GLOBAL_STATE()->pt_ip_filter_configured[buffer[2]]) {
-        nyx_debug_p(CORE_PREFIX,
-                    "Ignoring agent-provided address ranges (abort reason: 1) - %ld",
-                    buffer[2]);
+        nyx_warn("ignoring already configured range reg %ld\n", buffer[2]);
         return;
     }
 
@@ -310,13 +307,10 @@ static void handle_hypercall_kafl_range_submit(struct kvm_run *run,
         GET_GLOBAL_STATE()->pt_ip_filter_a[buffer[2]]          = buffer[0];
         GET_GLOBAL_STATE()->pt_ip_filter_b[buffer[2]]          = buffer[1];
         GET_GLOBAL_STATE()->pt_ip_filter_configured[buffer[2]] = true;
-        nyx_debug_p(CORE_PREFIX, "Configuring agent-provided address ranges:");
-        nyx_debug_p(CORE_PREFIX, "\tIP%ld: %lx-%lx [ENABLED]", buffer[2],
-                    GET_GLOBAL_STATE()->pt_ip_filter_a[buffer[2]],
-                    GET_GLOBAL_STATE()->pt_ip_filter_b[buffer[2]]);
+        nyx_debug_p(CORE_PREFIX, "Configured range register IP%ld: 0x%08lx-0x%08lx\n",
+                    buffer[2], buffer[0], buffer[1]);
     } else {
-        nyx_debug_p(CORE_PREFIX,
-                    "Ignoring agent-provided address ranges (abort reason: 2)");
+        nyx_warn("ignoring invalid range register %ld (NULL page)\n", buffer[2]);
     }
 }
 
@@ -325,7 +319,7 @@ static void release_print_once(CPUState *cpu)
     if (release_print_once_bool) {
         release_print_once_bool = false;
         kvm_arch_get_registers(cpu);
-        nyx_debug("handle_hypercall_kafl_release at:%lx\n", get_rip(cpu));
+        nyx_debug("handle_hypercall_kafl_release at IP: %lx\n", get_rip(cpu));
     }
 }
 
@@ -335,6 +329,7 @@ void handle_hypercall_kafl_release(struct kvm_run *run,
 {
     if (hypercall_enabled) {
         if (init_state) {
+            nyx_debug_p(CORE_PREFIX, "[RELEASE] init_state=false\n");
             init_state = false;
         } else {
             if (hypercall_arg > 0) {
@@ -359,7 +354,7 @@ void handle_hypercall_kafl_mtf(struct kvm_run *run, CPUState *cpu, uint64_t hype
     // assert(false);
     kvm_arch_get_registers_fast(cpu);
 
-    fprintf(stderr, "%s --> %lx\n", __func__, get_rip(cpu));
+    nyx_printf("%s --> %lx\n", __func__, get_rip(cpu));
 
     kvm_vcpu_ioctl(cpu, KVM_VMX_PT_DISABLE_MTF);
 
@@ -383,7 +378,7 @@ void handle_hypercall_kafl_page_dump_bp(struct kvm_run *run,
     kvm_vcpu_ioctl(cpu, KVM_VMX_PT_DISABLE_MTF);
 
     bool success = false;
-    // fprintf(stderr, "page_cache_fetch = %lx\n",
+    // nyx_printf("page_cache_fetch = %lx\n",
     // page_cache_fetch(GET_GLOBAL_STATE()->page_cache, page, &success, false));
     page_cache_fetch(GET_GLOBAL_STATE()->page_cache, page, &success, false);
     if (success) {
@@ -416,7 +411,7 @@ static void handle_hypercall_kafl_cr3(struct kvm_run *run,
                                       uint64_t        hypercall_arg)
 {
     if (hypercall_enabled) {
-        // nyx_debug_p(CORE_PREFIX, "CR3 address:\t\t%lx", hypercall_arg);
+        nyx_debug_p(CORE_PREFIX, "Setting CR3 filter: %lx\n", hypercall_arg);
         pt_set_cr3(cpu, hypercall_arg & 0xFFFFFFFFFFFFF000ULL, false);
         if (GET_GLOBAL_STATE()->dump_page) {
             set_page_dump_bp(cpu, hypercall_arg & 0xFFFFFFFFFFFFF000ULL,
@@ -434,7 +429,7 @@ static void handle_hypercall_kafl_submit_panic(struct kvm_run *run,
     }
 
     if (hypercall_enabled) {
-        nyx_debug_p(CORE_PREFIX, "Panic address:\t%lx", hypercall_arg);
+        nyx_debug_p(CORE_PREFIX, "Panic address: %lx\n", hypercall_arg);
 
         switch (get_current_mem_mode(cpu)) {
         case mm_32_protected:
@@ -460,7 +455,7 @@ static void handle_hypercall_kafl_submit_kasan(struct kvm_run *run,
                                                uint64_t        hypercall_arg)
 {
     if (hypercall_enabled) {
-        nyx_debug_p(CORE_PREFIX, "kASAN address:\t%lx", hypercall_arg);
+        nyx_debug_p(CORE_PREFIX, "kASAN address:\t%lx\n", hypercall_arg);
 
         switch (get_current_mem_mode(cpu)) {
         case mm_32_protected:
@@ -572,9 +567,7 @@ static void handle_hypercall_kafl_kasan(struct kvm_run *run,
         if (fast_reload_snapshot_exists(get_fast_reload_snapshot())) {
             synchronization_lock_asan_found();
         } else {
-            nyx_debug_p(
-                CORE_PREFIX,
-                "KASAN detected during initialization of stage 1 or stage 2 loader");
+            nyx_warn("KASAN detected during initialization stage!\n");
         }
     }
 }
@@ -588,15 +581,13 @@ static void handle_hypercall_kafl_lock(struct kvm_run *run,
     }
 
     if (!GET_GLOBAL_STATE()->fast_reload_pre_image) {
-        nyx_debug_p(CORE_PREFIX,
-                    "Skipping pre image creation (hint: set pre=on) ...");
+        nyx_error("Skipping pre image creation (hint: set pre=on)\n");
         return;
     }
 
-    nyx_debug_p(CORE_PREFIX, "Creating pre image snapshot <%s> ...",
+    nyx_debug_p(CORE_PREFIX, "Creating pre image snapshot <%s>\n",
                 GET_GLOBAL_STATE()->fast_reload_pre_path);
 
-    nyx_debug("Creating pre image snapshot");
     request_fast_vm_reload(GET_GLOBAL_STATE()->reload_state,
                            REQUEST_SAVE_SNAPSHOT_PRE);
 }
@@ -606,9 +597,9 @@ static void handle_hypercall_kafl_printf(struct kvm_run *run,
                                          uint64_t        hypercall_arg)
 {
     read_virtual_memory(hypercall_arg, (uint8_t *)hprintf_buffer, HPRINTF_SIZE, cpu);
-#ifdef DEBUG_HPRINTF
-    fprintf(stderr, "%s %s\n", __func__, hprintf_buffer);
-#endif
+    // hprintf_buffer[HPRINTF_SIZE] = 0;
+    // nyx_debug("%s: %s\n", __func__, hprintf_buffer);
+
     set_hprintf_auxiliary_buffer(GET_GLOBAL_STATE()->auxilary_buffer, hprintf_buffer,
                                  strnlen(hprintf_buffer, HPRINTF_SIZE));
     synchronization_lock();
@@ -647,22 +638,17 @@ static void handle_hypercall_kafl_user_submit_mode(struct kvm_run *run,
 
     switch (hypercall_arg) {
     case KAFL_MODE_64:
-        nyx_debug_p(CORE_PREFIX, "target runs in KAFL_MODE_64 ...");
+        nyx_debug_p(CORE_PREFIX, "SUBMIT_MODE set to KAFL_MODE_64\n");
         GET_GLOBAL_STATE()->disassembler_word_width = 64;
         break;
     case KAFL_MODE_32:
-        nyx_debug_p(CORE_PREFIX, "target runs in KAFL_MODE_32 ...");
+        nyx_debug_p(CORE_PREFIX, "SUBMIT_MODE set to KAFL_MODE_32\n");
         GET_GLOBAL_STATE()->disassembler_word_width = 32;
         break;
     case KAFL_MODE_16:
-        nyx_debug_p(CORE_PREFIX, "target runs in KAFL_MODE_16 ...");
-        GET_GLOBAL_STATE()->disassembler_word_width = 16;
-        abort(); /* not implemented in this version (due to hypertrash hacks) */
-        break;
+        /* not implemented in this version (due to hypertrash hacks) */
     default:
-        nyx_debug_p(CORE_PREFIX, "target runs in unkown mode...");
-        GET_GLOBAL_STATE()->disassembler_word_width = 0;
-        abort(); /* not implemented in this version (due to hypertrash hacks) */
+        nyx_abort("SUBMIT_MODE set to invalid value\n");
         break;
     }
 }
@@ -697,7 +683,8 @@ static void handle_hypercall_kafl_user_abort(struct kvm_run *run,
 {
     read_virtual_memory(hypercall_arg, (uint8_t *)hprintf_buffer, HPRINTF_SIZE, cpu);
     set_abort_reason_auxiliary_buffer(GET_GLOBAL_STATE()->auxilary_buffer,
-                                      hprintf_buffer, strlen(hprintf_buffer));
+                                      hprintf_buffer,
+                                      strnlen(hprintf_buffer, HPRINTF_SIZE));
     synchronization_lock();
 }
 
@@ -748,7 +735,7 @@ static void handle_hypercall_kafl_dump_file(struct kvm_run *run,
     if (!read_virtual_memory(vaddr, (uint8_t *)&file_obj, sizeof(kafl_dump_file_t),
                              cpu))
     {
-        fprintf(stderr, "Failed to read file_obj in %s. Skipping..\n", __func__);
+        nyx_error("Failed to read file_obj in %s. Skipping..\n", __func__);
         goto err_out1;
     }
 
@@ -756,14 +743,14 @@ static void handle_hypercall_kafl_dump_file(struct kvm_run *run,
         if (!read_virtual_memory(file_obj.file_name_str_ptr, (uint8_t *)filename,
                                  sizeof(filename) - 1, cpu))
         {
-            fprintf(stderr, "Failed to read file_name_str_ptr in %s. Skipping..\n",
-                    __func__);
+            nyx_error("Failed to read file_name_str_ptr in %s. Skipping..\n",
+                      __func__);
             goto err_out1;
         }
         filename[sizeof(filename) - 1] = 0;
     }
 
-    // fprintf(stderr, "%s: dump %lu fbytes from %s (append=%u)\n",
+    // nyx_error("%s: dump %lu fbytes from %s (append=%u)\n",
     //	   	__func__, file_obj.bytes, filename, file_obj.append);
 
     // use a tempfile if file_name_ptr == NULL or points to empty string
@@ -781,9 +768,7 @@ static void handle_hypercall_kafl_dump_file(struct kvm_run *run,
         unsigned suffix = strlen(pattern) - strlen("XXXXXX");
         f               = fdopen(mkstemps(host_path, suffix), "w+");
         if (file_obj.append) {
-            fprintf(stderr,
-                    "Warning in %s: Writing unique generated file in append mode?\n",
-                    __func__);
+            nyx_warn("Writing unique generated file in append mode?\n");
         }
     } else {
         if (file_obj.append) {
@@ -794,7 +779,7 @@ static void handle_hypercall_kafl_dump_file(struct kvm_run *run,
     }
 
     if (!f) {
-        fprintf(stderr, "Error in %s(%s): %s\n", host_path, __func__, strerror(errno));
+        nyx_error("%s: %s - %s\n", __func__, host_path, strerror(errno));
         goto err_out1;
     }
 
@@ -803,8 +788,8 @@ static void handle_hypercall_kafl_dump_file(struct kvm_run *run,
     void    *page    = malloc(PAGE_SIZE);
     uint32_t written = 0;
 
-    nyx_debug_p(CORE_PREFIX, "%s: dump %d bytes to %s (append=%u)", __func__, bytes,
-                host_path, file_obj.append);
+    nyx_debug_p(CORE_PREFIX, "Dump %d bytes to %s (append=%u)\n", bytes, host_path,
+                file_obj.append);
 
     while (bytes > 0) {
         if (bytes >= PAGE_SIZE) {
@@ -818,8 +803,7 @@ static void handle_hypercall_kafl_dump_file(struct kvm_run *run,
         }
 
         if (!written) {
-            fprintf(stderr, "Error in %s(%s): %s\n", host_path, __func__,
-                    strerror(errno));
+            nyx_error("%s: %s - %s\n", __func__, host_path, strerror(errno));
             goto err_out2;
         }
 
@@ -857,7 +841,7 @@ int handle_kafl_hypercall(struct kvm_run *run,
                           uint64_t        arg)
 {
     int ret = -1;
-    // fprintf(stderr, "%s -> %ld\n", __func__, hypercall);
+    // nyx_debug("%s -> %ld\n", __func__, hypercall);
 
     // FIXME: ret is always 0. no default case.
     switch (hypercall) {

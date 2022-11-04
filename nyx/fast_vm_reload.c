@@ -316,7 +316,7 @@ void fast_reload_serialize_to_file(fast_reload_t *self,
 
     /* sanity check */
     if (!folder_exits(folder)) {
-        nyx_debug_p(RELOAD_PREFIX, "Folder %s does not exist...failed!", folder);
+        nyx_error("Folder %s does not exist. Abort.\n", folder);
         assert(0);
     }
 
@@ -348,7 +348,7 @@ static void fast_reload_create_from_snapshot(fast_reload_t *self,
     wait_for_snapshot(folder);
 
     nyx_debug_p(RELOAD_PREFIX,
-                "=> CREATING FAST RELOAD SNAPSHOT FROM DUMP (located in: %s)", folder);
+                "=> CREATING FAST RELOAD SNAPSHOT FROM DUMP (location: %s)\n", folder);
 
     rcu_read_lock();
 

@@ -73,7 +73,7 @@ shadow_memory_t *shadow_memory_init(void)
                               MAP_SHARED, self->snapshot_ptr_fd, 0);
     madvise(self->snapshot_ptr, self->memory_size, MADV_RANDOM | MADV_MERGEABLE);
 
-    nyx_debug_p(RELOAD_PREFIX, "Allocating Memory (%p) Size: %lx",
+    nyx_debug_p(RELOAD_PREFIX, "Allocating Memory (%p) Size: %lx\n",
                 self->snapshot_ptr, self->memory_size);
 
 
@@ -81,7 +81,7 @@ shadow_memory_t *shadow_memory_init(void)
     uint8_t  i           = 0;
     uint8_t  regions_num = 0;
     QLIST_FOREACH_RCU (block, &ram_list.blocks, next) {
-        nyx_debug_p(RELOAD_PREFIX, "%lx %lx %lx\t%s\t%p", block->offset,
+        nyx_debug_p(RELOAD_PREFIX, "%lx %lx %lx\t%s\t%p\n", block->offset,
                     block->used_length, block->max_length, block->idstr, block->host);
         block_array[i] = block;
 
@@ -233,7 +233,7 @@ shadow_memory_t *shadow_memory_init_from_snapshot(const char *snapshot_folder,
     uint8_t  i           = 0;
     uint8_t  regions_num = 0;
     QLIST_FOREACH_RCU (block, &ram_list.blocks, next) {
-        nyx_debug_p(RELOAD_PREFIX, "%lx %lx %lx\t%s\t%p", block->offset,
+        nyx_debug_p(RELOAD_PREFIX, "%lx %lx %lx\t%s\t%p\n", block->offset,
                     block->used_length, block->max_length, block->idstr, block->host);
 
         block_array[i]                 = block;

@@ -685,7 +685,7 @@ static int fdl_vmstate_load_state(state_reallocation_t     *self,
                 }
             }
         } else if (field->flags & VMS_MUST_EXIST) {
-            nyx_debug("Input validation failed: %s/%s", vmsd->name, field->name);
+            nyx_debug("Input validation failed: %s/%s\n", vmsd->name, field->name);
             return -1;
         } else {
             // printf("Field does not exist...\n");
