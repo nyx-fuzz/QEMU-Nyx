@@ -39,10 +39,12 @@ static void sigsegfault_handler(int signo, siginfo_t *info, void *extra)
     fprintf(stderr, "[qemu-nyx] crash detected (pid: %d / signal: %d)\n", getpid(),
             signo);
     qemu_backtrace();
+#ifdef NYX_DEBUG
     fprintf(stderr, "WAITING FOR GDB ATTACH (PID: %d...\n", getpid());
     while (1) {
         sleep(1);
     }
+#endif /* NYX_DEBUG */
 }
 
 static void sigabrt_handler(int signo, siginfo_t *info, void *extra)
@@ -50,10 +52,12 @@ static void sigabrt_handler(int signo, siginfo_t *info, void *extra)
     fprintf(stderr, "[qemu-nyx] crash detected (pid: %d / signal: %d)\n", getpid(),
             signo);
     qemu_backtrace();
+#ifdef NYX_DEBUG
     fprintf(stderr, "WAITING FOR GDB ATTACH (PID: %d...\n", getpid());
     while (1) {
         sleep(1);
     }
+#endif /* NYX_DEBUG */
 }
 
 static void sigint_handler(int signo, siginfo_t *info, void *extra)
