@@ -4,6 +4,7 @@
 #include <dirent.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -55,9 +56,12 @@ static char *sharedir_scan(sharedir_t *self, const char *file)
      * Agent is not under our control, but lets roughly constrain
      * it to anything stored in or linked from sharedir
      */
-    chdir(self->dir);
-    char *real_path = realpath(file, NULL);
+    if (0 != chdir(self->dir)) {
+        nyx_error("Failed to chdir to sharedir: %s", strerror(errno));
+        return NULL;
+    }
 
+    char *real_path = realpath(file, NULL);
     if (file[0] != '/' && !strstr(file, "/../") && real_path && file_exits(real_path))
     {
         return real_path;
