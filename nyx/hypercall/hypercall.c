@@ -234,18 +234,11 @@ static void handle_hypercall_kafl_req_stream_data(struct kvm_run *run,
     }
 }
 
-typedef struct req_data_bulk_s {
-    char     file_name[256];
-    uint64_t num_addresses;
-    uint64_t addresses[479];
-} req_data_bulk_t;
-
 static void handle_hypercall_kafl_req_stream_data_bulk(struct kvm_run *run,
                                                        CPUState       *cpu,
                                                        uint64_t        hypercall_arg)
 {
     static uint8_t req_stream_buffer[0x1000];
-    // static uint64_t addresses[512];
     req_data_bulk_t req_data_bulk_data;
 
     if (is_called_in_fuzzing_mode("HYPERCALL_KAFL_REQ_STREAM_DATA_BULK")) {
@@ -257,33 +250,31 @@ static void handle_hypercall_kafl_req_stream_data_bulk(struct kvm_run *run,
     if ((hypercall_arg & 0xFFF) != 0) {
         nyx_debug("%s: ERROR -> address is not page aligned!\n", __func__);
         set_return_value(cpu, 0xFFFFFFFFFFFFFFFFUL);
-    } else {
-        uint64_t bytes = 0;
-        read_virtual_memory(hypercall_arg, (uint8_t *)&req_data_bulk_data, 0x1000,
-                            cpu);
-
-        assert(req_data_bulk_data.num_addresses <= 479);
-        for (int i = 0; i < req_data_bulk_data.num_addresses; i++) {
-            uint64_t ret_val =
-                sharedir_request_file(GET_GLOBAL_STATE()->sharedir,
-                                      (const char *)req_data_bulk_data.file_name,
-                                      req_stream_buffer);
-            if (ret_val != 0xFFFFFFFFFFFFFFFFUL) {
-                bytes += ret_val;
-                write_virtual_memory((uint64_t)req_data_bulk_data.addresses[i],
-                                     (uint8_t *)req_stream_buffer, ret_val, cpu);
-            } else if (ret_val == 0) {
-                break;
-            } else {
-                bytes = 0xFFFFFFFFFFFFFFFFUL;
-                break;
-            }
-        }
-
-        set_return_value(cpu, bytes);
+        return;
     }
-}
 
+    uint64_t bytes = 0;
+    read_virtual_memory(hypercall_arg, (uint8_t *)&req_data_bulk_data, 0x1000, cpu);
+
+    assert(req_data_bulk_data.num_addresses <= 479);
+    for (int i = 0; i < req_data_bulk_data.num_addresses; i++) {
+        uint64_t ret_val =
+            sharedir_request_file(GET_GLOBAL_STATE()->sharedir,
+                                  (const char *)req_data_bulk_data.file_name,
+                                  req_stream_buffer);
+        if (ret_val == 0xFFFFFFFFFFFFFFFFUL) {
+            bytes = ret_val;
+            break;
+        }
+        if (ret_val == 0) {
+            break;
+        }
+        bytes += ret_val;
+        write_virtual_memory((uint64_t)req_data_bulk_data.addresses[i],
+                             (uint8_t *)req_stream_buffer, ret_val, cpu);
+    }
+    set_return_value(cpu, bytes);
+}
 
 static void handle_hypercall_kafl_range_submit(struct kvm_run *run,
                                                CPUState       *cpu,

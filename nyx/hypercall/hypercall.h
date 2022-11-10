@@ -168,3 +168,9 @@ typedef struct kafl_dump_file_s {
     uint64_t bytes;
     uint8_t  append;
 } __attribute__((packed)) kafl_dump_file_t;
+
+typedef struct req_data_bulk_s {
+    char     file_name[256];
+    uint64_t num_addresses;
+    uint64_t addresses[479];
+} __attribute__((packed)) req_data_bulk_t;
