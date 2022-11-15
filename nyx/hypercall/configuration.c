@@ -16,10 +16,7 @@ void handle_hypercall_kafl_get_host_config(struct kvm_run *run,
         return;
     }
 
-    if (GET_GLOBAL_STATE()->get_host_config_done) {
-        nyx_abort((char *)"KVM_EXIT_KAFL_GET_HOST_CONFIG called twice...");
-        return;
-    }
+    nyx_trace();
 
     memset((void *)&config, 0, sizeof(host_config_t));
 
@@ -46,8 +43,7 @@ void handle_hypercall_kafl_set_agent_config(struct kvm_run *run,
     }
 
     if (GET_GLOBAL_STATE()->set_agent_config_done) {
-        nyx_abort((char *)"KVM_EXIT_KAFL_SET_AGENT_CONFIG called twice...");
-        return;
+        nyx_abort("SET_AGENT_CONFIG called twice.");
     }
 
     X86CPU      *cpux86 = X86_CPU(cpu);
