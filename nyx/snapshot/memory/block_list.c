@@ -44,7 +44,7 @@ snapshot_page_blocklist_t *snapshot_page_blocklist_init(void)
 void snapshot_page_blocklist_add(snapshot_page_blocklist_t *self, uint64_t phys_addr)
 {
     if (phys_addr == -1) {
-        fprintf(stderr, "ERROR %s: phys_addr=%lx\n", __func__, phys_addr);
+        nyx_error("%s: phys_addr=%lx\n", __func__, phys_addr);
         return;
     }
     assert(self != NULL);

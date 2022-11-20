@@ -61,7 +61,7 @@ uint32_t nyx_snapshot_debug_restore(shadow_memory_t           *shadow_memory_sta
                 if (snapshot_page_blocklist_check_phys_addr(blocklist,
                                                             physical_addr) == false)
                 {
-                    // fprintf(stderr, "(2) DIRTY: 0x%lx (NUM: %d - OFFSET: 0x%lx)\n", physical_addr, i, addr);
+                    // nyx_debug("(2) DIRTY: 0x%lx (NUM: %d - OFFSET: 0x%lx)\n", physical_addr, i, addr);
 
                     if (verbose) {
                         printf("%s -> (phys: 0x%lx) %p <-- %p [%d]\n", __func__,
@@ -113,7 +113,7 @@ void nyx_snapshot_debug_save_root_pages(shadow_memory_t *shadow_memory_state,
                 if (snapshot_page_blocklist_check_phys_addr(blocklist,
                                                             physical_addr) == false)
                 {
-                    // fprintf(stderr, "(2) DIRTY: 0x%lx (NUM: %d - OFFSET: 0x%lx)\n", physical_addr, i, addr);
+                    // nyx_debug("(2) DIRTY: 0x%lx (NUM: %d - OFFSET: 0x%lx)\n", physical_addr, i, addr);
 
                     if (verbose &&
                         !shadow_memory_is_root_page_tracked(shadow_memory_state,

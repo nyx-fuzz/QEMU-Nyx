@@ -56,7 +56,6 @@ static void alt_bitmap_add(uint64_t from, uint64_t to)
     }
 }
 
-
 static int reset_trace_fd(void)
 {
     if (trace_fd)
@@ -64,7 +63,7 @@ static int reset_trace_fd(void)
     trace_fd =
         open(redqueen_workdir.pt_trace_results, O_WRONLY | O_CREAT | O_TRUNC, 0644);
     if (trace_fd < 0) {
-        fprintf(stderr, "Failed to initiate trace output: %s\n", strerror(errno));
+        nyx_error("Failed to initiate trace output: %s\n", strerror(errno));
         assert(0);
     }
     return trace_fd;

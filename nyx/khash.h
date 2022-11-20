@@ -130,6 +130,8 @@ int main() {
 #include <limits.h>
 #include <assert.h>
 
+#include "debug.h"
+
 /* compiler specific configuration */
 
 #if UINT_MAX == 0xffffffffu
@@ -358,7 +360,7 @@ static const double __ac_HASH_UPPER = 0.77;
     SCOPE void kh_write_##name(kh_##name##_t *map, const char *path) {  \
         FILE *fp = fopen(path, "wb");                                   \
         if(fp == NULL) {                                                \
-            fprintf(stderr, "[%s] Could not open file %s.\n", __func__, path);\
+            nyx_error("[%s] Could not open file %s.\n", __func__, path);\
             assert(0);                                              \
 						/*exit(EXIT_FAILURE);*/                                     \
         }                                                               \
