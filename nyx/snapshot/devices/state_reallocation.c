@@ -257,7 +257,7 @@ static void add_post_fptr(state_reallocation_t *self,
         --> globalstate
         */
 
-        // fprintf(stderr, "--> %s\n", name);
+        // printf("--> %s\n", name);
 
         self->fptr[self->fast_state_fptr_pos]    = fptr;
         self->opaque[self->fast_state_fptr_pos]  = opaque;
@@ -358,7 +358,7 @@ static void add_get(state_reallocation_t *self,
         data    = malloc(sizeof(uint8_t) * size);
         qemu_get_buffer(f, (uint8_t *)data, size);
     } else {
-        fprintf(stderr, "WARNING: NOT IMPLEMENTED FAST GET ROUTINE for %s\n", name);
+        nyx_warn("NOT IMPLEMENTED FAST GET ROUTINE for %s\n", name);
         abort();
         return;
     }
@@ -433,7 +433,9 @@ static inline int get_handler(state_reallocation_t *self,
                               char                 *vmsd_name)
 {
     int ret;
-    // printf("%s\n", vmsd_name);
+#ifdef VERBOSE_DEBUG
+    nyx_debug("%s: %s\n", __func__, vmsd_name);
+#endif
 
     ret = field->info->get(f, curr_elem, size, field);
 
@@ -537,9 +539,8 @@ static inline int get_handler(state_reallocation_t *self,
         add_get(self, (void *)field->info->get, curr_elem, size, (void *)field, f,
                 field->info->name);
     } else {
-        fprintf(stderr,
-                "[QEMU-PT] %s: WARNING no handler for %s, type %s, size %lx!\n",
-                __func__, vmsd_name, field->info->name, size);
+        nyx_error("%s: no handler for %s, type %s, size %lx!\n", __func__, vmsd_name,
+                  field->info->name, size);
         assert(0);
     }
     return ret;
@@ -554,7 +555,9 @@ static int fdl_vmstate_load_state(state_reallocation_t     *self,
                                   uintptr_t                *opaque_ptr)
 {
 #ifdef VERBOSE_DEBUG
-    printf("---------------------------------\nVMSD: %p\t%s\n", opaque, vmsd->name);
+    nyx_debug("---------------------------------\n"
+              "VMSD: %p\t%s\n",
+              opaque, vmsd->name);
 #endif
 
     VMStateField *field = (VMStateField *)vmsd->fields;
@@ -567,11 +570,11 @@ static int fdl_vmstate_load_state(state_reallocation_t     *self,
     }
     if (version_id < vmsd->minimum_version_id) {
 #ifdef VERBOSE_DEBUG
-        printf("OLD LOAD\n");
+        nyx_debug("OLD LOAD\n");
 #endif
 
         if (vmsd->load_state_old && version_id >= vmsd->minimum_version_id_old) {
-            fprintf(stderr, "OLDSTATE\n");
+            nyx_debug("OLDSTATE\n");
             assert(0);
             ret = vmsd->load_state_old(f, opaque, version_id);
             return ret;
@@ -580,16 +583,16 @@ static int fdl_vmstate_load_state(state_reallocation_t     *self,
     }
     if (vmsd->pre_load) {
 #ifdef VERBOSE_DEBUG
-        printf("\tPRELOAD Function\n");
+        nyx_debug("\tPRELOAD Function\n");
 #endif
         /* TODO ADD PRE FPTR FOR SERIAL */
-        // fprintf(stderr, "PRELOAD RUN: %s\n", vmsd->name);
+        // nyx_debug("PRELOAD RUN: %s\n", vmsd->name);
         // add_pre_fptr(self, vmsd->pre_load, opaque, vmsd->name);
         add_post_fptr(self, vmsd->pre_load, 1337, opaque, vmsd->name);
     }
     while (field->name) {
 #ifdef VERBOSE_DEBUG
-        printf("Field: %s %s %s\n", __func__, vmsd->name, field->name);
+        nyx_debug("Field: %s %s %s\n", __func__, vmsd->name, field->name);
 #endif
         if ((field->field_exists && field->field_exists(opaque, version_id)) ||
             (!field->field_exists && field->version_id <= version_id))
@@ -599,15 +602,16 @@ static int fdl_vmstate_load_state(state_reallocation_t     *self,
             int   size = vmstate_size(opaque, field);
 
 #ifdef VERBOSE_DEBUG
-            printf("----------------->          vmstate_handle_alloc\n");
+            nyx_debug("--> vmstate_handle_alloc\n");
 #endif
-            // fprintf(stderr, "----------------->          vmstate_handle_alloc\n");
             vmstate_handle_alloc(first_elem, field, opaque);
             if (field->flags & VMS_POINTER) {
 #ifdef VERBOSE_DEBUG
-                printf("FIX ME VMS_POINTER\n");
+                nyx_debug("FIX ME VMS_POINTER\n");
 #endif
-                //            printf("Field-Offset 0x%lx-0x%lx\n", opaque+field->offset, opaque+field->offset+(size*n_elems));
+                // nyx_debug("Field-Offset 0x%lx-0x%lx\n",
+                //           opaque+field->offset,
+                //           opaque+field->offset+(size*n_elems));
 
                 first_elem = *(void **)first_elem;
                 assert(first_elem || !n_elems || !size);
@@ -620,11 +624,11 @@ static int fdl_vmstate_load_state(state_reallocation_t     *self,
 
                 if (field->flags & VMS_ARRAY_OF_POINTER) {
 #ifdef VERBOSE_DEBUG
-                    printf("Field-Offset 1 0x%lx-0x%lx\n",
-                           (uint64_t)(field->offset + (opaque)),
-                           (uint64_t)(field->offset + (size * n_elems) + (opaque)));
-                    printf("=VMS_ARRAY_OF_POINTER 1= %lx %x\n",
-                           *((uint64_t *)curr_elem), size);
+                    nyx_debug("Field-Offset 1 0x%lx-0x%lx\n",
+                              (uint64_t)(field->offset + (opaque)),
+                              (uint64_t)(field->offset + (size * n_elems) + (opaque)));
+                    nyx_debug("=VMS_ARRAY_OF_POINTER 1= %lx %x\n",
+                              *((uint64_t *)curr_elem), size);
                     // hexDump((void*)field->name, curr_elem, size);
 #endif
 
@@ -641,11 +645,11 @@ static int fdl_vmstate_load_state(state_reallocation_t     *self,
                     // if null pointer check placeholder and do not follow
                     assert(field->flags & VMS_ARRAY_OF_POINTER);
 #ifdef VERBOSE_DEBUG
-                    printf("Field-Offset 2 0x%lx-0x%lx\n",
-                           (uint64_t)(field->offset + (opaque)),
-                           (uint64_t)(field->offset + (size * n_elems) + (opaque)));
-                    printf("=VMS_ARRAY_OF_POINTER 2= %lx %x\n",
-                           *((uint64_t *)curr_elem), size);
+                    nyx_debug("Field-Offset 2 0x%lx-0x%lx\n",
+                              (uint64_t)(field->offset + (opaque)),
+                              (uint64_t)(field->offset + (size * n_elems) + (opaque)));
+                    nyx_debug("=VMS_ARRAY_OF_POINTER 2= %lx %x\n",
+                              *((uint64_t *)curr_elem), size);
                     // hexDump((void*)field->name, curr_elem, size);
 #endif
 
@@ -658,10 +662,11 @@ static int fdl_vmstate_load_state(state_reallocation_t     *self,
 #endif
 
                 } else if (field->flags & VMS_STRUCT) {
-                    // printf("Field-Offset 0x%lx-0x%lx\n", field->offset + (opaque-base_opaque),
+                    // nyx_debug("Field-Offset 0x%lx-0x%lx\n",
+                    // field->offset + (opaque-base_opaque),
                     // field->offset+(size*n_elems) + (opaque-base_opaque));
 #ifdef VERBOSE_DEBUG
-                    printf("=VMS_STRUCT= %lx %x\n", *((uint64_t *)curr_elem), size);
+                    nyx_debug("=VMS_STRUCT= %lx %x\n", *((uint64_t *)curr_elem), size);
                     // hexDump((void*)field->name, curr_elem, size);
 #endif
                     /* FIXME */
@@ -688,7 +693,7 @@ static int fdl_vmstate_load_state(state_reallocation_t     *self,
             nyx_debug("Input validation failed: %s/%s\n", vmsd->name, field->name);
             return -1;
         } else {
-            // printf("Field does not exist...\n");
+            // nyx_debug("Field does not exist...\n");
         }
         field++;
     }
@@ -702,13 +707,13 @@ static int fdl_vmstate_load_state(state_reallocation_t     *self,
 
     if (vmsd->post_load) {
 #ifdef VERBOSE_DEBUG
-        printf("\tPOSTLOAD Function\n");
+        nyx_debug("\tPOSTLOAD Function\n");
 #endif
         add_post_fptr(self, vmsd->post_load, version_id, opaque, vmsd->name);
         ret = vmsd->post_load(opaque, version_id);
     }
 #ifdef VERBOSE_DEBUG
-    printf("\tTotal Size:%ld\n", total_size);
+    nyx_debug("\tTotal Size:%ld\n", total_size);
 #endif
     return ret;
 }
@@ -741,7 +746,7 @@ static int fdl_enumerate_section(state_reallocation_t   *self,
     /* Read section start */
     section_id = qemu_get_be32(f);
     if (!qemu_get_counted_string(f, idstr)) {
-        printf("Unable to read ID string for section %u", section_id);
+        nyx_error("Unable to read ID string for section %u", section_id);
         return -EINVAL;
     }
     instance_id = qemu_get_be32(f);
@@ -750,14 +755,14 @@ static int fdl_enumerate_section(state_reallocation_t   *self,
     /* Find savevm section */
     se = fdl_find_se(idstr, instance_id);
     if (se == NULL) {
-        printf("Unknown savevm section or instance '%s' %d", idstr, instance_id);
+        nyx_error("Unknown savevm section or instance '%s' %d", idstr, instance_id);
         return -EINVAL;
     }
 
     /* Validate version */
     if (version_id > se->version_id) {
-        printf("savevm: unsupported version %d for '%s' v%d", version_id, idstr,
-               se->version_id);
+        nyx_error("savevm: unsupported version %d for '%s' v%d", version_id, idstr,
+                  se->version_id);
         return -EINVAL;
     }
 
@@ -816,8 +821,8 @@ static int fdl_enumerate_section(state_reallocation_t   *self,
     }
 
     if (ret < 0) {
-        printf("error while loading state for instance 0x%x of device '%s'",
-               instance_id, idstr);
+        nyx_error("failed to load state for instance 0x%x of device '%s'",
+                  instance_id, idstr);
         return ret;
     }
 

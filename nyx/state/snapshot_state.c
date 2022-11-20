@@ -144,7 +144,7 @@ void deserialize_state(const char *filename_prefix)
         nyx_global_state->get_host_config_done  = true;
         nyx_global_state->set_agent_config_done = true;
     } else {
-        fprintf(stderr, "[QEMU-Nyx]: this feature is currently missing\n");
+        nyx_error("this feature is currently missing\n");
         abort();
     }
 

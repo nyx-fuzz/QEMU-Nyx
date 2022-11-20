@@ -33,8 +33,6 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 #include "nyx/sharedir.h"
 #include "nyx/state/state.h"
 
-// #define STATE_VERBOSE
-
 /* global singleton */
 qemu_nyx_state_t global_state;
 
@@ -42,9 +40,8 @@ qemu_nyx_state_t global_state;
 
 void state_init_global(void)
 {
-#ifdef STATE_VERBOSE
-    fprintf(stderr, "--> %s <--\n", __func__);
-#endif
+    nyx_trace();
+
     /* safety first */
     assert(libxdc_get_release_version() == LIBXDC_RELEASE_VERSION_REQUIRED);
 

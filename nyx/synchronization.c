@@ -47,7 +47,7 @@ static void sigalarm_handler(int signum)
     /* ensure that SIGALARM is ALWAYS handled by kvm thread */
     assert(GET_GLOBAL_STATE()->timeout_detector.kvm_tid == syscall(SYS_gettid));
 #ifdef DEBUG_TIMEOUT_DETECTOR
-    fprintf(stderr, "Handled! %d %ld\n", signum, syscall(SYS_gettid));
+    nyx_debug("Handled! %d %ld\n", signum, syscall(SYS_gettid));
 #endif
 }
 
@@ -55,18 +55,18 @@ void install_timeout_detector(timeout_detector_t *timer)
 {
     timer->kvm_tid = syscall(SYS_gettid);
     if (signal(SIGALRM, sigalarm_handler) == SIG_ERR) {
-        fprintf(stderr, "%s failed!\n", __func__);
+        nyx_debug("%s failed!\n", __func__);
         assert(false);
     }
 #ifdef DEBUG_TIMEOUT_DETECTOR
-    fprintf(stderr, "SIGALRM HANDLER INSTALLED! tid=%ld\n", syscall(SYS_gettid));
+    nyx_debug("SIGALRM HANDLER INSTALLED! tid=%ld\n", syscall(SYS_gettid));
 #endif
 }
 
 void reset_timeout_detector(timeout_detector_t *timer)
 {
 #ifdef DEBUG_TIMEOUT_DETECTOR
-    fprintf(stderr, "%s!\n", __func__);
+    nyx_debug("%s!\n", __func__);
 #endif
 
     if (timer->config.tv_sec || timer->config.tv_usec) {
@@ -81,7 +81,7 @@ void reset_timeout_detector(timeout_detector_t *timer)
 void update_itimer(timeout_detector_t *timer, uint8_t sec, uint32_t usec)
 {
 #ifdef DEBUG_TIMEOUT_DETECTOR
-    // fprintf(stderr, "%s: %x %x\n", __func__, sec, usec);
+    nyx_debug("%s: %x %x\n", __func__, sec, usec);
 #endif
 
     if (sec || usec) {
@@ -96,15 +96,14 @@ void update_itimer(timeout_detector_t *timer, uint8_t sec, uint32_t usec)
 void arm_sigprof_timer(timeout_detector_t *timer)
 {
 #ifdef DEBUG_TIMEOUT_DETECTOR
-    fprintf(stderr, "%s (%ld %ld)\n", __func__, timer->alarm.it_value.tv_sec,
-            timer->alarm.it_value.tv_usec);
+    nyx_debug("%s (%ld %ld)\n", __func__, timer->alarm.it_value.tv_sec,
+              timer->alarm.it_value.tv_usec);
 #endif
 
     if (timer->detection_enabled) {
         if (timer->alarm.it_value.tv_usec == 0 && timer->alarm.it_value.tv_sec == 0) {
-            fprintf(stderr,
-                    "Attempting to re-arm an expired timer! => reset(%ld.%ld)\n",
-                    timer->config.tv_sec, timer->config.tv_usec);
+            nyx_warn("Attempt to re-arm an expired timer! => reset(%ld.%ld)\n",
+                     timer->config.tv_sec, timer->config.tv_usec);
             reset_timeout_detector(timer);
         }
         assert(setitimer(ITIMER_REAL, &timer->alarm, NULL) == 0);
@@ -114,8 +113,8 @@ void arm_sigprof_timer(timeout_detector_t *timer)
 bool disarm_sigprof_timer(timeout_detector_t *timer)
 {
 #ifdef DEBUG_TIMEOUT_DETECTOR
-    fprintf(stderr, "%s (%ld %ld)\n", __func__, timer->alarm.it_value.tv_sec,
-            timer->alarm.it_value.tv_usec);
+    nyx_debug("%s (%ld %ld)\n", __func__, timer->alarm.it_value.tv_sec,
+              timer->alarm.it_value.tv_usec);
 #endif
 
     if (timer->detection_enabled) {
@@ -140,7 +139,6 @@ void block_signals(void)
     sigaddset(&set, SIGABRT);
     sigaddset(&set, SIGSEGV);
     pthread_sigmask(SIG_BLOCK, &set, NULL);
-    // fprintf(stderr, "%s!\n", __func__);
 }
 
 void unblock_signals(void)
@@ -163,7 +161,7 @@ static inline void handle_tmp_snapshot_state(void)
             qemu_mutex_lock_iothread();
             fast_reload_discard_tmp_snapshot(get_fast_reload_snapshot()); /* bye bye */
             qemu_mutex_unlock_iothread();
-            // fprintf(stderr, "======= SNAPSHOT REMOVED! =======\n");
+            // nyx_debug("======= SNAPSHOT REMOVED! =======\n");
         }
         GET_GLOBAL_STATE()->discard_tmp_snapshot = false;
         set_tmp_snapshot_created(GET_GLOBAL_STATE()->auxilary_buffer, 0);
@@ -197,7 +195,7 @@ static inline bool synchronization_check_page_not_found(void)
 
 void synchronization_unlock(void)
 {
-    // fprintf(stderr, "%s\n", __func__);
+    // nyx_debug("%s\n", __func__);
 
     pthread_mutex_lock(&synchronization_lock_mutex);
     pthread_cond_signal(&synchronization_lock_condition);
@@ -231,7 +229,7 @@ void synchronization_lock(void)
 
     if (runtime_usec < 0) {
         if (runtime_sec < 1) {
-            fprintf(stderr, "Error: negative payload runtime?!\n");
+            nyx_warn("negative payload runtime?!\n");
         }
         runtime_sec -= 1;
         runtime_usec = timer.config.tv_usec - timer.alarm.it_value.tv_usec + 1000000;
@@ -285,15 +283,15 @@ static void perform_reload(void)
         set_result_dirty_pages(GET_GLOBAL_STATE()->auxilary_buffer,
                                get_dirty_page_num(get_fast_reload_snapshot()));
     } else {
-        fprintf(stderr, "WARNING: Root snapshot is not available yet!\n");
+        nyx_warn("Root snapshot is not available yet!\n");
     }
 }
 
 void synchronization_lock_crash_found(void)
 {
     if (!in_fuzzing_loop && GET_GLOBAL_STATE()->in_fuzzing_mode) {
-        fprintf(stderr, "<%d-%ld>\t%s [NOT IN FUZZING LOOP] at %lx\n", getpid(),
-                run_counter, __func__, get_rip(qemu_get_cpu(0)));
+        nyx_warn("<%d-%ld>\t%s [NOT IN FUZZING LOOP] at %lx\n", getpid(),
+                 run_counter, __func__, get_rip(qemu_get_cpu(0)));
         // abort();
     }
 
@@ -311,8 +309,8 @@ void synchronization_lock_crash_found(void)
 void synchronization_lock_asan_found(void)
 {
     if (!in_fuzzing_loop) {
-        fprintf(stderr, "<%d-%ld>\t%s [NOT IN FUZZING LOOP]\n", getpid(),
-                run_counter, __func__);
+        nyx_warn("<%d-%ld>\t%s [NOT IN FUZZING LOOP]\n", getpid(), run_counter,
+                 __func__);
         set_success_auxiliary_result_buffer(GET_GLOBAL_STATE()->auxilary_buffer, 0);
     }
 
@@ -329,10 +327,10 @@ void synchronization_lock_asan_found(void)
 
 void synchronization_lock_timeout_found(void)
 {
-    // fprintf(stderr, "<%d>\t%s\n", getpid(), __func__);
+    // nyx_debug("<%d>\t%s\n", getpid(), __func__);
 
     if (!in_fuzzing_loop) {
-        // fprintf(stderr, "<%d-%ld>\t%s [NOT IN FUZZING LOOP]\n", getpid(), run_counter, __func__);
+        // nyx_warn("<%d-%ld>\t%s [NOT IN FUZZING LOOP]\n", getpid(), run_counter, __func__);
         set_success_auxiliary_result_buffer(GET_GLOBAL_STATE()->auxilary_buffer, 0);
     }
 
@@ -350,8 +348,8 @@ void synchronization_lock_timeout_found(void)
 void synchronization_lock_shutdown_detected(void)
 {
     if (!in_fuzzing_loop) {
-        fprintf(stderr, "<%d-%ld>\t%s [NOT IN FUZZING LOOP]\n", getpid(),
-                run_counter, __func__);
+        nyx_warn("<%d-%ld>\t%s [NOT IN FUZZING LOOP]\n", getpid(), run_counter,
+                 __func__);
         set_success_auxiliary_result_buffer(GET_GLOBAL_STATE()->auxilary_buffer, 0);
     }
 
@@ -369,8 +367,8 @@ void synchronization_payload_buffer_write_detected(void)
     static char reason[1024];
 
     if (!in_fuzzing_loop) {
-        fprintf(stderr, "<%d-%ld>\t%s [NOT IN FUZZING LOOP]\n", getpid(),
-                run_counter, __func__);
+        nyx_warn("<%d-%ld>\t%s [NOT IN FUZZING LOOP]\n", getpid(), run_counter,
+                 __func__);
     }
 
     pt_disable(qemu_get_cpu(0), false);
@@ -391,8 +389,8 @@ void synchronization_payload_buffer_write_detected(void)
 void synchronization_cow_full_detected(void)
 {
     if (!in_fuzzing_loop) {
-        fprintf(stderr, "<%d-%ld>\t%s [NOT IN FUZZING LOOP]\n", getpid(),
-                run_counter, __func__);
+        nyx_warn("<%d-%ld>\t%s [NOT IN FUZZING LOOP]\n", getpid(), run_counter,
+                 __func__);
     }
 
     pt_disable(qemu_get_cpu(0), false);
@@ -408,7 +406,7 @@ void synchronization_disable_pt(CPUState *cpu)
 {
     // nyx_trace();
     if (!in_fuzzing_loop) {
-        // fprintf(stderr, "<%d-%ld>\t%s [NOT IN FUZZING LOOP]\n", getpid(), run_counter, __func__);
+        // nyx_warn("<%d-%ld>\t%s [NOT IN FUZZING LOOP]\n", getpid(), run_counter, __func__);
         set_success_auxiliary_result_buffer(GET_GLOBAL_STATE()->auxilary_buffer, 0);
     }
 

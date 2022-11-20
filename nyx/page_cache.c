@@ -42,15 +42,14 @@ static bool reload_addresses(page_cache_t *self)
             k = kh_get(PC_CACHE, self->lookup, addr);
             if (k == kh_end(self->lookup)) {
                 if (value & 0xFFF) {
-                    fprintf(stderr, "Load page: %lx (UNMAPPED)\n", addr);
+                    nyx_warn("Load page: %lx (UNMAPPED)\n", addr);
                 } else {
                     k = kh_put(PC_CACHE, self->lookup, addr, &ret);
                     kh_value(self->lookup, k) = (offset - 1) * PAGE_SIZE;
                 }
             } else {
                 /* likely a bug / race condition in page_cache itself! */
-                fprintf(stderr,
-                        "----------> Page duplicate found ...skipping! %lx\n", addr);
+                nyx_warn("----> Page duplicate found ...skipping! %lx\n", addr);
                 // abort();
             }
         }
@@ -119,7 +118,7 @@ static void page_cache_lock(page_cache_t *self)
             return;
         } else if (ret == EINTR) {
             /* try again if acquiring this lock has failed */
-            fprintf(stderr, "%s: interrupted by signal...\n", __func__);
+            nyx_debug("%s: interrupted by signal...\n", __func__);
         } else {
             assert(false);
         }
@@ -135,7 +134,7 @@ static void page_cache_unlock(page_cache_t *self)
             return;
         } else if (ret == EINTR) {
             /* try again if releasing this lock has failed */
-            fprintf(stderr, "%s: interrupted by signal...\n", __func__);
+            nyx_debug("%s: interrupted by signal...\n", __func__);
         } else {
             assert(false);
         }
