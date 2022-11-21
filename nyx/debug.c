@@ -5,8 +5,10 @@
 #include <unistd.h>
 
 #include "qemu/osdep.h"
-#include "nyx/debug.h"
 #include "signal.h"
+
+#include "nyx/debug.h"
+#include "nyx/helpers.h"
 
 #ifdef ENABLE_BACKTRACES
 #define BT_BUF_SIZE 100
@@ -18,51 +20,52 @@ void qemu_backtrace(void)
     int   j;
 
     nptrs = backtrace(buffer, BT_BUF_SIZE);
-    fprintf(stderr, "backtrace() returned %d addresses\n", nptrs);
+    nyx_printf("backtrace() returned %d addresses:\n", nptrs);
 
 
     char **strings = backtrace_symbols(buffer, nptrs);
     if (strings == NULL) {
-        fprintf(stderr, "backtrace_symbols failed!\n");
+        nyx_error("backtrace_symbols failed!\n");
         return;
-        // exit(EXIT_FAILURE);
     }
 
     for (j = 0; j < nptrs; j++)
-        fprintf(stderr, "%s\n", strings[j]);
+        nyx_printf("\t%s\n", strings[j]);
 
     free(strings);
 }
 
 static void sigsegfault_handler(int signo, siginfo_t *info, void *extra)
 {
-    fprintf(stderr, "[qemu-nyx] crash detected (pid: %d / signal: %d)\n", getpid(),
-            signo);
+    nyx_printf("Crash detected (pid: %d / signal: %d)\n", getpid(), signo);
     qemu_backtrace();
 #ifdef NYX_DEBUG
-    fprintf(stderr, "WAITING FOR GDB ATTACH (PID: %d...\n", getpid());
+    nyx_printf("WAITING FOR GDB ATTACH... (PID: %d)\n", getpid());
     while (1) {
         sleep(1);
     }
+#else
+	nyx_abort("Exit after SIGSEGV. Check logs for details.");
 #endif /* NYX_DEBUG */
 }
 
 static void sigabrt_handler(int signo, siginfo_t *info, void *extra)
 {
-    fprintf(stderr, "[qemu-nyx] crash detected (pid: %d / signal: %d)\n", getpid(),
-            signo);
+    nyx_printf("Abort detected (pid: %d / signal: %d)\n", getpid(), signo);
     qemu_backtrace();
 #ifdef NYX_DEBUG
-    fprintf(stderr, "WAITING FOR GDB ATTACH (PID: %d...\n", getpid());
+    nyx_printf("WAITING FOR GDB ATTACH... (PID: %d)\n", getpid());
     while (1) {
         sleep(1);
     }
+#else
+	nyx_abort("Exit after SIGABRT. Check logs for details.");
 #endif /* NYX_DEBUG */
 }
 
 static void sigint_handler(int signo, siginfo_t *info, void *extra)
 {
-    fprintf(stderr, "[qemu-nyx] bye! (pid: %d / signal: %d)\n", getpid(), signo);
+    nyx_error("Bye! (pid: %d / signal: %d)\n", getpid(), signo);
     exit(0);
 }
 
@@ -73,24 +76,21 @@ void init_crash_handler(void)
     action.sa_sigaction = sigsegfault_handler;
 
     if (sigaction(SIGSEGV, &action, NULL) == -1) {
-        fprintf(stderr, "SIGSEGV: sigaction failed");
-        _exit(1);
+        nyx_abort("Failed to install SIGSEGV handler\n");
     }
 
 
     action.sa_sigaction = sigabrt_handler;
 
     if (sigaction(SIGABRT, &action, NULL) == -1) {
-        fprintf(stderr, "SIGABRT: sigaction failed");
-        _exit(1);
+        nyx_abort("Failed to install SIGABRT handler\n");
     }
 
     /* don't install a SIGINT handler if the nyx block cow cache layer is disabled */
     if (!getenv("NYX_DISABLE_BLOCK_COW")) {
         action.sa_sigaction = sigint_handler;
         if (sigaction(SIGINT, &action, NULL) == -1) {
-            fprintf(stderr, "SIGINT: sigaction failed");
-            _exit(1);
+            nyx_abort("Failed to install SIGINT handler\n");
         }
     }
 }
