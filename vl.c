@@ -4632,32 +4632,32 @@ int main(int argc, char **argv, char **envp)
         if ((snapshot_used || load_mode || skip_serialization) &&
             getenv("NYX_DISABLE_DIRTY_RING"))
         {
-            error_report("NYX_DISABLE_DIRTY_RING is only allowed during "
-                         "pre-snapshot creation\n");
+            nyx_error("NYX_DISABLE_DIRTY_RING is only allowed during "
+                      "pre-snapshot creation\n");
             exit(1);
         }
 
         if ((pre_snapshot_used && !snapshot_used && !load_mode) &&
             !getenv("NYX_DISABLE_DIRTY_RING"))
         {
-            error_report(
+            nyx_error(
                 "NYX_DISABLE_DIRTY_RING is required during pre-snapshot creation\n");
             exit(1);
         }
 
         if (pre_snapshot_used && load_mode) {
-            error_report("invalid argument (pre_snapshot_used && load_mode)!\n");
+            nyx_error("invalid argument (pre_snapshot_used && load_mode)!\n");
             exit(1);
         }
 
         if ((!snapshot_used && !pre_snapshot_used) && load_mode) {
-            error_report("invalid argument ((!pre_snapshot_used && "
-                         "!pre_snapshot_used) && load_mode)!\n");
+            nyx_error("invalid argument ((!pre_snapshot_used && "
+                      "!pre_snapshot_used) && load_mode)!\n");
             exit(1);
         }
 
         if (pre_snapshot_used && snapshot_used) {
-            nyx_printf("[Qemu-Nyx]: loading pre image to start fuzzing...\n");
+            nyx_printf("Loading pre image to start fuzzing...\n");
             set_fast_reload_mode(false);
             set_fast_reload_path(snapshot_path);
             if (!skip_serialization) {
@@ -4670,7 +4670,7 @@ int main(int argc, char **argv, char **envp)
             fast_reload_init(GET_GLOBAL_STATE()->fast_reload_snapshot);
         } else {
             if (pre_snapshot_used) {
-                nyx_printf("[Qemu-Nyx]: preparing to create pre image...\n");
+                nyx_printf("Preparing to create pre image...\n");
                 set_fast_reload_pre_path(pre_snapshot_path);
                 set_fast_reload_pre_image();
             } else if (snapshot_used) {
@@ -4681,7 +4681,7 @@ int main(int argc, char **argv, char **envp)
                 if (load_mode) {
                     set_fast_reload_mode(true);
                     nyx_printf(
-                        "[Qemu-Nyx]: waiting for snapshot to start fuzzing...\n");
+                        "Waiting for snapshot to start fuzzing...\n");
                     fast_reload_create_from_file(get_fast_reload_snapshot(),
                                                  snapshot_path, false);
                     // cpu_synchronize_all_post_reset();
@@ -4690,7 +4690,7 @@ int main(int argc, char **argv, char **envp)
                     skip_init();
                     // GET_GLOBAL_STATE()->pt_trace_mode = false;
                 } else {
-                    nyx_printf("[Qemu-Nyx]: Booting VM to start fuzzing...\n");
+                    nyx_printf("Booting VM to start fuzzing...\n");
                     set_fast_reload_mode(false);
                 }
             }
