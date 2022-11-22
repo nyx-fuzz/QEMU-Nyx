@@ -226,7 +226,7 @@ static bool verify_workdir_state(nyx_interface_state *s, Error **errp)
     char    *tmp;
 
     if (!folder_exits(workdir)) {
-        nyx_error("Error: %s does not exist...\n", workdir);
+        nyx_error("Folder %s does not exist...\n", workdir);
         return false;
     }
 
@@ -240,7 +240,7 @@ static bool verify_workdir_state(nyx_interface_state *s, Error **errp)
 
     assert(asprintf(&tmp, "%s/interface_%d", workdir, id) != -1);
     if (!file_exits(tmp)) {
-        nyx_error("Error: %s does not exist...\n", tmp);
+        nyx_error("File %s does not exist...\n", tmp);
         free(tmp);
         return false;
     }
@@ -248,7 +248,7 @@ static bool verify_workdir_state(nyx_interface_state *s, Error **errp)
 
     assert(asprintf(&tmp, "%s/payload_%d", workdir, id) != -1);
     if (!file_exits(tmp)) {
-        nyx_error("Error: %s does not exist...\n", tmp);
+        nyx_error("File %s does not exist...\n", tmp);
         free(tmp);
         return false;
     } else {
@@ -258,7 +258,7 @@ static bool verify_workdir_state(nyx_interface_state *s, Error **errp)
 
     assert(asprintf(&tmp, "%s/bitmap_%d", workdir, id) != -1);
     if (!file_exits(tmp)) {
-        nyx_error("Error: %s does not exist...\n", tmp);
+        nyx_error("File %s does not exist...\n", tmp);
         free(tmp);
         return false;
     } else {
@@ -268,7 +268,7 @@ static bool verify_workdir_state(nyx_interface_state *s, Error **errp)
 
     assert(asprintf(&tmp, "%s/ijon_%d", workdir, id) != -1);
     if (!file_exits(tmp)) {
-        nyx_error("Error: %s does not exist...\n", tmp);
+        nyx_error("File %s does not exist...\n", tmp);
         free(tmp);
         return false;
     } else {
@@ -278,7 +278,7 @@ static bool verify_workdir_state(nyx_interface_state *s, Error **errp)
 
     assert(asprintf(&tmp, "%s/page_cache.lock", workdir) != -1);
     if (!file_exits(tmp)) {
-        nyx_error("Error: %s does not exist...", tmp);
+        nyx_error("File %s does not exist...", tmp);
         free(tmp);
         return false;
     }
@@ -286,7 +286,7 @@ static bool verify_workdir_state(nyx_interface_state *s, Error **errp)
 
     assert(asprintf(&tmp, "%s/page_cache.addr", workdir) != -1);
     if (!file_exits(tmp)) {
-        nyx_error("Error: %s does not exist...\n", tmp);
+        nyx_error("File %s does not exist...\n", tmp);
         free(tmp);
         return false;
     }
@@ -294,7 +294,7 @@ static bool verify_workdir_state(nyx_interface_state *s, Error **errp)
 
     assert(asprintf(&tmp, "%s/page_cache.dump", workdir) != -1);
     if (!file_exits(tmp)) {
-        nyx_error("Error: %s does not exist...\n", tmp);
+        nyx_error("File %s does not exist...\n", tmp);
         free(tmp);
         return false;
     }
@@ -305,7 +305,7 @@ static bool verify_workdir_state(nyx_interface_state *s, Error **errp)
 
     assert(asprintf(&tmp, "%s/redqueen_workdir_%d/", workdir, id) != -1);
     if (!folder_exits(tmp)) {
-        nyx_error("%s does not exist...\n", tmp);
+        nyx_error("Folder %s does not exist...\n", tmp);
         free(tmp);
         return false;
     } else {
@@ -343,13 +343,11 @@ static void check_ipt_range(uint8_t i)
     ret     = ioctl(kvm, KVM_VMX_PT_GET_ADDRN, NULL);
 
     if (ret == -1) {
-        nyx_error("Error: Multi range tracing is not supported!\n");
-        exit(1);
+        nyx_abort("Multi range tracing is not supported!\n");
     }
 
     if (ret < (i + 1)) {
-        nyx_error("Error: CPU supports only %d IP filters!\n", ret);
-        exit(1);
+        nyx_abort("CPU supports only %d IP filters!\n", ret);
     }
     close(kvm);
 }
@@ -360,8 +358,7 @@ static void check_available_ipt_ranges(nyx_interface_state *s)
 
     int kvm_fd = qemu_open("/dev/kvm", O_RDWR);
     if (kvm_fd == -1) {
-        nyx_error("Error: could not access KVM kernel module: %m\n");
-        exit(1);
+        nyx_abort("Could not access KVM kernel module: %m\n");
     }
 
     if (ioctl(kvm_fd, KVM_CHECK_EXTENSION, KVM_CAP_NYX_PT) == 1 &&
@@ -404,8 +401,7 @@ static void nyx_realize(DeviceState *dev, Error **errp)
 
 
     if (s->worker_id == 0xFFFF) {
-        nyx_error("Error: Invalid worker id...\n");
-        exit(1);
+        nyx_abort("Invalid worker id...\n");
     }
 
     if (s->cow_primary_size) {
@@ -414,8 +410,7 @@ static void nyx_realize(DeviceState *dev, Error **errp)
     GET_GLOBAL_STATE()->worker_id = s->worker_id;
 
     if (!s->workdir || !verify_workdir_state(s, errp)) {
-        nyx_error("Error: Invalid work dir...\n");
-        exit(1);
+        nyx_abort("Invalid work dir...\n");
     }
 
     if (!s->sharedir || !verify_sharedir_state(s, errp)) {

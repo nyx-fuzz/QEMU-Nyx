@@ -56,17 +56,13 @@ void handle_hypercall_kafl_set_agent_config(struct kvm_run *run,
 
     if (read_virtual_memory(vaddr, (uint8_t *)&config, sizeof(agent_config_t), cpu)) {
         if (config.agent_magic != NYX_AGENT_MAGIC) {
-            nyx_error("Error: NYX_AGENT_MAGIC not found in agent configuration"
-                      " - You are probably using an outdated agent...\n");
-            exit(1);
+            nyx_abort("NYX_AGENT_MAGIC mismatch - agent outdated? (%x != %x)\n",
+                      config.agent_magic, NYX_AGENT_MAGIC);
         }
 
         if (config.agent_version != NYX_AGENT_VERSION) {
-            nyx_error("Error: NYX_AGENT_VERSION does not match in agent "
-                      "configuration (%d != %d) - "
-                      "You are probably using an outdated agent...\n",
+            nyx_abort("NYX_AGENT_VERSION mismatch - agent outdated? (%x != %x)\n",
                       config.agent_version, NYX_AGENT_VERSION);
-            exit(1);
         }
 
         GET_GLOBAL_STATE()->cap_timeout_detection = config.agent_timeout_detection;
@@ -77,9 +73,8 @@ void handle_hypercall_kafl_set_agent_config(struct kvm_run *run,
         if (!GET_GLOBAL_STATE()->cap_compile_time_tracing &&
             !GET_GLOBAL_STATE()->nyx_fdl)
         {
-            nyx_error("Error: No Intel PT support on this KVM build and no "
+            nyx_abort("No Intel PT support on this KVM build and no "
                       "compile-time instrumentation enabled in the target\n");
-            exit(1);
         }
 
         GET_GLOBAL_STATE()->cap_ijon_tracing = config.agent_ijon_tracing;
@@ -104,7 +99,7 @@ void handle_hypercall_kafl_set_agent_config(struct kvm_run *run,
         }
 
         if (apply_capabilities(cpu) == false) {
-            nyx_abort((char *)"applying agent configuration failed...");
+            nyx_abort("Applying agent configuration failed...");
         }
 
         if (getenv("DUMP_PAYLOAD_MODE")) {
@@ -114,8 +109,7 @@ void handle_hypercall_kafl_set_agent_config(struct kvm_run *run,
         }
 
     } else {
-        nyx_error("Error: %s - failed (vaddr: 0x%lx)!\n", __func__, vaddr);
-        exit(1);
+        nyx_abort("%s - failed (vaddr: 0x%lx)!\n", __func__, vaddr);
     }
     GET_GLOBAL_STATE()->set_agent_config_done = true;
 }

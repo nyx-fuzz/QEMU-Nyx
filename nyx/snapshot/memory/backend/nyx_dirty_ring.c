@@ -2,6 +2,8 @@
 #include "qemu/osdep.h"
 #include <sys/ioctl.h>
 
+#include "nyx/debug.h"
+#include "nyx/helpers.h"
 #include "nyx/snapshot/helper.h"
 #include "nyx/snapshot/memory/backend/nyx_dirty_ring.h"
 
@@ -35,7 +37,7 @@ static int vm_enable_dirty_ring(int vm_fd, uint32_t ring_size)
 
     int ret = ioctl(vm_fd, KVM_ENABLE_CAP, &cap);
     if (ret != 0) {
-        printf("[QEMU-Nyx] Error: KVM_ENABLE_CAP ioctl failed\n");
+        nyx_error("KVM_ENABLE_CAP ioctl failed\n");
     }
 
     return ring_size;
@@ -45,13 +47,11 @@ static int check_dirty_ring_size(int kvm_fd, int vm_fd)
 {
     int ret = ioctl(kvm_fd, KVM_CHECK_EXTENSION, KVM_CAP_DIRTY_LOG_RING);
     if (ret < 0) {
-        printf("[QEMU-Nyx] Error: KVM_CAP_DIRTY_LOG_RING failed (dirty ring not "
-               "supported?)\n");
-        exit(1);
+        nyx_abort("KVM_CAP_DIRTY_LOG_RING failed (dirty ring not supported?)\n");
     }
 
-    printf("[QEMU-Nyx] Max Dirty Ring Size -> %d (Entries: %d)\n", ret,
-           ret / (int)sizeof(struct kvm_dirty_gfn));
+    nyx_printf("Max Dirty Ring Size -> %d (Entries: %d)\n", ret,
+               ret / (int)sizeof(struct kvm_dirty_gfn));
 
     uint64_t dirty_ring_max_size =
         ret; // kvm_dirty_ring_size * sizeof(struct kvm_dirty_gfn);
@@ -60,9 +60,7 @@ static int check_dirty_ring_size(int kvm_fd, int vm_fd)
     ret = vm_enable_dirty_ring(vm_fd, dirty_ring_max_size);
 
     if (ret < 0) {
-        printf("[QEMU-Nyx] Error: Enabling dirty ring (size: %ld) failed\n",
-               dirty_ring_max_size);
-        exit(1);
+        nyx_abort("Enabling dirty ring (size: %ld) failed\n", dirty_ring_max_size);
     }
 
     dirty_ring_max_size_global = dirty_ring_max_size;
@@ -78,11 +76,10 @@ static void allocate_dirty_ring(int kvm_vcpu, int vm_fd)
                               MAP_SHARED, kvm_vcpu,
                               PAGE_SIZE * KVM_DIRTY_LOG_PAGE_OFFSET);
         if (kvm_dirty_gfns == MAP_FAILED) {
-            printf("[QEMU-Nyx] Error: Dirty ring mmap failed!\n");
-            exit(1);
+            nyx_abort("Dirty ring mmap failed!\n");
         }
     }
-    printf("[QEMU-Nyx] Dirty ring mmap region located at %p\n", kvm_dirty_gfns);
+    nyx_printf("Dirty ring mmap region located at %p\n", kvm_dirty_gfns);
 
     int ret = ioctl(vm_fd, KVM_RESET_DIRTY_RINGS, 0);
     assert(ret == 0);
@@ -141,11 +138,8 @@ static void dirty_ring_flush_and_collect(nyx_dirty_ring_t *self,
             cleared++;
             entry->flags |= 0x2; // reset dirty entry
         } else {
-            printf("[QEMU-Nyx] [%p] kvm_dirty_gfn -> flags: %d slot: %d offset: %lx "
-                   "{ERROR}\n",
-                   entry, entry->flags, entry->slot, entry->offset);
-            fflush(stdout);
-            exit(1);
+            nyx_abort("[%p] kvm_dirty_gfn -> flags: %d slot: %d offset: %lx\n",
+                      entry, entry->flags, entry->slot, entry->offset);
         }
 
         kvm_dirty_gfns_index++;
@@ -171,11 +165,8 @@ static void dirty_ring_flush(int vm_fd)
             cleared++;
             entry->flags |= 0x2; // reset dirty entry
         } else {
-            printf("[QEMU-Nyx] [%p] kvm_dirty_gfn -> flags: %d slot: %d offset: %lx "
-                   "{ERROR}\n",
-                   entry, entry->flags, entry->slot, entry->offset);
-            fflush(stdout);
-            exit(1);
+            nyx_abort("[%p] kvm_dirty_gfn -> flags: %d slot: %d offset: %lx\n",
+                      entry, entry->flags, entry->slot, entry->offset);
         }
 
         kvm_dirty_gfns_index++;
@@ -253,18 +244,19 @@ nyx_dirty_ring_t *nyx_dirty_ring_init(shadow_memory_t *shadow_memory)
 
 #ifdef DEBUG__PRINT_DIRTY_RING
     for (int i = 0; i < self->kvm_region_slots_num; i++) {
-        printf("[%d].enabled       = %d\n", i, self->kvm_region_slots[i].enabled);
-        printf("[%d].bitmap        = %p\n", i, self->kvm_region_slots[i].bitmap);
-        printf("[%d].stack         = %p\n", i, self->kvm_region_slots[i].stack);
-        printf("[%d].stack_ptr     = %ld\n", i, self->kvm_region_slots[i].stack_ptr);
+        nyx_debug("[%d].enabled       = %d\n", i, self->kvm_region_slots[i].enabled);
+        nyx_debug("[%d].bitmap        = %p\n", i, self->kvm_region_slots[i].bitmap);
+        nyx_debug("[%d].stack         = %p\n", i, self->kvm_region_slots[i].stack);
+        nyx_debug("[%d].stack_ptr     = %ld\n", i,
+                  self->kvm_region_slots[i].stack_ptr);
         if (self->kvm_region_slots[i].enabled) {
-            printf("[%d].region_id     = %d\n", i,
-                   self->kvm_region_slots[i].region_id);
-            printf("[%d].region_offset = 0x%lx\n", i,
-                   self->kvm_region_slots[i].region_offset);
+            nyx_debug("[%d].region_id     = %d\n", i,
+                      self->kvm_region_slots[i].region_id);
+            nyx_debug("[%d].region_offset = 0x%lx\n", i,
+                      self->kvm_region_slots[i].region_offset);
         } else {
-            printf("[%d].region_id     = -\n", i);
-            printf("[%d].region_offset = -\n", i);
+            nyx_debug("[%d].region_id     = -\n", i);
+            nyx_debug("[%d].region_offset = -\n", i);
         }
     }
 #endif

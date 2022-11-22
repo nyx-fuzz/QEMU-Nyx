@@ -304,8 +304,7 @@ bool check_if_relood_request_exists_pre(fast_vm_reload_sync_t *self)
 
         switch (self->current_request) {
         case REQUEST_VOID:
-            nyx_error("%s: REQUEST_VOID requested!\n", __func__);
-            abort();
+            nyx_abort("%s: REQUEST_VOID requested!\n", __func__);
 
         case REQUEST_SAVE_SNAPSHOT_PRE_FIX_RIP:
         case REQUEST_SAVE_SNAPSHOT_ROOT_FIX_RIP:
@@ -335,8 +334,7 @@ bool check_if_relood_request_exists_pre(fast_vm_reload_sync_t *self)
             break;
 
         default:
-            nyx_error("%s: Unkown request: %d\n", __func__, self->current_request);
-            abort();
+            nyx_abort("%s: Unkown request: %d\n", __func__, self->current_request);
         }
         return true;
     }
