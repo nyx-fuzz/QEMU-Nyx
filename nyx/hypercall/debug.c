@@ -109,6 +109,6 @@ void handle_hypercall_kafl_debug_tmp_snapshot(struct kvm_run *run,
                                               CPUState       *cpu,
                                               uint64_t        hypercall_arg)
 {
-    nyx_abort("Error: HYPERCALL_KAFL_DEBUG_TMP not enabled!\n");
+    nyx_abort("HYPERCALL_KAFL_DEBUG_TMP not enabled!\n");
 }
 #endif

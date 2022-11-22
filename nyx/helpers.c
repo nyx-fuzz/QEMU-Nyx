@@ -177,9 +177,8 @@ bool apply_capabilities(CPUState *cpu)
         }
 
         if (GET_GLOBAL_STATE()->cap_compile_time_tracing_buffer_vaddr & 0xfff) {
-            nyx_error(
-                "Error: Guest trace bitmap v_addr (0x%lx) is not page aligned!\n",
-                GET_GLOBAL_STATE()->cap_compile_time_tracing_buffer_vaddr);
+            nyx_error("Guest trace bitmap v_addr (0x%lx) is not page aligned!\n",
+                      GET_GLOBAL_STATE()->cap_compile_time_tracing_buffer_vaddr);
             return false;
         }
 
@@ -203,9 +202,8 @@ bool apply_capabilities(CPUState *cpu)
                   GET_GLOBAL_STATE()->cap_ijon_tracing_buffer_vaddr);
 
         if (GET_GLOBAL_STATE()->cap_ijon_tracing_buffer_vaddr & 0xfff) {
-            nyx_error(
-                "Error: Guest ijon buffer v_addr (0x%lx) is not page aligned!\n",
-                GET_GLOBAL_STATE()->cap_ijon_tracing_buffer_vaddr);
+            nyx_error("Guest ijon buffer v_addr (0x%lx) is not page aligned!\n",
+                      GET_GLOBAL_STATE()->cap_ijon_tracing_buffer_vaddr);
             return false;
         }
 
