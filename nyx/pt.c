@@ -322,6 +322,11 @@ void pt_pre_kvm_run(CPUState *cpu)
             assert(cpu->pt_fd != -1);
             ret = ioctl(cpu->pt_fd, KVM_VMX_PT_GET_TOPA_SIZE, (unsigned long)0x0);
 
+            if (ret == -1) {
+                nyx_abort("ToPA allocation failure. Check kernel logs.\n");
+            }
+
+            assert(ret % PAGE_SIZE == 0);
             cpu->pt_mmap = mmap((void *)PT_BUFFER_MMAP_ADDR, ret,
                                 PROT_READ | PROT_WRITE, MAP_SHARED, cpu->pt_fd, 0);
             assert(cpu->pt_mmap != (void *)0xFFFFFFFFFFFFFFFF);
