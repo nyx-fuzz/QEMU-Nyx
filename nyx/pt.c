@@ -116,10 +116,10 @@ void pt_dump(CPUState *cpu, int bytes)
                     libxdc_get_page_fault_addr(GET_GLOBAL_STATE()->decoder);
                 break;
             case decoder_unkown_packet:
-                nyx_warn("WARNING: libxdc_decode returned unknown_packet\n");
+                nyx_warn("libxdc_decode returned unknown_packet\n");
                 break;
             case decoder_error:
-                nyx_warn("WARNING: libxdc_decode returned decoder_error\n");
+                nyx_warn("libxdc_decode returned decoder_error\n");
                 break;
             }
         }

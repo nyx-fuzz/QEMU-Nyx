@@ -1023,7 +1023,7 @@ uint64_t disassemble_at_rip(int fd, uint64_t address, CPUState *cpu, uint64_t cr
                       insn[i].mnemonic, insn[i].op_str);
         }
     } else {
-        nyx_error("ERROR in %s at %lx (cr3: %lx)\n", __func__, address, cr3);
+        nyx_error("nothing to decode at %s(%lx,%lx)\n", __func__, address, cr3);
     }
 
 

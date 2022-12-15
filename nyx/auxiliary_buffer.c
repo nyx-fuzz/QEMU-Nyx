@@ -257,7 +257,7 @@ void set_state_auxiliary_result_buffer(auxilary_buffer_t *auxilary_buffer,
     if (auxilary_buffer) {
         VOLATILE_WRITE_8(auxilary_buffer->result.state, state);
     } else {
-        nyx_error("WARNING: auxilary_buffer pointer is zero\n");
+        nyx_error("auxilary_buffer pointer is zero\n");
     }
 }
 
