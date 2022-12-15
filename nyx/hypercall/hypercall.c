@@ -581,7 +581,7 @@ static void handle_hypercall_kafl_lock(struct kvm_run *run,
     }
 
     if (!GET_GLOBAL_STATE()->fast_reload_pre_image) {
-        nyx_error("Skipping pre image creation (hint: set pre=on)\n");
+        nyx_debug_p(CORE_PREFIX, "Skipping pre image creation (hint: set pre=on)\n");
         return;
     }
 
