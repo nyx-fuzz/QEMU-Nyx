@@ -266,10 +266,7 @@ void synchronization_lock(void)
     check_auxiliary_config_buffer(GET_GLOBAL_STATE()->auxilary_buffer,
                                   &GET_GLOBAL_STATE()->shadow_config);
 
-    if (GET_GLOBAL_STATE()->starved == true)
-        set_success_auxiliary_result_buffer(GET_GLOBAL_STATE()->auxilary_buffer, 2);
-    else
-        set_success_auxiliary_result_buffer(GET_GLOBAL_STATE()->auxilary_buffer, 1);
+    set_success_auxiliary_result_buffer(GET_GLOBAL_STATE()->auxilary_buffer, 1);
     reset_pt_overflow_auxiliary_result_buffer(GET_GLOBAL_STATE()->auxilary_buffer);
 
     GET_GLOBAL_STATE()->pt_trace_size = 0;
@@ -427,6 +424,9 @@ void synchronization_disable_pt(CPUState *cpu)
                              GET_GLOBAL_STATE()->pt_trace_size);
     set_result_bb_coverage(GET_GLOBAL_STATE()->auxilary_buffer,
                            GET_GLOBAL_STATE()->bb_coverage);
+
+    if (GET_GLOBAL_STATE()->starved == true)
+        set_success_auxiliary_result_buffer(GET_GLOBAL_STATE()->auxilary_buffer, 2);
 
     in_fuzzing_loop = false;
 }
