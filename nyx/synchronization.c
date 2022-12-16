@@ -220,10 +220,6 @@ void synchronization_lock(void)
     pthread_mutex_lock(&synchronization_lock_mutex);
     run_counter++;
 
-    if (qemu_get_cpu(0)->intel_pt_run_trashed) {
-        set_pt_overflow_auxiliary_result_buffer(GET_GLOBAL_STATE()->auxilary_buffer);
-    }
-
     long runtime_sec  = timer.config.tv_sec - timer.alarm.it_value.tv_sec;
     long runtime_usec = timer.config.tv_usec - timer.alarm.it_value.tv_usec;
 
@@ -240,6 +236,11 @@ void synchronization_lock(void)
 
     if (synchronization_check_page_not_found()) {
         set_success_auxiliary_result_buffer(GET_GLOBAL_STATE()->auxilary_buffer, 0);
+    }
+
+    if (qemu_get_cpu(0)->intel_pt_run_trashed) {
+        set_pt_overflow_auxiliary_result_buffer(GET_GLOBAL_STATE()->auxilary_buffer);
+        qemu_get_cpu(0)->intel_pt_run_trashed = false;
     }
 
     if (GET_GLOBAL_STATE()->dump_page) {
@@ -269,6 +270,7 @@ void synchronization_lock(void)
         set_success_auxiliary_result_buffer(GET_GLOBAL_STATE()->auxilary_buffer, 2);
     else
         set_success_auxiliary_result_buffer(GET_GLOBAL_STATE()->auxilary_buffer, 1);
+    reset_pt_overflow_auxiliary_result_buffer(GET_GLOBAL_STATE()->auxilary_buffer);
 
     GET_GLOBAL_STATE()->pt_trace_size = 0;
 }

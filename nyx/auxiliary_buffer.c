@@ -208,6 +208,11 @@ void set_pt_overflow_auxiliary_result_buffer(auxilary_buffer_t *auxilary_buffer)
     VOLATILE_WRITE_8(auxilary_buffer->result.pt_overflow, 1);
 }
 
+void reset_pt_overflow_auxiliary_result_buffer(auxilary_buffer_t *auxilary_buffer)
+{
+    VOLATILE_WRITE_8(auxilary_buffer->result.pt_overflow, 0);
+}
+
 void set_exec_done_auxiliary_result_buffer(auxilary_buffer_t *auxilary_buffer,
                                            uint32_t           sec,
                                            uint32_t           usec,
