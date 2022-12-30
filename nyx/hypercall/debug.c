@@ -2,13 +2,18 @@
 
 #include "sysemu/kvm.h"
 #include <sys/time.h>
+#include "qapi/error.h"
 
 #include "nyx/fast_vm_reload.h"
 #include "nyx/hypercall/debug.h"
 #include "nyx/state/state.h"
 #include "nyx/synchronization.h"
+#include "qapi/qapi-commands-dump.h"
 
-// #define NYX_ENABLE_DEBUG_HYPERCALLS
+#ifdef NYX_DEBUG
+#define NYX_ENABLE_DEBUG_HYPERCALLS
+#endif 
+
 #ifdef NYX_ENABLE_DEBUG_HYPERCALLS
 
 static double get_time(void)
@@ -52,6 +57,7 @@ void handle_hypercall_kafl_debug_tmp_snapshot(struct kvm_run *run,
                                               uint64_t        hypercall_arg)
 {
     static bool first = true;
+    Error *err = NULL;
 
     switch (hypercall_arg & 0xFFF) {
     case 0: /* create root snapshot */
@@ -99,6 +105,17 @@ void handle_hypercall_kafl_debug_tmp_snapshot(struct kvm_run *run,
                                    REQUEST_LOAD_SNAPSHOT_ROOT);
             break;
         }
+    case 6:
+        nyx_warn_once("%s: perform kcore_dump!\n", __func__);
+        bool in_fuzzing_mode_state = GET_GLOBAL_STATE()->in_fuzzing_mode;
+        GET_GLOBAL_STATE()->in_fuzzing_mode = true;        
+	    qmp_dump_guest_memory(false, "file:/tmp/vmcore_test.img", true, 0, 0, 0,
+			      0, 0, false, DUMP_GUEST_MEMORY_FORMAT_ELF, &err);
+        if (err) {
+            nyx_abort("(qmp_dump_guest_memory): %s\n", error_get_pretty(err));
+        }
+        GET_GLOBAL_STATE()->in_fuzzing_mode = in_fuzzing_mode_state;
+        break;
     default:
         abort();
     }
