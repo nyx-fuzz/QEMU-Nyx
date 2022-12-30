@@ -31,6 +31,10 @@
 #include "qemu/main-loop.h"
 #include "hw/misc/vmcoreinfo.h"
 
+#ifdef QEMU_NYX
+#include "nyx/state/state.h"
+#endif
+
 #ifdef TARGET_X86_64
 #include "win_dump.h"
 #endif
@@ -1663,8 +1667,17 @@ static void dump_init(DumpState *s, int fd, bool has_format,
     }
 
     if (runstate_is_running()) {
+#ifdef QEMU_NYX
+        if(GET_GLOBAL_STATE()->in_fuzzing_mode){
+            s->resume = false;
+        }
+        else {
+#endif
         vm_stop(RUN_STATE_SAVE_VM);
         s->resume = true;
+#ifdef QEMU_NYX
+        }
+#endif    
     } else {
         s->resume = false;
     }
@@ -1997,7 +2010,11 @@ void qmp_dump_guest_memory(bool paging, const char *file,
 #endif
 
     if  (strstart(file, "file:", &p)) {
+#ifdef QEMU_NYX
+        fd = qemu_open(p, O_WRONLY | O_CREAT | O_TRUNC | O_BINARY, S_IRUSR | S_IWRITE);
+#else
         fd = qemu_open(p, O_WRONLY | O_CREAT | O_TRUNC | O_BINARY, S_IRUSR);
+#endif
         if (fd < 0) {
             error_setg_file_open(errp, errno, p);
             return;
