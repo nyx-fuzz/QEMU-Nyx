@@ -41,6 +41,14 @@
 #define nyx_warn(format, ...)   qemu_log(NYX_LOG_PREFIX "Warning: " format, ##__VA_ARGS__)
 #define nyx_trace(format, ...)  nyx_debug("=> %s\n", __func__)
 
+#define nyx_warn_once(format, ...)                      \
+    ({                                                  \
+        static bool _printed = false;                   \
+        if (_printed == false){                         \
+            _printed = true;                            \
+            nyx_warn(format, ##__VA_ARGS__);            \
+        }                                               \
+    })
 
 #ifdef ENABLE_BACKTRACES
 void qemu_backtrace(void);
