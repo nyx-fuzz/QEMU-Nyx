@@ -16,6 +16,9 @@
 
 // #define DEBUG_NYX_SNAPSHOT_PAGE_BLOCKLIST
 
+uint64_t snapshot_page_blocklist_get_phys_area_size(snapshot_page_blocklist_t *self){
+    return self->phys_area_size;
+}
 
 snapshot_page_blocklist_t *snapshot_page_blocklist_init(void)
 {

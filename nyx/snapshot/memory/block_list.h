@@ -32,3 +32,7 @@ static inline bool snapshot_page_blocklist_check_phys_addr(
 }
 
 snapshot_page_blocklist_t *snapshot_page_blocklist_init(void);
+
+#ifdef NYX_DEBUG
+uint64_t snapshot_page_blocklist_get_phys_area_size(snapshot_page_blocklist_t *self);
+#endif
