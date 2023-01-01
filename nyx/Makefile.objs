@@ -33,5 +33,6 @@ hypercall/configuration.o \
 hypercall/debug.o \
 state/state.o \
 state/snapshot_state.o \
-pt.o
+pt.o \
+mem_split.o
 

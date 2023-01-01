@@ -13,6 +13,7 @@
 #include "nyx/snapshot/helper.h"
 #include "nyx/snapshot/memory/nyx_fdl_user.h"
 #include "nyx/snapshot/memory/shadow_memory.h"
+#include "nyx/mem_split.h"
 
 /* debug option */
 // #define DEBUG_USER_FDL

@@ -117,6 +117,8 @@ void state_init_global(void)
     global_state.get_host_config_done  = false;
     global_state.set_agent_config_done = false;
 
+    global_state.mem_mapping_type = MEM_SPLIT_TYPE_INVALID;
+
     global_state.sharedir = sharedir_new();
 
 

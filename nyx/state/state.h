@@ -30,6 +30,7 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 #include "nyx/sharedir.h"
 #include "nyx/synchronization.h"
 #include "nyx/types.h"
+#include "nyx/mem_split.h"
 
 #include <libxdc.h>
 
@@ -136,6 +137,8 @@ typedef struct qemu_nyx_state_s {
 
     bool get_host_config_done;
     bool set_agent_config_done;
+
+    MemSplitType mem_mapping_type;
 
     /* capabilites */
     uint8_t  cap_timeout_detection;

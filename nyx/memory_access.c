@@ -34,6 +34,7 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 #include "nyx/helpers.h"
 #include "nyx/hypercall/hypercall.h"
 #include "nyx/state/state.h"
+#include "nyx/mem_split.h"
 
 #define INVALID_ADDRESS 0xFFFFFFFFFFFFFFFFULL
 

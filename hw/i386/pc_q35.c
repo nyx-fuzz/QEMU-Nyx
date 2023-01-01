@@ -53,6 +53,11 @@
 #include "qapi/error.h"
 #include "qemu/error-report.h"
 #include "sysemu/numa.h"
+#ifdef QEMU_NYX
+#include "nyx/state/state.h"
+#include "nyx/mem_split.h"
+
+#endif
 
 /* ICH9 AHCI has 6 ports */
 #define MAX_SATA_PORTS     6
@@ -145,8 +150,14 @@ static void pc_q35_init(MachineState *machine)
      */
     if (machine->ram_size >= 0xb0000000) {
         lowmem = 0x80000000;
+#ifdef QEMU_NYX
+        GET_GLOBAL_STATE()->mem_mapping_type = Q35_MEM_MEM_TYPE;
+#endif
     } else {
         lowmem = 0xb0000000;
+#ifdef QEMU_NYX
+        GET_GLOBAL_STATE()->mem_mapping_type = Q35_MEM_MEM_LOW_TYPE;
+#endif
     }
 
     /* Handle the machine opt max-ram-below-4g.  It is basically doing
