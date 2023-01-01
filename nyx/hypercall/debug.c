@@ -6,6 +6,7 @@
 
 #include "nyx/fast_vm_reload.h"
 #include "nyx/hypercall/debug.h"
+#include "nyx/mem_split.h"
 #include "nyx/memory_access.h"
 #include "nyx/state/state.h"
 #include "nyx/synchronization.h"

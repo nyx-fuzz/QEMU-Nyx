@@ -143,6 +143,7 @@ int main(int argc, char **argv)
 #include "nyx/pt.h"
 #include "nyx/state/state.h"
 #include "nyx/synchronization.h"
+#include "nyx/mem_split.h"
 // clang-format off
 #endif
 
@@ -4588,6 +4589,11 @@ int main(int argc, char **argv, char **envp)
 
 #ifdef QEMU_NYX
     // clang-format on
+    if(is_mem_mapping_supported(GET_GLOBAL_STATE()->mem_mapping_type) == false){
+        nyx_error("Unsupported memory mapping type (only q35 and pc_piix are supported)\n");
+        exit(1);
+    }
+
     fast_reload_init(GET_GLOBAL_STATE()->fast_reload_snapshot);
 
     if (fast_vm_reload) {

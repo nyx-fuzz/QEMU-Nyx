@@ -61,6 +61,11 @@
 #include "migration/misc.h"
 #include "sysemu/numa.h"
 
+#ifdef QEMU_NYX
+#include "nyx/state/state.h"
+#include "nyx/mem_split.h"
+#endif
+
 #define MAX_IDE_BUS 2
 
 #ifdef CONFIG_IDE_ISA
@@ -147,9 +152,15 @@ static void pc_init1(MachineState *machine,
         if (machine->ram_size >= lowmem) {
             x86ms->above_4g_mem_size = machine->ram_size - lowmem;
             x86ms->below_4g_mem_size = lowmem;
+#ifdef QEMU_NYX
+            GET_GLOBAL_STATE()->mem_mapping_type = PC_PIIX_MEM_TYPE;
+#endif
         } else {
             x86ms->above_4g_mem_size = 0;
             x86ms->below_4g_mem_size = machine->ram_size;
+#ifdef QEMU_NYX
+            GET_GLOBAL_STATE()->mem_mapping_type = PC_PIIX_MEM_LOW_TYPE;
+#endif
         }
     }
 

@@ -11,6 +11,7 @@
 #include "nyx/snapshot/helper.h"
 #include "nyx/snapshot/memory/block_list.h"
 #include "nyx/snapshot/memory/shadow_memory.h"
+#include "nyx/mem_split.h"
 
 #define REALLOC_SIZE 0x8000
 
@@ -25,16 +26,16 @@ snapshot_page_blocklist_t *snapshot_page_blocklist_init(void)
     snapshot_page_blocklist_t *self = malloc(sizeof(snapshot_page_blocklist_t));
 
     uint64_t ram_size    = get_ram_size();
-    self->phys_area_size = ram_size <= MEM_SPLIT_START ?
+    self->phys_area_size = ram_size <= get_mem_split_start() ?
                                ram_size :
-                               ram_size + (MEM_SPLIT_END - MEM_SPLIT_START);
+                               ram_size + (get_mem_split_end() - get_mem_split_start());
 
     self->phys_bitmap = malloc(BITMAP_SIZE(self->phys_area_size));
     memset(self->phys_bitmap, 0x0, BITMAP_SIZE(self->phys_area_size));
 
-    if (ram_size > MEM_SPLIT_START) {
-        memset(self->phys_bitmap + BITMAP_SIZE(MEM_SPLIT_START), 0xff,
-               BITMAP_SIZE((MEM_SPLIT_END - MEM_SPLIT_START)));
+    if (ram_size > get_mem_split_start()) {
+        memset(self->phys_bitmap + BITMAP_SIZE(get_mem_split_start()), 0xff,
+               BITMAP_SIZE((get_mem_split_end() - get_mem_split_start())));
     }
 
     self->pages_num  = 0;
