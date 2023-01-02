@@ -139,6 +139,8 @@ typedef struct qemu_nyx_state_s {
     bool set_agent_config_done;
 
     MemSplitType mem_mapping_type;
+    uint64_t mem_mapping_low;
+    uint64_t mem_mapping_high;
 
     /* capabilites */
     uint8_t  cap_timeout_detection;

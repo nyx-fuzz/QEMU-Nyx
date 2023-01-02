@@ -150,14 +150,8 @@ static void pc_q35_init(MachineState *machine)
      */
     if (machine->ram_size >= 0xb0000000) {
         lowmem = 0x80000000;
-#ifdef QEMU_NYX
-        GET_GLOBAL_STATE()->mem_mapping_type = Q35_MEM_MEM_TYPE;
-#endif
     } else {
         lowmem = 0xb0000000;
-#ifdef QEMU_NYX
-        GET_GLOBAL_STATE()->mem_mapping_type = Q35_MEM_MEM_LOW_TYPE;
-#endif
     }
 
     /* Handle the machine opt max-ram-below-4g.  It is basically doing
@@ -181,9 +175,19 @@ static void pc_q35_init(MachineState *machine)
     if (machine->ram_size >= lowmem) {
         x86ms->above_4g_mem_size = machine->ram_size - lowmem;
         x86ms->below_4g_mem_size = lowmem;
+#ifdef QEMU_NYX
+        GET_GLOBAL_STATE()->mem_mapping_type = Q35_MEM_MEM_TYPE;
+        GET_GLOBAL_STATE()->mem_mapping_low = lowmem;
+        GET_GLOBAL_STATE()->mem_mapping_high = 0x100000000;
+#endif
     } else {
         x86ms->above_4g_mem_size = 0;
         x86ms->below_4g_mem_size = machine->ram_size;
+#ifdef QEMU_NYX
+        GET_GLOBAL_STATE()->mem_mapping_type = Q35_MEM_MEM_TYPE;
+        GET_GLOBAL_STATE()->mem_mapping_low = lowmem;
+        GET_GLOBAL_STATE()->mem_mapping_high = 0;
+#endif
     }
 
     if (xen_enabled()) {

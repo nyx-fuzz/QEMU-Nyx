@@ -6,9 +6,7 @@
 
 typedef enum MemSplitType {
     MEM_SPLIT_TYPE_INVALID,
-    PC_PIIX_MEM_LOW_TYPE,
     PC_PIIX_MEM_TYPE,
-    Q35_MEM_MEM_LOW_TYPE,
     Q35_MEM_MEM_TYPE,
 } MemSplitType;
 
