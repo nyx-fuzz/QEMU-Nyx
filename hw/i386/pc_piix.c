@@ -154,12 +154,16 @@ static void pc_init1(MachineState *machine,
             x86ms->below_4g_mem_size = lowmem;
 #ifdef QEMU_NYX
             GET_GLOBAL_STATE()->mem_mapping_type = PC_PIIX_MEM_TYPE;
+            GET_GLOBAL_STATE()->mem_mapping_low = lowmem;
+            GET_GLOBAL_STATE()->mem_mapping_high = 0x100000000;
 #endif
         } else {
             x86ms->above_4g_mem_size = 0;
             x86ms->below_4g_mem_size = machine->ram_size;
 #ifdef QEMU_NYX
-            GET_GLOBAL_STATE()->mem_mapping_type = PC_PIIX_MEM_LOW_TYPE;
+            GET_GLOBAL_STATE()->mem_mapping_type = PC_PIIX_MEM_TYPE;
+            GET_GLOBAL_STATE()->mem_mapping_low = lowmem;
+            GET_GLOBAL_STATE()->mem_mapping_high = 0;
 #endif
         }
     }

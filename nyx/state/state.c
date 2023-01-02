@@ -120,7 +120,8 @@ void state_init_global(void)
     global_state.mem_mapping_type = MEM_SPLIT_TYPE_INVALID;
 
     global_state.sharedir = sharedir_new();
-
+    global_state.mem_mapping_low = 0;
+    global_state.mem_mapping_high = 0;
 
     global_state.shared_bitmap_fd        = 0;
     global_state.shared_bitmap_size      = 0;
