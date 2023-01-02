@@ -20,7 +20,9 @@ uint64_t get_ram_size(void)
     RAMBlock *block;
     uint64_t  guest_ram_size = 0;
     QLIST_FOREACH_RCU (block, &ram_list.blocks, next) {
-        guest_ram_size += block->used_length;
+        if(!strcmp(block->idstr, "pc.ram")){
+            guest_ram_size += block->used_length;
+        }
 #ifdef DEBUG_NYX_SNAPSHOT_HELPER
         printf("Block: %s (%lx)\n", block->idstr, block->used_length);
 #endif
