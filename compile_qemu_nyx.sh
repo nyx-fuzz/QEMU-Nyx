@@ -30,6 +30,7 @@ error()
   echo "Available compile options: "
   echo " -  dynamic        dynamically link libxdc and capstone4"
   echo " -  static         statically link libxdc and capstone4"
+  echo " -  full_static    compile a full static QEMU build"
   echo " -  lto            enable static linking and LTO (up to 10% better performance)"
   echo " -  debug          enable debug and ASAN options"
   echo " -  debug_static   enable debug, ASAN and static linking"
@@ -40,7 +41,7 @@ error()
 compile_libraries()
 {
   case $1 in
-    "debug_static"|"static"|"lto")
+    "debug_static"|"static"|"full_static"|"lto")
       echo "[!] Compiling capstone4..."
       make -C $CAPSTONE_ROOT -j $(nproc)
 
@@ -55,7 +56,7 @@ configure_qemu()
   QEMU_CONFIGURE="./configure --target-list=x86_64-softmmu --disable-docs --disable-gtk --disable-werror --disable-capstone --disable-libssh --disable-tools"
 
   case $1 in
-    "debug_static"|"static"|"lto")
+    "debug_static"|"static"|"full_static"|"lto")
       export LIBS="-L$CAPSTONE_ROOT -L$LIBXDC_ROOT/ $LIBS"
       export QEMU_CFLAGS="-I$CAPSTONE_ROOT/include/ -I$LIBXDC_ROOT/ $QEMU_CFLAGS"
       ;;
@@ -75,6 +76,9 @@ configure_qemu()
       ;;
     "static")
       $QEMU_CONFIGURE --enable-nyx --enable-nyx-static
+      ;;
+    "full_static")
+      $QEMU_CONFIGURE --enable-nyx --enable-nyx-static --static --disable-xkbcommon --disable-usb-redir --disable-smartcard --disable-slirp --disable-opengl --audio-drv-list= --disable-libusb --disable-rdma --disable-libiscsi
       ;;
     "lto")
       $QEMU_CONFIGURE --enable-nyx --enable-nyx-static --enable-nyx-flto
@@ -97,7 +101,7 @@ if [ "$#" -ne 1 ] ; then
 fi
 
 case $1 in
-    "dynamic"|"debug"|"debug_static"|"static"|"lto")
+    "dynamic"|"debug"|"debug_static"|"static"|"full_static"|"lto")
       ;;
     *)
       error
