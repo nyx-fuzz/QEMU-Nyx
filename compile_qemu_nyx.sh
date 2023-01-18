@@ -78,7 +78,7 @@ configure_qemu()
       $QEMU_CONFIGURE --enable-nyx --enable-nyx-static
       ;;
     "full_static")
-      $QEMU_CONFIGURE --enable-nyx --enable-nyx-static --static --disable-xkbcommon --disable-usb-redir --disable-smartcard --disable-slirp --disable-opengl --audio-drv-list= --disable-libusb --disable-rdma --disable-libiscsi
+      $QEMU_CONFIGURE --enable-nyx --enable-nyx-static --static --enable-slirp=git --disable-xkbcommon --disable-usb-redir --disable-smartcard --disable-opengl --audio-drv-list= --disable-libusb --disable-rdma --disable-libiscsi
       ;;
     "lto")
       $QEMU_CONFIGURE --enable-nyx --enable-nyx-static --enable-nyx-flto
