@@ -25,19 +25,14 @@ extern int load_snapshot(const char *name, Error **errp);
 
 static void adjust_rip(CPUX86State *env, fast_reload_t *snapshot)
 {
-    switch (fast_reload_get_mode(snapshot)) {
-    case RELOAD_MEMORY_MODE_DEBUG:
-    case RELOAD_MEMORY_MODE_DEBUG_QUIET:
-        env->eip -= 1; /* out */
-        break;
-    case RELOAD_MEMORY_MODE_FDL:
-    case RELOAD_MEMORY_MODE_FDL_DEBUG:
+    /* PT mode relies on a custom kernel which uses 'vmcall' hypercalls instead of
+     * vmware-backdoor based hypercalls (via 'out' instructions). 
+     */
+    if (GET_GLOBAL_STATE()->nyx_pt == true){
         env->eip -= 3; /* vmcall */
-        break;
-    case RELOAD_MEMORY_MODE_DIRTY_RING:
-    case RELOAD_MEMORY_MODE_DIRTY_RING_DEBUG:
+    }
+    else{
         env->eip -= 1; /* out */
-        break;
     }
 }
 
