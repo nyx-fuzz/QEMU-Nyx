@@ -95,6 +95,7 @@ struct KVMState
 #ifdef QEMU_NYX
     // clang-format on
     bool nyx_no_pt_mode;
+    bool nyx_dirty_ring;
 // clang-format off
 #endif
 
@@ -419,7 +420,7 @@ int kvm_init_vcpu(CPUState *cpu)
 
 #ifdef QEMU_NYX
     // clang-format on
-    if (s->nyx_no_pt_mode) {
+    if (s->nyx_dirty_ring) {
         if (!getenv("NYX_DISABLE_DIRTY_RING")) {
             nyx_dirty_ring_pre_init(cpu->kvm_fd, s->vmfd);
         }
@@ -1931,8 +1932,7 @@ static int kvm_init(MachineState *ms)
     }
 #ifdef QEMU_NYX
     // clang-format on
-    if (ioctl(s->fd, KVM_CHECK_EXTENSION, KVM_CAP_NYX_PT) != 1 &&
-        ioctl(s->fd, KVM_CHECK_EXTENSION, KVM_CAP_NYX_FDL) != 1)
+    if (ioctl(s->fd, KVM_CHECK_EXTENSION, KVM_CAP_NYX_PT) != 1)
     {
         /* fallback -> use vanilla KVM module instead (no Intel-PT tracing or nested hypercalls at this point) */
         fprintf(stderr, "[QEMU-Nyx] Could not access KVM-PT kernel "
@@ -1940,14 +1940,6 @@ static int kvm_init(MachineState *ms)
         if (s->fd == -1) {
             fprintf(stderr, "[QEMU-Nyx] Error: NYX fallback failed: Could not "
                             "access vanilla KVM module!\n");
-            ret = -errno;
-            goto err;
-        }
-
-        int ret_val = ioctl(s->fd, KVM_CHECK_EXTENSION, KVM_CAP_DIRTY_LOG_RING);
-        if (ret_val == -1 || ret_val == 0) {
-            fprintf(stderr, "[QEMU-Nyx] Error: NYX requires support for "
-                            "KVM_CAP_DIRTY_LOG_RING in fallback mode!\n");
             ret = -errno;
             goto err;
         }
@@ -1985,15 +1977,32 @@ static int kvm_init(MachineState *ms)
         fprintf(stderr, "[QEMU-Nyx] NYX runs in fallback mode (no Intel-PT tracing "
                         "or nested hypercall support)!\n");
         s->nyx_no_pt_mode           = true;
-        GET_GLOBAL_STATE()->nyx_fdl = false;
-        GET_GLOBAL_STATE()->pt_trace_mode =
-            false; // Intel PT is not available in this mode
+        GET_GLOBAL_STATE()->nyx_pt = false;
+        GET_GLOBAL_STATE()->pt_trace_mode = false; // Intel PT is not available in this mode
+    } 
+    else {
+        s->nyx_no_pt_mode           = false;
+        GET_GLOBAL_STATE()->nyx_pt = true;
+        GET_GLOBAL_STATE()->pt_trace_mode = true;
+    }
+
+    if (ioctl(s->fd, KVM_CHECK_EXTENSION, KVM_CAP_NYX_FDL) == 1){
+        s->nyx_dirty_ring = false;
+        fast_reload_set_mode(get_fast_reload_snapshot(), RELOAD_MEMORY_MODE_FDL);
+    }
+    else {
+    
+        int ret_val = ioctl(s->fd, KVM_CHECK_EXTENSION, KVM_CAP_DIRTY_LOG_RING);
+        if (ret_val == -1 || ret_val == 0) {
+            fprintf(stderr, "[QEMU-Nyx] Error: NYX requires support for "
+                            "KVM_CAP_DIRTY_LOG_RING in fallback mode!\n");
+            ret = -errno;
+            goto err;
+        }
+
+        s->nyx_dirty_ring = true;
         fast_reload_set_mode(get_fast_reload_snapshot(),
                              RELOAD_MEMORY_MODE_DIRTY_RING);
-    } else {
-        s->nyx_no_pt_mode           = false;
-        GET_GLOBAL_STATE()->nyx_fdl = true;
-        fast_reload_set_mode(get_fast_reload_snapshot(), RELOAD_MEMORY_MODE_FDL);
     }
 // clang-format off
 #endif
@@ -2063,7 +2072,7 @@ static int kvm_init(MachineState *ms)
 
 #ifdef QEMU_NYX
     // clang-format on
-    if (s->nyx_no_pt_mode) {
+    if (s->nyx_dirty_ring) {
         if (getenv("NYX_DISABLE_DIRTY_RING")) {
             fprintf(stderr,
                     "WARNING: Nyx has disabled KVM's dirty-ring (required to enable "
@@ -2121,7 +2130,7 @@ static int kvm_init(MachineState *ms)
         ret = kvm_vm_enable_cap(s, KVM_CAP_MANUAL_DIRTY_LOG_PROTECT2, 0, 1);
 #else
         // clang-format on
-        if (s->nyx_no_pt_mode) {
+        if (s->nyx_dirty_ring) {
             ret = kvm_vm_enable_cap(s, KVM_CAP_MANUAL_DIRTY_LOG_PROTECT2, 0, 1);
         } else {
             ret = 0;

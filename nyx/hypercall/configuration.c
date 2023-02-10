@@ -70,7 +70,7 @@ void handle_hypercall_kafl_set_agent_config(struct kvm_run *run,
         GET_GLOBAL_STATE()->cap_compile_time_tracing = config.agent_tracing;
 
         if (!GET_GLOBAL_STATE()->cap_compile_time_tracing &&
-            !GET_GLOBAL_STATE()->nyx_fdl)
+            !GET_GLOBAL_STATE()->nyx_pt)
         {
             nyx_abort("No Intel PT support on this KVM build and no "
                       "compile-time instrumentation enabled in the target\n");

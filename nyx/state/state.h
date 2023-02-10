@@ -37,8 +37,8 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 #define INTEL_PT_MAX_RANGES 4
 
 typedef struct qemu_nyx_state_s {
-    /* set if FDL backend is used (required to perform some additional runtime tests) */
-    bool nyx_fdl;
+    /* set if PT mode is supported */
+    bool nyx_pt;
 
     char    *workdir_path;
     uint32_t worker_id;

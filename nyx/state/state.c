@@ -45,7 +45,7 @@ void state_init_global(void)
     /* safety first */
     assert(libxdc_get_release_version() == LIBXDC_RELEASE_VERSION_REQUIRED);
 
-    global_state.nyx_fdl = false;
+    global_state.nyx_pt = false;
 
     global_state.workdir_path = NULL;
     global_state.worker_id    = 0xffff;
