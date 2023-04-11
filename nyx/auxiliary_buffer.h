@@ -152,6 +152,12 @@ typedef struct auxilary_buffer_s {
 
 } __attribute__((packed)) auxilary_buffer_t;
 
+#define AUX_BUFFER_HASH ((  sizeof(auxilary_buffer_header_t) +\
+                            sizeof(auxilary_buffer_cap_t) +\
+                            sizeof(auxilary_buffer_config_t) +\
+                            sizeof(auxilary_buffer_result_t) +\
+                            sizeof(auxilary_buffer_misc_t)) % 0xFFFF)
+
 void init_auxiliary_buffer(auxilary_buffer_t *auxilary_buffer);
 void check_auxiliary_config_buffer(auxilary_buffer_t        *auxilary_buffer,
                                    auxilary_buffer_config_t *shadow_config);
