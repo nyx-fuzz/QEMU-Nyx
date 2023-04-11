@@ -64,11 +64,7 @@ void init_auxiliary_buffer(auxilary_buffer_t *auxilary_buffer)
 
     VOLATILE_WRITE_16(auxilary_buffer->header.version, QEMU_PT_VERSION);
 
-    uint16_t hash =
-        (sizeof(auxilary_buffer_header_t) + sizeof(auxilary_buffer_cap_t) +
-         sizeof(auxilary_buffer_config_t) + sizeof(auxilary_buffer_result_t) +
-         sizeof(auxilary_buffer_misc_t)) %
-        0xFFFF;
+    uint16_t hash = AUX_BUFFER_HASH;
 
     VOLATILE_WRITE_16(auxilary_buffer->header.hash, hash);
 
@@ -82,6 +78,13 @@ void check_auxiliary_config_buffer(auxilary_buffer_t        *auxilary_buffer,
     VOLATILE_READ_8(changed, auxilary_buffer->configuration.changed);
     if (changed) {
         uint8_t aux_byte;
+
+        /* sanitiy check to verify that the buffer is not corrupted */
+        uint16_t _hash = AUX_BUFFER_HASH;
+        uint64_t _magic = AUX_MAGIC;
+
+        assert(memcmp(&auxilary_buffer->header.magic, &_magic, sizeof(auxilary_buffer->header.magic)) == 0);
+        assert(memcmp(&auxilary_buffer->header.hash, &_hash, sizeof(auxilary_buffer->header.hash)) == 0);
 
         VOLATILE_READ_8(aux_byte, auxilary_buffer->configuration.redqueen_mode);
         if (aux_byte) {
