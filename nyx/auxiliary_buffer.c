@@ -43,6 +43,16 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 #define VOLATILE_READ_16(dst, src) dst = *((volatile uint16_t *)(&src))
 #define VOLATILE_READ_8(dst, src)  dst = *((volatile uint8_t *)(&src))
 
+uint32_t misc_size(void)
+{
+    return GET_GLOBAL_STATE()->auxilary_buffer_size - (HEADER_SIZE + CAP_SIZE + CONFIG_SIZE + STATE_SIZE);
+}
+
+uint32_t misc_data_size(void)
+{
+    return misc_size() - sizeof(uint16_t);
+}
+
 static void volatile_memset(void *dst, uint8_t ch, size_t count)
 {
     for (size_t i = 0; i < count; i++) {
@@ -57,10 +67,10 @@ static void volatile_memcpy(void *dst, void *src, size_t size)
     }
 }
 
-void init_auxiliary_buffer(auxilary_buffer_t *auxilary_buffer)
+void init_auxiliary_buffer(auxilary_buffer_t *auxilary_buffer, uint32_t aux_buffer_size)
 {
     nyx_trace();
-    volatile_memset((void *)auxilary_buffer, 0, sizeof(auxilary_buffer_t));
+    volatile_memset((void *)auxilary_buffer, 0, aux_buffer_size);
 
     VOLATILE_WRITE_16(auxilary_buffer->header.version, QEMU_PT_VERSION);
 
@@ -233,9 +243,10 @@ void set_hprintf_auxiliary_buffer(auxilary_buffer_t *auxilary_buffer,
                                   char              *msg,
                                   uint32_t           len)
 {
-    VOLATILE_WRITE_16(auxilary_buffer->misc.len, MIN(len, MISC_SIZE - 2));
+    uint32_t misc_data_size_value = misc_data_size();
+    VOLATILE_WRITE_16(auxilary_buffer->misc.len, MIN(len, misc_data_size_value));
     volatile_memcpy((void *)&auxilary_buffer->misc.data, (void *)msg,
-                    (size_t)MIN(len, MISC_SIZE - 2));
+                    (size_t)MIN(len, misc_data_size_value));
     VOLATILE_WRITE_8(auxilary_buffer->result.exec_result_code, rc_hprintf);
 }
 
@@ -243,9 +254,10 @@ void set_crash_reason_auxiliary_buffer(auxilary_buffer_t *auxilary_buffer,
                                        char              *msg,
                                        uint32_t           len)
 {
-    VOLATILE_WRITE_16(auxilary_buffer->misc.len, MIN(len, MISC_SIZE - 2));
+     uint32_t misc_data_size_value = misc_data_size();
+    VOLATILE_WRITE_16(auxilary_buffer->misc.len, MIN(len, misc_data_size_value));
     volatile_memcpy((void *)&auxilary_buffer->misc.data, (void *)msg,
-                    (size_t)MIN(len, MISC_SIZE - 2));
+                    (size_t)MIN(len, misc_data_size_value));
     VOLATILE_WRITE_8(auxilary_buffer->result.exec_result_code, rc_crash);
 }
 
@@ -253,9 +265,10 @@ void set_abort_reason_auxiliary_buffer(auxilary_buffer_t *auxilary_buffer,
                                        char              *msg,
                                        uint32_t           len)
 {
-    VOLATILE_WRITE_16(auxilary_buffer->misc.len, MIN(len, MISC_SIZE - 2));
+    uint32_t misc_data_size_value = misc_data_size();
+    VOLATILE_WRITE_16(auxilary_buffer->misc.len, MIN(len, misc_data_size_value));
     volatile_memcpy((void *)&auxilary_buffer->misc.data, (void *)msg,
-                    (size_t)MIN(len, MISC_SIZE - 2));
+                    (size_t)MIN(len, misc_data_size_value));
     VOLATILE_WRITE_8(auxilary_buffer->result.exec_result_code, rc_aborted);
 }
 
@@ -295,12 +308,12 @@ void set_success_auxiliary_result_buffer(auxilary_buffer_t *auxilary_buffer,
 void set_payload_buffer_write_reason_auxiliary_buffer(
     auxilary_buffer_t *auxilary_buffer, char *msg, uint32_t len)
 {
-    VOLATILE_WRITE_16(auxilary_buffer->misc.len, MIN(len, MISC_SIZE - 2));
+    uint32_t misc_data_size_value = misc_data_size();
+    VOLATILE_WRITE_16(auxilary_buffer->misc.len, MIN(len, misc_data_size_value));
     volatile_memcpy((void *)&auxilary_buffer->misc.data, (void *)msg,
-                    (size_t)MIN(len, MISC_SIZE - 2));
+                    (size_t)MIN(len, misc_data_size_value));
     VOLATILE_WRITE_8(auxilary_buffer->result.exec_result_code, rc_input_buffer_write);
 }
-
 
 void set_tmp_snapshot_created(auxilary_buffer_t *auxilary_buffer, uint8_t value)
 {

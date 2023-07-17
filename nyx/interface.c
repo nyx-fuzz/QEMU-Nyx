@@ -54,9 +54,9 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 #include "nyx/state/state.h"
 #include "nyx/synchronization.h"
 #include "nyx/trace_dump.h"
-#include "pt.h"
-
-#include "redqueen.h"
+#include "nyx/pt.h"
+#include "nyx/redqueen.h"
+#include "nyx/auxiliary_buffer.h"
 
 #define CONVERT_UINT64(x) (uint64_t)(strtoull(x, NULL, 16))
 
@@ -94,6 +94,7 @@ typedef struct nyx_interface_state {
 
     bool redqueen;
 
+    uint32_t aux_buffer_size;
 } nyx_interface_state;
 
 static void nyx_interface_event(void *opaque, int event)
@@ -399,6 +400,11 @@ static void nyx_realize(DeviceState *dev, Error **errp)
         s->bitmap_size = DEFAULT_NYX_BITMAP_SIZE;
     }
 
+    if (s->aux_buffer_size < 0x1000 || (s->aux_buffer_size & 0xFFF) != 0) {
+        fprintf(stderr, "Invalid aux buffer size (%d)...\n", s->aux_buffer_size);
+        exit(1);
+    }
+    set_aux_buffer_size(s->aux_buffer_size);
 
     if (s->worker_id == 0xFFFF) {
         nyx_abort("Invalid worker id...\n");
@@ -462,6 +468,10 @@ static Property nyx_interface_properties[] = {
                        DEFAULT_NYX_BITMAP_SIZE),
     DEFINE_PROP_BOOL("dump_pt_trace", nyx_interface_state, dump_pt_trace, false),
     DEFINE_PROP_BOOL("edge_cb_trace", nyx_interface_state, edge_cb_trace, false),
+    DEFINE_PROP_UINT32("aux_buffer_size",
+                       nyx_interface_state,
+                       aux_buffer_size,
+                       DEFAULT_AUX_BUFFER_SIZE),
 
 
     DEFINE_PROP_END_OF_LIST(),

@@ -24,7 +24,7 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdbool.h>
 #include <stdint.h>
 
-#define AUX_BUFFER_SIZE 4096
+#define DEFAULT_AUX_BUFFER_SIZE 4096
 
 #define AUX_MAGIC 0x54502d554d4551
 
@@ -158,7 +158,7 @@ typedef struct auxilary_buffer_s {
                             sizeof(auxilary_buffer_result_t) +\
                             sizeof(auxilary_buffer_misc_t)) % 0xFFFF)
 
-void init_auxiliary_buffer(auxilary_buffer_t *auxilary_buffer);
+void init_auxiliary_buffer(auxilary_buffer_t *auxilary_buffer, uint32_t aux_buffer_size);
 void check_auxiliary_config_buffer(auxilary_buffer_t        *auxilary_buffer,
                                    auxilary_buffer_config_t *shadow_config);
 
@@ -203,3 +203,6 @@ void set_result_bb_coverage(auxilary_buffer_t *auxilary_buffer, uint32_t value);
 
 void set_payload_buffer_write_reason_auxiliary_buffer(
     auxilary_buffer_t *auxilary_buffer, char *msg, uint32_t len);
+
+uint32_t misc_size(void);
+uint32_t misc_data_size(void);
