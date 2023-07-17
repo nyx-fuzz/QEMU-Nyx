@@ -142,6 +142,9 @@ typedef struct qemu_nyx_state_s {
     uint64_t mem_mapping_low;
     uint64_t mem_mapping_high;
 
+    uint32_t auxilary_buffer_size;
+    char* hprintf_tmp_buffer;
+
     /* capabilites */
     uint8_t  cap_timeout_detection;
     uint8_t  cap_only_reload_mode;
@@ -187,3 +190,4 @@ void set_payload_buffer(uint64_t payload_buffer);
 void set_payload_pages(uint64_t *payload_pages, uint32_t pages);
 
 void set_workdir_path(char *workdir);
+void set_aux_buffer_size(uint32_t aux_buffer_size);

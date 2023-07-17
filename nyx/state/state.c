@@ -98,6 +98,7 @@ void state_init_global(void)
     global_state.shutdown_requested = false;
     global_state.cow_cache_full     = false;
 
+    global_state.auxilary_buffer_size = DEFAULT_AUX_BUFFER_SIZE;
     global_state.auxilary_buffer = NULL;
     memset(&global_state.shadow_config, 0x0, sizeof(auxilary_buffer_config_t));
 
@@ -211,20 +212,20 @@ redqueen_t *get_redqueen_state(void)
     return global_state.redqueen_state;
 }
 
-static void *alloc_auxiliary_buffer(const char *file)
+static void *alloc_auxiliary_buffer(const char *file, uint32_t aux_buffer_size)
 {
     void       *ptr;
     struct stat st;
     int         fd = open(file, O_CREAT | O_RDWR, S_IRWXU | S_IRWXG | S_IRWXO);
 
-    assert(ftruncate(fd, AUX_BUFFER_SIZE) == 0);
+    assert(ftruncate(fd, aux_buffer_size) == 0);
     stat(file, &st);
 
     nyx_debug_p(INTERFACE_PREFIX, "new aux buffer file: (max size: %x) %lx\n",
-                AUX_BUFFER_SIZE, st.st_size);
+                aux_buffer_size, st.st_size);
 
-    assert(AUX_BUFFER_SIZE == st.st_size);
-    ptr = mmap(0, AUX_BUFFER_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    assert(aux_buffer_size == st.st_size);
+    ptr = mmap(0, aux_buffer_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     if (ptr == MAP_FAILED) {
         nyx_error("aux buffer allocation failed!\n");
         return (void *)-1;
@@ -235,8 +236,11 @@ static void *alloc_auxiliary_buffer(const char *file)
 void init_aux_buffer(const char *filename)
 {
     global_state.auxilary_buffer =
-        (auxilary_buffer_t *)alloc_auxiliary_buffer(filename);
-    init_auxiliary_buffer(global_state.auxilary_buffer);
+        (auxilary_buffer_t *)alloc_auxiliary_buffer(filename, global_state.auxilary_buffer_size);
+    init_auxiliary_buffer(global_state.auxilary_buffer, global_state.auxilary_buffer_size);
+
+    global_state.hprintf_tmp_buffer = (char *)malloc(misc_size());
+    memset(global_state.hprintf_tmp_buffer, 0, misc_size());
 }
 
 void set_payload_buffer(uint64_t payload_buffer)
@@ -260,4 +264,12 @@ void set_workdir_path(char *workdir)
 {
     assert(workdir && !global_state.workdir_path);
     assert(asprintf(&global_state.workdir_path, "%s", workdir) != -1);
+}
+
+void set_aux_buffer_size(uint32_t aux_buffer_size)
+{
+    assert(aux_buffer_size >= DEFAULT_AUX_BUFFER_SIZE && (aux_buffer_size & 0xfff) == 0 );
+    assert(global_state.auxilary_buffer == NULL);
+
+    global_state.auxilary_buffer_size = aux_buffer_size;
 }
