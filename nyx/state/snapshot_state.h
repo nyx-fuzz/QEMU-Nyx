@@ -44,3 +44,5 @@ typedef struct serialized_state_root_snapshot_s {
 
 void serialize_state(const char *filename_prefix, bool is_pre_snapshot);
 void deserialize_state(const char *filename_prefix);
+
+void serialize_root_snapshot_meta_data(const char *snapshot_dir);
