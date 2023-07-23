@@ -152,3 +152,86 @@ void deserialize_state(const char *filename_prefix)
 
     free(tmp);
 }
+
+static bool yaml_write_bool(FILE *fp, const char *key, bool value)
+{
+    return fprintf(fp, "    %s: %s\n", key, value ? "true" : "false") != -1;
+}
+
+static bool yaml_write_uint64(FILE *fp, const char *key, uint64_t value)
+{
+    return fprintf(fp, "    %s: 0x%" PRIx64 "\n", key, value) != -1;
+}
+
+static bool yaml_write_uint64_range(FILE *fp, const char *key, uint64_t value_a, uint64_t value_b)
+{
+    return fprintf(fp, "    %s: [0x%" PRIx64 ", 0x%" PRIx64 "]\n", key, value_a, value_b) != -1;
+}
+
+/* Helper function to serialize the meta data of a snapshot to yaml.
+ * This function is only called in case a root snapshot is created.
+ * The data written to the yaml file is not used later on, but can be used
+ * by the frontend to get specific information about the snapshot.
+ */
+void serialize_root_snapshot_meta_data(const char *snapshot_dir){
+    nyx_trace();
+
+    char *tmp;
+
+    assert(asprintf(&tmp, "%s/state.yaml", snapshot_dir) != -1);
+
+    FILE *fp = fopen(tmp, "wb");
+    if (fp == NULL) {
+        nyx_error("[%s] Could not open file %s.\n", __func__, tmp);
+        assert(false);
+    }
+
+    qemu_nyx_state_t *nyx_global_state = GET_GLOBAL_STATE();
+
+    assert(fprintf(fp, "---\n") != -1);
+
+    assert(fprintf(fp, "process_trace:\n") != 1);
+    for (uint8_t i = 0; i < 4; i++) {
+        char* key = NULL;
+        assert(asprintf(&key, "pt_ip_filter_configured_%d", i) != -1);
+        assert(yaml_write_bool(fp, key, nyx_global_state->pt_ip_filter_configured[i]));
+        free(key);
+    }
+
+    for (uint8_t i = 0; i < 4; i++) {
+        char* key = NULL;
+        assert(asprintf(&key, "pt_ip_filter_%d", i) != -1);
+        assert(yaml_write_uint64_range(fp, key, nyx_global_state->pt_ip_filter_a[i], nyx_global_state->pt_ip_filter_b[i]));
+        free(key);
+    }
+
+    assert(yaml_write_uint64(fp, "parent_cr3", nyx_global_state->parent_cr3));
+    assert(yaml_write_uint64(fp, "disassembler_word_width", nyx_global_state->disassembler_word_width));
+    //assert(yaml_write_uint64(fp, "fast_reload_pre_image", nyx_global_state->fast_reload_pre_image));
+    assert(yaml_write_uint64(fp, "mem_mode", nyx_global_state->mem_mode)); /* improve? */
+    assert(yaml_write_bool(fp, "pt_trace_mode", nyx_global_state->pt_trace_mode));
+    assert(fprintf(fp, "\n") != -1);
+
+
+    assert(fprintf(fp, "input_buffer:\n") != -1);
+    assert(yaml_write_uint64(fp, "input_buffer_vaddr", nyx_global_state->payload_buffer));
+    assert(yaml_write_bool(fp, "protect_input_buffer", nyx_global_state->protect_payload_buffer));
+    assert(yaml_write_uint64(fp, "input_buffer_size", nyx_global_state->input_buffer_size));
+    assert(fprintf(fp, "\n") != -1);
+
+
+    assert(fprintf(fp, "capabilites:\n") != -1);
+    assert(yaml_write_bool(fp, "cap_timeout_detection", nyx_global_state->cap_timeout_detection));
+    assert(yaml_write_bool(fp, "cap_only_reload_mode", nyx_global_state->cap_only_reload_mode));
+    assert(yaml_write_bool(fp, "cap_compile_time_tracing", nyx_global_state->cap_compile_time_tracing));
+    assert(yaml_write_bool(fp, "cap_ijon_tracing", nyx_global_state->cap_ijon_tracing));
+    assert(yaml_write_bool(fp, "cap_cr3", nyx_global_state->cap_cr3));
+    assert(yaml_write_uint64(fp, "cap_compile_time_tracing_buffer_vaddr", nyx_global_state->cap_compile_time_tracing_buffer_vaddr));
+    assert(yaml_write_uint64(fp, "cap_ijon_tracing_buffer_vaddr", nyx_global_state->cap_ijon_tracing_buffer_vaddr));
+    assert(yaml_write_uint64(fp, "cap_coverage_bitmap_size", nyx_global_state->cap_coverage_bitmap_size));
+    assert(fprintf(fp, "\n") != -1);
+
+    assert(fprintf(fp, "...\n") != -1);
+    fclose(fp);
+    free(tmp);
+}

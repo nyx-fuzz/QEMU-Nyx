@@ -131,6 +131,8 @@ static inline void create_root_snapshot(void)
             fast_reload_create_in_memory(get_fast_reload_snapshot());
             fast_reload_serialize_to_file(get_fast_reload_snapshot(),
                                           GET_GLOBAL_STATE()->fast_reload_path, false);
+
+            serialize_root_snapshot_meta_data(GET_GLOBAL_STATE()->fast_reload_path);
         }
     } else {
         nyx_debug("===> GET_GLOBAL_STATE()->fast_reload_enabled: FALSE\n");
