@@ -158,14 +158,43 @@ static bool yaml_write_bool(FILE *fp, const char *key, bool value)
     return fprintf(fp, "    %s: %s\n", key, value ? "true" : "false") != -1;
 }
 
-static bool yaml_write_uint64(FILE *fp, const char *key, uint64_t value)
+static bool yaml_write_uint64_x(FILE *fp, const char *key, uint64_t value)
 {
     return fprintf(fp, "    %s: 0x%" PRIx64 "\n", key, value) != -1;
 }
 
-static bool yaml_write_uint64_range(FILE *fp, const char *key, uint64_t value_a, uint64_t value_b)
+static bool yaml_write_uint64_d(FILE *fp, const char *key, uint64_t value)
+{
+    return fprintf(fp, "    %s: %" PRId64 "\n", key, value) != -1;
+}
+
+static bool yaml_write_uint64_x_range(FILE *fp, const char *key, uint64_t value_a, uint64_t value_b)
 {
     return fprintf(fp, "    %s: [0x%" PRIx64 ", 0x%" PRIx64 "]\n", key, value_a, value_b) != -1;
+}
+
+static void yaml_write_mem_mode(FILE *fp, const char *key, mem_mode_t value)
+{
+    switch (value) {
+        case mm_unkown:
+            assert(fprintf(fp, "    %s: \"mm_unkown\"\n", key) != 1);
+            break;
+        case mm_32_protected:   /* 32 Bit / No MMU */
+            assert(fprintf(fp, "    %s: \"mm_32_protected\"\n", key) != 1);
+            break;
+        case mm_32_paging:      /* 32 Bit / PAE Paging */
+            assert(fprintf(fp, "    %s: \"mm_32_paging\"\n", key) != 1);
+            break;
+        case mm_32_pae:         /* 32 Bit / PAE Paging */
+            assert(fprintf(fp, "    %s: \"mm_32_pae\"\n", key) != 1);
+            break;
+        case mm_64_l4_paging:   /* 64 Bit / L4 Paging */
+            assert(fprintf(fp, "    %s: \"mm_64_l4_paging\"\n", key) != 1);
+            break;
+        case mm_64_l5_paging:   /* 64 Bit / L5 Paging */
+            assert(fprintf(fp, "    %s: \"mm_64_l5_paging\"\n", key) != 1);
+            break;
+    }
 }
 
 /* Helper function to serialize the meta data of a snapshot to yaml.
@@ -190,7 +219,11 @@ void serialize_root_snapshot_meta_data(const char *snapshot_dir){
 
     assert(fprintf(fp, "---\n") != -1);
 
-    assert(fprintf(fp, "process_trace:\n") != 1);
+    assert(fprintf(fp, "qemu_nyx:\n") != 1);
+    assert(yaml_write_uint64_x(fp, "nyx_serialized_state_version", NYX_SERIALIZED_STATE_VERSION));
+    assert(fprintf(fp, "\n") != -1);
+
+    assert(fprintf(fp, "processor_trace:\n") != 1);
     for (uint8_t i = 0; i < 4; i++) {
         char* key = NULL;
         assert(asprintf(&key, "pt_ip_filter_configured_%d", i) != -1);
@@ -201,22 +234,23 @@ void serialize_root_snapshot_meta_data(const char *snapshot_dir){
     for (uint8_t i = 0; i < 4; i++) {
         char* key = NULL;
         assert(asprintf(&key, "pt_ip_filter_%d", i) != -1);
-        assert(yaml_write_uint64_range(fp, key, nyx_global_state->pt_ip_filter_a[i], nyx_global_state->pt_ip_filter_b[i]));
+        assert(yaml_write_uint64_x_range(fp, key, nyx_global_state->pt_ip_filter_a[i], nyx_global_state->pt_ip_filter_b[i]));
         free(key);
     }
 
-    assert(yaml_write_uint64(fp, "parent_cr3", nyx_global_state->parent_cr3));
-    assert(yaml_write_uint64(fp, "disassembler_word_width", nyx_global_state->disassembler_word_width));
-    //assert(yaml_write_uint64(fp, "fast_reload_pre_image", nyx_global_state->fast_reload_pre_image));
-    assert(yaml_write_uint64(fp, "mem_mode", nyx_global_state->mem_mode)); /* improve? */
+    assert(yaml_write_uint64_x(fp, "parent_cr3", nyx_global_state->parent_cr3));
+    /* TODO: remove disassembler_word_width (it is actually not used or set anymore) */
+    //assert(yaml_write_uint64_d(fp, "disassembler_word_width", nyx_global_state->disassembler_word_width));
+    //assert(yaml_write_uint64_x(fp, "fast_reload_pre_image", nyx_global_state->fast_reload_pre_image));
+    yaml_write_mem_mode(fp, "mem_mode", nyx_global_state->mem_mode);
     assert(yaml_write_bool(fp, "pt_trace_mode", nyx_global_state->pt_trace_mode));
     assert(fprintf(fp, "\n") != -1);
 
 
     assert(fprintf(fp, "input_buffer:\n") != -1);
-    assert(yaml_write_uint64(fp, "input_buffer_vaddr", nyx_global_state->payload_buffer));
+    assert(yaml_write_uint64_x(fp, "input_buffer_vaddr", nyx_global_state->payload_buffer));
     assert(yaml_write_bool(fp, "protect_input_buffer", nyx_global_state->protect_payload_buffer));
-    assert(yaml_write_uint64(fp, "input_buffer_size", nyx_global_state->input_buffer_size));
+    assert(yaml_write_uint64_x(fp, "input_buffer_size", nyx_global_state->input_buffer_size));
     assert(fprintf(fp, "\n") != -1);
 
 
@@ -226,9 +260,9 @@ void serialize_root_snapshot_meta_data(const char *snapshot_dir){
     assert(yaml_write_bool(fp, "cap_compile_time_tracing", nyx_global_state->cap_compile_time_tracing));
     assert(yaml_write_bool(fp, "cap_ijon_tracing", nyx_global_state->cap_ijon_tracing));
     assert(yaml_write_bool(fp, "cap_cr3", nyx_global_state->cap_cr3));
-    assert(yaml_write_uint64(fp, "cap_compile_time_tracing_buffer_vaddr", nyx_global_state->cap_compile_time_tracing_buffer_vaddr));
-    assert(yaml_write_uint64(fp, "cap_ijon_tracing_buffer_vaddr", nyx_global_state->cap_ijon_tracing_buffer_vaddr));
-    assert(yaml_write_uint64(fp, "cap_coverage_bitmap_size", nyx_global_state->cap_coverage_bitmap_size));
+    assert(yaml_write_uint64_x(fp, "cap_compile_time_tracing_buffer_vaddr", nyx_global_state->cap_compile_time_tracing_buffer_vaddr));
+    assert(yaml_write_uint64_x(fp, "cap_ijon_tracing_buffer_vaddr", nyx_global_state->cap_ijon_tracing_buffer_vaddr));
+    assert(yaml_write_uint64_x(fp, "cap_coverage_bitmap_size", nyx_global_state->cap_coverage_bitmap_size));
     assert(fprintf(fp, "\n") != -1);
 
     assert(fprintf(fp, "...\n") != -1);
