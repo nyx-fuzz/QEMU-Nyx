@@ -19,6 +19,7 @@
 #include "nyx/fast_vm_reload.h"
 #include "nyx/kvm_nested.h"
 #include "nyx/state/state.h"
+#include "nyx/state/snapshot_state.h"
 
 extern int save_snapshot(const char *name, Error **errp);
 extern int load_snapshot(const char *name, Error **errp);
@@ -138,6 +139,16 @@ static inline void create_root_snapshot(void)
         nyx_debug("===> GET_GLOBAL_STATE()->fast_reload_enabled: FALSE\n");
         /* so we haven't set a path for our snapshot files - just store everything in memory */
         fast_reload_create_in_memory(get_fast_reload_snapshot());
+
+        /* Even if we don't serialize the snapshot we still want to have the 
+         * option to export the meta data of the root snapshot as yaml file.
+         * This might be useful for the fuzzing frontend in charge; thus it 
+         * is also up to the frontend to set a path for the snapshot directory.
+         * If the path is not set, we just skip this step.
+         */ 
+        if (GET_GLOBAL_STATE()->fast_reload_path != NULL) {
+            serialize_root_snapshot_meta_data(GET_GLOBAL_STATE()->fast_reload_path);
+        }
     }
 }
 
