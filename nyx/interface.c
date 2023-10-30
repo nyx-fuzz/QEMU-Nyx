@@ -359,12 +359,10 @@ static void check_available_ipt_ranges(nyx_interface_state *s)
 
     int kvm_fd = qemu_open("/dev/kvm", O_RDWR);
     if (kvm_fd == -1) {
-        nyx_abort("Could not access KVM kernel module: %m\n");
+        nyx_abort("Could not access KVM kernel module (/dev/kvm)!\n");
     }
 
-    if (ioctl(kvm_fd, KVM_CHECK_EXTENSION, KVM_CAP_NYX_PT) == 1 &&
-        ioctl(kvm_fd, KVM_CHECK_EXTENSION, KVM_CAP_NYX_FDL) == 1)
-    {
+    if (ioctl(kvm_fd, KVM_CHECK_EXTENSION, KVM_CAP_NYX_PT) == 1) {
         for (uint8_t i = 0; i < INTEL_PT_MAX_RANGES; i++) {
             if (s->ip_filter[i][0] && s->ip_filter[i][1]) {
                 if (i >= 1) {
@@ -377,6 +375,9 @@ static void check_available_ipt_ranges(nyx_interface_state *s)
                 }
             }
         }
+    }
+    else{
+        nyx_abort("KVM-Nyx support is missing...\n");
     }
     close(kvm_fd);
 }
