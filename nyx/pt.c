@@ -233,6 +233,10 @@ void pt_init_decoder(CPUState *cpu)
                     GET_GLOBAL_STATE()->shared_bitmap_ptr,
                     GET_GLOBAL_STATE()->shared_bitmap_size);
 
+    if (GET_GLOBAL_STATE()->decoder == (void*)-1) {
+        nyx_abort("libxdc_init() has failed ...\n");
+    }
+
     libxdc_register_bb_callback(GET_GLOBAL_STATE()->decoder,
                                 (void (*)(void *, disassembler_mode_t, uint64_t,
                                           uint64_t))redqueen_callback,
