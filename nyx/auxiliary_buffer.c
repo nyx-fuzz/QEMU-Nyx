@@ -243,6 +243,10 @@ void set_hprintf_auxiliary_buffer(auxilary_buffer_t *auxilary_buffer,
                                   char              *msg,
                                   uint32_t           len)
 {
+    if (!auxilary_buffer) {
+        nyx_warn("Ignored hprintf hypercall since no auxilary_buffer is set\n");
+        return;
+    }
     uint32_t misc_data_size_value = misc_data_size();
     VOLATILE_WRITE_16(auxilary_buffer->misc.len, MIN(len, misc_data_size_value));
     volatile_memcpy((void *)&auxilary_buffer->misc.data, (void *)msg,
