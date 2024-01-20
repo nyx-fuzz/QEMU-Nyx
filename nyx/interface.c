@@ -376,9 +376,6 @@ static void check_available_ipt_ranges(nyx_interface_state *s)
             }
         }
     }
-    else{
-        nyx_abort("KVM-Nyx support is missing...\n");
-    }
     close(kvm_fd);
 }
 

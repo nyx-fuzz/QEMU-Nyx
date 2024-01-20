@@ -227,6 +227,15 @@ void pt_init_decoder(CPUState *cpu)
     assert(GET_GLOBAL_STATE()->decoder == NULL);
     assert(GET_GLOBAL_STATE()->shared_bitmap_ptr != NULL);
     assert(GET_GLOBAL_STATE()->shared_bitmap_size != 0);
+
+
+    if (GET_GLOBAL_STATE()->pt_ip_filter_configured[0] == false && 
+        GET_GLOBAL_STATE()->pt_ip_filter_configured[1] == false && 
+        GET_GLOBAL_STATE()->pt_ip_filter_configured[2] == false && 
+        GET_GLOBAL_STATE()->pt_ip_filter_configured[3] == false) {
+        nyx_abort("Intel PT mode cannot be enabled without any IP filters configured...\n");
+    }
+
     GET_GLOBAL_STATE()->decoder =
         libxdc_init(filters, (void *(*)(void *, uint64_t, bool *))page_cache_fetch2,
                     GET_GLOBAL_STATE()->page_cache,

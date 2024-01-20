@@ -110,12 +110,17 @@ bool handle_hypercall_kafl_next_payload(struct kvm_run *run,
                                        REQUEST_SAVE_SNAPSHOT_ROOT_FIX_RIP);
                 setup_snapshot_once = true;
 
-                for (int i = 0; i < INTEL_PT_MAX_RANGES; i++) {
-                    if (GET_GLOBAL_STATE()->pt_ip_filter_configured[i]) {
-                        pt_enable_ip_filtering(cpu, i, true, false);
+                /* At this point we need to check if PT mode is enabled
+                 * and configured. Otherwise, libxdc_init() will fail.
+                 */
+                if(GET_GLOBAL_STATE()->nyx_pt && GET_GLOBAL_STATE()->cap_compile_time_tracing == false) {
+                    for (int i = 0; i < INTEL_PT_MAX_RANGES; i++) {
+                        if (GET_GLOBAL_STATE()->pt_ip_filter_configured[i]) {
+                            pt_enable_ip_filtering(cpu, i, true, false);
+                        }
                     }
+                    pt_init_decoder(cpu);
                 }
-                pt_init_decoder(cpu);
                 request_fast_vm_reload(GET_GLOBAL_STATE()->reload_state,
                                        REQUEST_LOAD_SNAPSHOT_ROOT);
 
