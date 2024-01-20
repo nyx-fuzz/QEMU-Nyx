@@ -38,10 +38,10 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 #define VOLATILE_WRITE_16(dst, src) *((volatile uint16_t *)&dst) = (uint16_t)src
 #define VOLATILE_WRITE_8(dst, src)  *((volatile uint8_t *)&dst) = (uint8_t)src
 
-#define VOLATILE_READ_64(dst, src) dst = *((volatile uint64_t *)(&src))
-#define VOLATILE_READ_32(dst, src) dst = *((volatile uint32_t *)(&src))
-#define VOLATILE_READ_16(dst, src) dst = *((volatile uint16_t *)(&src))
-#define VOLATILE_READ_8(dst, src)  dst = *((volatile uint8_t *)(&src))
+#define VOLATILE_READ_64(dst, src) (memcpy(&dst, &src, sizeof(uint64_t)))
+#define VOLATILE_READ_32(dst, src) (memcpy(&dst, &src, sizeof(uint32_t)))
+#define VOLATILE_READ_16(dst, src) (memcpy(&dst, &src, sizeof(uint16_t)))
+#define VOLATILE_READ_8(dst, src)  (memcpy(&dst, &src, sizeof(uint8_t)))
 
 uint32_t misc_size(void)
 {
