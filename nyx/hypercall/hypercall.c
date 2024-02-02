@@ -828,6 +828,14 @@ static void handle_hypercall_kafl_persist_page_past_snapshot(struct kvm_run *run
     fast_reload_blacklist_page(get_fast_reload_snapshot(), phys_addr);
 }
 
+static void handle_hypercall_kafl_disable_timeout(struct kvm_run *run,
+                                                  CPUState       *cpu,
+                                                  uint64_t hypercall_arg)
+{
+    disarm_sigprof_timer(&GET_GLOBAL_STATE()->timeout_detector);
+    GET_GLOBAL_STATE()->timeout_detector.detection_enabled = false;
+}
+
 int handle_kafl_hypercall(struct kvm_run *run,
                           CPUState       *cpu,
                           uint64_t        hypercall,
@@ -996,6 +1004,10 @@ int handle_kafl_hypercall(struct kvm_run *run,
         break;
     case KVM_EXIT_KAFL_PERSIST_PAGE_PAST_SNAPSHOT:
         handle_hypercall_kafl_persist_page_past_snapshot(run, cpu, arg);
+        ret = 0;
+        break;
+    case KVM_EXIT_KAFL_DISABLE_TIMEOUT:
+        handle_hypercall_kafl_disable_timeout(run, cpu, arg);
         ret = 0;
         break;
     }
