@@ -51,6 +51,7 @@ compile_libraries()
       LDFLAGS="-L$CAPSTONE_ROOT -L$LIBXDC_ROOT" CFLAGS="-I$CAPSTONE_ROOT/include/" make -C $LIBXDC_ROOT -j $(nproc)
       if [ $? -ne 0 ]; then
           echo "[!] libxdc LTO build failed! Trying to compile in non-LTO mode..."
+          make -C $LIBXDC_ROOT clean
           NO_LTO=1 LDFLAGS="-L$CAPSTONE_ROOT -L$LIBXDC_ROOT" CFLAGS="-I$CAPSTONE_ROOT/include/" make -C $LIBXDC_ROOT -j $(nproc)
           if [ $? -ne 0 ]; then
               echo "[ ] libxdc non-LTO build failed again ..."
