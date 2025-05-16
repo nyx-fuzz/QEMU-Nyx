@@ -25,7 +25,7 @@
 #ifdef NYX_DEBUG
 /*
  * qemu_log() is the standard logging, forward to file with -D
- * qemu_log_mask() is activated with additional -t nyx option
+ * qemu_log_mask() is activated with additional -d nyx option
  */
 #define nyx_debug(format, ...) \
     qemu_log_mask(LOG_NYX, NYX_LOG_PREFIX format, ##__VA_ARGS__)
