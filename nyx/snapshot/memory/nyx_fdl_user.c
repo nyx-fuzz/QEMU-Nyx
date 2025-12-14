@@ -30,8 +30,10 @@ nyx_fdl_user_t *nyx_fdl_user_init(shadow_memory_t *shadow_memory_state)
     for (uint8_t i = 0; i < shadow_memory_state->ram_regions_num; i++) {
         self->entry[i].stack =
             malloc(DIRTY_STACK_SIZE(shadow_memory_state->ram_regions[i].size));
+        memset(self->entry[i].stack, 0, DIRTY_STACK_SIZE(shadow_memory_state->ram_regions[i].size));
         self->entry[i].bitmap =
             malloc(BITMAP_SIZE(shadow_memory_state->ram_regions[i].size));
+        memset(self->entry[i].bitmap, 0, BITMAP_SIZE(shadow_memory_state->ram_regions[i].size));
     }
     return self;
 }
