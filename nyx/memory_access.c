@@ -371,6 +371,14 @@ bool write_virtual_memory(uint64_t address, uint8_t *data, uint32_t size, CPUSta
         }
 
         phys_addr += (address & ~x86_64_PAGE_MASK);
+
+        // Only write on the current physical page since the next virtual page
+        // may not correspond to the next contiguous physical page.
+        uint64_t remaining_on_page = x86_64_PAGE_SIZE - (address & ~x86_64_PAGE_MASK);
+        if (l > remaining_on_page) {
+            l = remaining_on_page;
+        }
+
         res = address_space_rw(cpu_get_address_space(cpu, asidx), phys_addr,
                                MEMTXATTRS_UNSPECIFIED, data, l, true);
         if (res != MEMTX_OK) {
