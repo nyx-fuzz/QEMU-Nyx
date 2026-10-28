@@ -63,6 +63,8 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 #include "nyx/snapshot/memory/block_list.h"
 #include "nyx/snapshot/memory/shadow_memory.h"
 
+void nyx_hpet_rearm(void);
+
 FastReloadMemoryMode mode = RELOAD_MEMORY_MODE_DEBUG;
 
 /* basic operations */
@@ -417,6 +419,8 @@ void fast_reload_create_in_memory(fast_reload_t *self)
 
 void fast_reload_restore(fast_reload_t *self)
 {
+    cpu_disable_ticks();
+    
     assert(self != NULL);
     self->dirty_pages = 0;
 
@@ -436,6 +440,11 @@ void fast_reload_restore(fast_reload_t *self)
     kvm_arch_put_registers(qemu_get_cpu(0), KVM_PUT_FULL_STATE_FAST);
     qemu_get_cpu(0)->vcpu_dirty = false;
 
+    cpu_enable_ticks();
+    nyx_hpet_rearm();
+    
+    qemu_clock_notify(QEMU_CLOCK_VIRTUAL);
+    
     return;
 }
 

@@ -164,6 +164,7 @@ static inline void perform_task_no_block_mode(fast_vm_reload_sync_t *self,
     switch (request) {
     case REQUEST_SAVE_SNAPSHOT_PRE:
         vm_stop(RUN_STATE_SAVE_VM);
+        cpu_disable_ticks();
         fast_reload_create_in_memory(get_fast_reload_snapshot());
         fast_reload_serialize_to_file(get_fast_reload_snapshot(),
                                       GET_GLOBAL_STATE()->fast_reload_pre_path, true);
@@ -177,23 +178,30 @@ static inline void perform_task_no_block_mode(fast_vm_reload_sync_t *self,
     case REQUEST_SAVE_SNAPSHOT_ROOT:
         kvm_arch_get_registers(cpu);
         vm_stop(RUN_STATE_SAVE_VM);
+        
+        cpu_disable_ticks();
         create_root_snapshot();
-
         fast_reload_restore(get_fast_reload_snapshot());
+        cpu_enable_ticks();
         break;
     case REQUEST_SAVE_SNAPSHOT_TMP_FIX_RIP:
         adjust_rip(env, get_fast_reload_snapshot());
         kvm_arch_put_registers(cpu, KVM_PUT_FULL_STATE);
     case REQUEST_SAVE_SNAPSHOT_TMP:
+        cpu_disable_ticks();
         fast_reload_create_tmp_snapshot(get_fast_reload_snapshot());
         fast_reload_restore(get_fast_reload_snapshot());
+        cpu_enable_ticks();
         break;
     case REQUEST_LOAD_SNAPSHOT_PRE:
         abort();
         break;
     case REQUEST_LOAD_SNAPSHOT_ROOT:
     case REQUEST_LOAD_SNAPSHOT_TMP:
+    
+        cpu_disable_ticks();  
         fast_reload_restore(get_fast_reload_snapshot());
+        cpu_enable_ticks();
         break;
     case REQUEST_SAVE_SNAPSHOT_ROOT_NESTED_FIX_RIP:
         kvm_arch_get_registers(cpu);

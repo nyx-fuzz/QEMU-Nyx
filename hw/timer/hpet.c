@@ -817,3 +817,22 @@ static void hpet_register_types(void)
 }
 
 type_init(hpet_register_types)
+
+
+void nyx_hpet_rearm(void)
+{
+    Object *o = object_resolve_path_type("", TYPE_HPET, NULL);
+    if (!o) {
+        return;                         /* -no-hpet */
+    }
+    HPETState *s = HPET(o);
+
+    for (int i = 0; i < s->num_timers; i++) {
+        HPETTimer *t = &s->timer[i];
+        if (hpet_enabled(s) && timer_enabled(t)) {
+            hpet_set_timer(t);          /* recomputes expiry from restored cmp/counter */
+        } else {
+            timer_del(t->qemu_timer);
+        }
+    }
+}
