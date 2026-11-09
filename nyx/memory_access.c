@@ -41,6 +41,15 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 static uint64_t get_48_paging_phys_addr(uint64_t cr3,
                                         uint64_t addr,
                                         bool     read_from_snapshot);
+static uint64_t get_32_paging_phys_addr(uint64_t cr3,
+                                        uint64_t addr,
+                                        bool     read_from_snapshot);
+static uint64_t get_pae_paging_phys_addr(uint64_t cr3,
+                                         uint64_t addr,
+                                         bool     read_from_snapshot);
+
+/* CR4.PSE: whether PDE.PS selects a 4MB page in non-PAE 32-bit paging */
+static bool cr4_pse = false;
 
 #define x86_64_PAGE_SIZE 0x1000
 #define x86_64_PAGE_MASK ~(x86_64_PAGE_SIZE - 1)
@@ -76,6 +85,7 @@ mem_mode_t get_current_mem_mode(CPUState *cpu)
 static void set_mem_mode(CPUState *cpu)
 {
     GET_GLOBAL_STATE()->mem_mode = get_current_mem_mode(cpu);
+    cr4_pse = !!(X86_CPU(cpu)->env.cr[4] & CR4_PSE_MASK);
 }
 
 /*  Warning: This might break memory handling for hypervisor fuzzing => FIXME LATER */
@@ -89,9 +99,9 @@ uint64_t get_paging_phys_addr(CPUState *cpu, uint64_t cr3, uint64_t addr)
     case mm_32_protected:
         return addr & 0xFFFFFFFFULL;
     case mm_32_paging:
-        nyx_abort("mem_mode: mm_32_paging not implemented!\n");
+        return get_32_paging_phys_addr(cr3, addr, false);
     case mm_32_pae:
-        nyx_abort("mem_mode: mm_32_pae not implemented!\n");
+        return get_pae_paging_phys_addr(cr3, addr, false);
     case mm_64_l4_paging:
         return get_48_paging_phys_addr(cr3, addr, false);
     case mm_64_l5_paging:
@@ -113,9 +123,9 @@ static uint64_t get_paging_phys_addr_snapshot(CPUState *cpu, uint64_t cr3, uint6
     case mm_32_protected:
         return addr & 0xFFFFFFFFULL;
     case mm_32_paging:
-        nyx_abort("mem_mode: mm_32_paging not implemented!\n");
+        return get_32_paging_phys_addr(cr3, addr, true);
     case mm_32_pae:
-        nyx_abort("mem_mode: mm_32_pae not implemented!\n");
+        return get_pae_paging_phys_addr(cr3, addr, true);
     case mm_64_l4_paging:
         return get_48_paging_phys_addr(cr3, addr, true);
     case mm_64_l5_paging:
@@ -669,6 +679,24 @@ static uint64_t load_entry(uint64_t address, uint64_t index, bool read_from_snap
     return entry;
 }
 
+// Same as load_entry(), but for the 32-bit entries of non-PAE paging.
+static uint32_t load_entry_32(uint64_t address, uint64_t index, bool read_from_snapshot)
+{
+    uint32_t entry = 0;
+    if (unlikely(!read_memory(address + (index * sizeof(entry)), (uint64_t *)&entry,
+                              sizeof(entry), read_from_snapshot)))
+    {
+        return 0;
+    }
+
+    // Check that the entry is present.
+    if (unlikely(!bit(entry, 0))) {
+        return 0;
+    }
+
+    return entry;
+}
+
 static void print_page(
     uint64_t address, uint64_t entry, size_t size, bool s, bool w, bool x)
 {
@@ -863,6 +891,79 @@ static uint64_t get_48_paging_phys_addr(uint64_t cr3,
     return page_address + page_offset;
 }
 
+// Non-PAE 32-bit paging: page directory -> page table, 1024 x 4-byte entries.
+static uint64_t get_32_paging_phys_addr(uint64_t cr3,
+                                        uint64_t addr,
+                                        bool     read_from_snapshot)
+{
+    uint64_t pde_address = bits(cr3, 12, 31) << 12;
+    uint64_t pde_offset  = bits(addr, 22, 31);
+    uint32_t pde_entry   = load_entry_32(pde_address, pde_offset, read_from_snapshot);
+    if (unlikely(!pde_entry)) {
+        return INVALID_ADDRESS;
+    }
+
+    if (unlikely(cr4_pse && bit(pde_entry, 7))) {
+        // 4MByte page translation (PSE-36: PDE bits 13-20 are address bits 32-39).
+        uint64_t page_address = (bits(pde_entry, 22, 31) << 22) |
+                                (bits(pde_entry, 13, 20) << 32);
+        uint64_t page_offset  = bits(addr, 0, 21);
+        return page_address + page_offset;
+    }
+
+    uint64_t pte_address = bits(pde_entry, 12, 31) << 12;
+    uint64_t pte_offset  = bits(addr, 12, 21);
+    uint32_t pte_entry   = load_entry_32(pte_address, pte_offset, read_from_snapshot);
+    if (unlikely(!pte_entry)) {
+        return INVALID_ADDRESS;
+    }
+
+    // 4Kbyte page translation.
+    uint64_t page_address = bits(pte_entry, 12, 31) << 12;
+    uint64_t page_offset  = bits(addr, 0, 11);
+    return page_address + page_offset;
+}
+
+// PAE paging: 4-entry PDPT -> page directory -> page table, 8-byte entries.
+static uint64_t get_pae_paging_phys_addr(uint64_t cr3,
+                                         uint64_t addr,
+                                         bool     read_from_snapshot)
+{
+    // The PDPT is only 32-byte aligned: CR3 bits 5-31 hold its address.
+    uint64_t pdpte_address = bits(cr3, 5, 31) << 5;
+    uint64_t pdpte_offset  = bits(addr, 30, 31);
+    uint64_t pdpte_entry = load_entry(pdpte_address, pdpte_offset, read_from_snapshot);
+    if (unlikely(!pdpte_entry)) {
+        return INVALID_ADDRESS;
+    }
+
+    uint64_t pde_address = bits(pdpte_entry, 12, 51) << 12;
+    uint64_t pde_offset  = bits(addr, 21, 29);
+    uint64_t pde_entry   = load_entry(pde_address, pde_offset, read_from_snapshot);
+    if (unlikely(!pde_entry)) {
+        return INVALID_ADDRESS;
+    }
+
+    if (unlikely(bit(pde_entry, 7))) {
+        // 2MByte page translation (bit 12 is PAT here, not an address bit).
+        uint64_t page_address = bits(pde_entry, 21, 51) << 21;
+        uint64_t page_offset  = bits(addr, 0, 20);
+        return page_address + page_offset;
+    }
+
+    uint64_t pte_address = bits(pde_entry, 12, 51) << 12;
+    uint64_t pte_offset  = bits(addr, 12, 20);
+    uint64_t pte_entry   = load_entry(pte_address, pte_offset, read_from_snapshot);
+    if (unlikely(!pte_entry)) {
+        return INVALID_ADDRESS;
+    }
+
+    // 4Kbyte page translation.
+    uint64_t page_address = bits(pte_entry, 12, 51) << 12;
+    uint64_t page_offset  = bits(addr, 0, 11);
+    return page_address + page_offset;
+}
+
 // #define DEBUG_48BIT_WALK
 
 bool read_virtual_memory(uint64_t address, uint8_t *data, uint32_t size, CPUState *cpu)
@@ -870,6 +971,10 @@ bool read_virtual_memory(uint64_t address, uint8_t *data, uint32_t size, CPUStat
     uint8_t tmp_buf[x86_64_PAGE_SIZE];
     hwaddr  phys_addr;
     int     asidx;
+#ifdef DEBUG_48BIT_WALK
+    hwaddr     phys_addr_2;
+    MemTxAttrs attrs;
+#endif
 
     uint64_t amount_copied = 0;
 
