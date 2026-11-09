@@ -182,7 +182,10 @@ static void handle_hypercall_get_payload(struct kvm_run *run,
         nyx_debug_p(CORE_PREFIX, "Payload Address: 0x%lx\n", hypercall_arg);
         kvm_arch_get_registers(cpu);
         CPUX86State *env               = &(X86_CPU(cpu))->env;
-        GET_GLOBAL_STATE()->parent_cr3 = env->cr[3] & 0xFFFFFFFFFFFFF000ULL;
+        /* in PAE mode the PDPT is 32-byte aligned, so CR3 bits 5-11 are part of its address */
+        uint64_t cr3_mask = get_current_mem_mode(cpu) == mm_32_pae ? 0xFFFFFFFFFFFFFFE0ULL
+                                                                   : 0xFFFFFFFFFFFFF000ULL;
+        GET_GLOBAL_STATE()->parent_cr3 = env->cr[3] & cr3_mask;
         nyx_debug_p(CORE_PREFIX, "Payload CR3: 0x%lx\n",
                     (uint64_t)GET_GLOBAL_STATE()->parent_cr3);
         // print_48_pagetables(GET_GLOBAL_STATE()->parent_cr3);
@@ -403,11 +406,15 @@ static void handle_hypercall_kafl_cr3(struct kvm_run *run,
                                       uint64_t        hypercall_arg)
 {
     if (hypercall_enabled) {
-        nyx_debug_p(CORE_PREFIX, "Setting CR3 filter: %lx\n", hypercall_arg);
-        pt_set_cr3(cpu, hypercall_arg & 0xFFFFFFFFFFFFF000ULL, false);
+        kvm_arch_get_registers(cpu);
+        /* in PAE mode the PDPT is 32-byte aligned, so CR3 bits 5-11 are part of its address */
+        uint64_t cr3_mask = get_current_mem_mode(cpu) == mm_32_pae ? 0xFFFFFFFFFFFFFFE0ULL
+                                                                   : 0xFFFFFFFFFFFFF000ULL;
+        uint64_t cr3      = hypercall_arg & cr3_mask;
+        nyx_debug_p(CORE_PREFIX, "Setting CR3 filter: %lx\n", cr3);
+        pt_set_cr3(cpu, cr3, false);
         if (GET_GLOBAL_STATE()->dump_page) {
-            set_page_dump_bp(cpu, hypercall_arg & 0xFFFFFFFFFFFFF000ULL,
-                             GET_GLOBAL_STATE()->dump_page_addr);
+            set_page_dump_bp(cpu, cr3, GET_GLOBAL_STATE()->dump_page_addr);
         }
     }
 }
