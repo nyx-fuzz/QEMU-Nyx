@@ -397,8 +397,12 @@ void pt_pre_kvm_run(CPUState *cpu)
                 ret = pt_ioctl(cpu->pt_fd, cpu->pt_cmd, (unsigned long)0);
                 break;
             case KVM_VMX_PT_CONFIGURE_CR3:
+                /* pt_c3_filter keeps the exact CR3, which for a PAE guest may have
+                 * bits 11:5 set (32-byte aligned PDPT). Writing such a value to
+                 * IA32_RTIT_CR3_MATCH raises #GP on some CPUs, so the filter is never
+                 * armed. The page-aligned value is accepted and matches the PAE CR3. */
                 ret = pt_ioctl(cpu->pt_fd, cpu->pt_cmd,
-                               GET_GLOBAL_STATE()->pt_c3_filter);
+                               GET_GLOBAL_STATE()->pt_c3_filter & 0xFFFFFFFFFFFFF000ULL);
                 break;
             case KVM_VMX_PT_ENABLE_CR3:
                 ret = pt_ioctl(cpu->pt_fd, cpu->pt_cmd, (unsigned long)0);
